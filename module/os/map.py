@@ -4,6 +4,7 @@ from contextlib import suppress
 import inflection
 
 from module.base.timer import Timer
+from module.config.config import OS_MAP_STALE_KEY
 from module.config.utils import get_os_reset_remain
 from module.exception import CampaignEnd, GameStuckError, GameTooManyClickError, MapDetectionError, \
     MapWalkError, RequestHumanTakeover, ScriptEnd, ScriptError
@@ -44,6 +45,43 @@ def should_move_fleet_for_fixed_patrol(current_ap, question_unreachable):
 
 class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     _FIXED_PATROL_L2_AP = 7
+
+    def _os_map_was_interrupted(self):
+        """
+        Whether the previous Opsi task was interrupted by another task.
+
+        The flag is set by `AzurLaneConfig.task_switched()` when an Opsi task is
+        switched away from, and cleared here once the resume barrier runs.
+        """
+        return bool(self.config.cross_get(OS_MAP_STALE_KEY, default=False))
+
+    def _handle_os_resume(self):
+        """
+        Resume barrier: re-establish the Operation Siren map context after a
+        task interruption.
+
+        When an Opsi task is interrupted by another task, the game map may have
+        changed (enemies killed, zone refreshed, events spawned, fleet switched,
+        page changed). The pre-interruption map data must not be trusted, so do a
+        full rescan and invalidate stale caches. This barrier runs once per
+        interruption, not on every loop.
+        """
+        logger.info('[OS RESUME] Opsi was interrupted by task switch, restoring map state')
+        logger.info(f'[OS RESUME] Current zone: {self.zone}')
+        # Invalidate stale scan caches before re-observing the map.
+        self._solved_map_event = set()
+        self._solved_fleet_mechanism = False
+        logger.info('[OS RESUME] Running FULL MAP RESCAN after interruption')
+        try:
+            self.map_rescan(rescan_mode='full')
+        except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
+                RequestHumanTakeover):
+            raise
+        except Exception as e:
+            logger.warning(f'[OS RESUME] full rescan failed, continue: {e}')
+        # The barrier runs once per interruption.
+        self.config.cross_set(OS_MAP_STALE_KEY, False)
+        logger.info('[OS RESUME] Map state restored, continuing')
 
     def os_init(self):
         """
@@ -92,6 +130,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         self.hp_reset()
         self.handle_after_auto_search()
         self.handle_current_fleet_resolve(revert=False)
+
+        # Resume barrier: if the previous Opsi task was interrupted by another
+        # task, the game map may have changed. Re-scan fully before continuing.
+        if self._os_map_was_interrupted():
+            self._handle_os_resume()
 
         # Exit from special zones types, only SAFE and DANGEROUS are acceptable.
         if self.is_in_special_zone():

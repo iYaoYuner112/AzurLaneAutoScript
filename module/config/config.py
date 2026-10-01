@@ -21,6 +21,12 @@ class TaskEnd(Exception):
     pass
 
 
+# Cross-storage flag marking the Operation Siren map state as stale. It is set
+# when an Opsi task is interrupted by another task (see `task_switched()`), and
+# cleared by the resume barrier in `OSMap.os_init()` after a full map rescan.
+OS_MAP_STALE_KEY = 'Alas.Storage.Storage.OpsiMapStale'
+
+
 class Function:
     def __init__(self, data):
         self.enable = deep_get(data, keys="Scheduler.Enable", default=False)
@@ -617,6 +623,11 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             return False
         else:
             logger.info(f"Switch task `{prev}` to `{new}`")
+            # When an Operation Siren task is interrupted by another task, mark
+            # its map state stale so the next Opsi entry runs a full rescan
+            # instead of trusting the pre-interruption map data.
+            if str(getattr(prev, 'command', '')).startswith('Opsi'):
+                self.cross_set(OS_MAP_STALE_KEY, True)
             return True
 
     def check_task_switch(self, message=""):
