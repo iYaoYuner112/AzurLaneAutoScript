@@ -11,13 +11,18 @@ class OpsiMeowfficerFarming(OSMap):
         Recommend 3 or 5 for higher meowfficer searching point per action points ratio.
         """
         logger.hr(f'OS meowfficer farming, hazard_level={self.config.OpsiMeowfficerFarming_HazardLevel}', level=1)
-        if self.is_cl1_enabled and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
+        if self.is_cl1_mode_enabled and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
             logger.info('With CL1 leveling enabled, set action point preserve to 1000')
             self.config.OpsiMeowfficerFarming_ActionPointPreserve = 1000
-        preserve = min(self.get_action_point_limit(), self.config.OpsiMeowfficerFarming_ActionPointPreserve, 2000)
+        action_point_preserve = (
+            self.config.OpsiScheduling_ActionPointPreserve
+            if self.is_smart_scheduling_enabled
+            else self.config.OpsiMeowfficerFarming_ActionPointPreserve
+        )
+        preserve = min(self.get_action_point_limit(), action_point_preserve, 2000)
         if preserve == 0:
             self.config.override(OpsiFleet_Submarine=False)
-        if self.is_cl1_enabled:
+        if self.is_cl1_mode_enabled:
             # Without these enabled, CL1 gains 0 profits
             self.config.override(
                 OpsiGeneral_DoRandomMapEvent=True,
@@ -40,13 +45,6 @@ class OpsiMeowfficerFarming(OSMap):
 
         ap_checked = False
         while True:
-            if self.is_cl1_enabled and self.is_cl1_yellow_coins_target_reached(self.get_yellow_coins()):
-                logger.info(f'Reach the yellow coin target, target={self.cl1_yellow_coins_target}')
-                with self.config.multi_set():
-                    self.config.task_delay(server_update=True)
-                    self.config.task_call('OpsiHazard1Leveling')
-                self.config.task_stop()
-
             self.config.OS_ACTION_POINT_PRESERVE = preserve
             if self.config.is_task_enabled('OpsiAshBeacon') \
                     and not self._ash_fully_collected \
@@ -59,9 +57,11 @@ class OpsiMeowfficerFarming(OSMap):
                 # When not running CL1 and use oil
                 keep_current_ap = True
                 check_rest_ap = True
-                if self.is_cl1_enabled and self.get_yellow_coins() >= self.yellow_coins_preserve:
+                if self.is_smart_scheduling_enabled:
                     check_rest_ap = False
-                if not self.is_cl1_enabled and self.config.OpsiGeneral_BuyActionPointLimit > 0:
+                if self.is_cl1_mode_enabled and self.get_yellow_coins() >= self.yellow_coins_preserve:
+                    check_rest_ap = False
+                if not self.is_cl1_mode_enabled and self.config.OpsiGeneral_BuyActionPointLimit > 0:
                     keep_current_ap = False
                 self.action_point_set(cost=0, keep_current_ap=keep_current_ap, check_rest_ap=check_rest_ap)
                 ap_checked = True
@@ -83,6 +83,7 @@ class OpsiMeowfficerFarming(OSMap):
                     self.run_auto_search()
                     self.handle_after_auto_search()
                     self.config.check_task_switch()
+
             else:
                 zones = self.zone_select(hazard_level=self.config.OpsiMeowfficerFarming_HazardLevel) \
                     .delete(SelectedGrids([self.zone])) \
@@ -98,3 +99,7 @@ class OpsiMeowfficerFarming(OSMap):
                 self.run_auto_search()
                 self.handle_after_auto_search()
                 self.config.check_task_switch()
+
+            if self.is_smart_scheduling_enabled:
+                self.config.task_call('OpsiScheduling')
+                self.config.task_stop()

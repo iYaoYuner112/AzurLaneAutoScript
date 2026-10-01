@@ -1,36 +1,35 @@
-from types import SimpleNamespace
-
-from module.os_handler.os_status import OSStatus
+from module.os.tasks.scheduling import decide_resource_action
 
 
-class FakeStatus:
-    def __init__(self, preserve, target):
-        self.config = SimpleNamespace(
-            OpsiHazard1Leveling_YellowCoinsPreserve=preserve,
-            OpsiMeowfficerFarming_YellowCoinsTarget=target,
-        )
-
-    @property
-    def cl1_yellow_coins_preserve(self):
-        return OSStatus.cl1_yellow_coins_preserve.fget(self)
-
-    @property
-    def cl1_yellow_coins_target(self):
-        return OSStatus.cl1_yellow_coins_target.fget(self)
+def decide(yellow_coins, total_ap, active=False, coin_target_mode=True):
+    return decide_resource_action(
+        yellow_coins=yellow_coins,
+        total_ap=total_ap,
+        coin_preserve=20000,
+        coin_return_threshold=60000,
+        ap_preserve=200,
+        coin_target_mode=coin_target_mode,
+        coin_replenish_active=active,
+    )
 
 
-def test_cl1_coin_thresholds_use_configured_values():
-    status = FakeStatus(preserve=20000, target=80000)
-
-    assert OSStatus.cl1_yellow_coins_preserve.fget(status) == 20000
-    assert OSStatus.cl1_yellow_coins_target.fget(status) == 80000
-    assert not OSStatus.is_cl1_yellow_coins_target_reached(status, 79999)
-    assert OSStatus.is_cl1_yellow_coins_target_reached(status, 80000)
+def test_low_coins_start_meowfficer_replenishment():
+    assert decide(19999, 1000) == ('meow', True)
 
 
-def test_meowfficer_target_cannot_be_below_cl1_switch_threshold():
-    status = FakeStatus(preserve=20000, target=10000)
+def test_active_replenishment_continues_until_total_reaches_80000():
+    assert decide(79999, 1000, active=True) == ('meow', True)
+    assert decide(80000, 1000, active=True) == ('cl1', False)
 
-    assert OSStatus.cl1_yellow_coins_target.fget(status) == 20000
-    assert not OSStatus.is_cl1_yellow_coins_target_reached(status, 19999)
-    assert OSStatus.is_cl1_yellow_coins_target_reached(status, 20000)
+
+def test_coin_target_mode_does_not_replenish_before_threshold():
+    assert decide(20000, 1000) == ('cl1', False)
+
+
+def test_insufficient_ap_waits_without_clearing_replenishment_state():
+    assert decide(30000, 200, active=True) == ('wait', True)
+
+
+def test_action_point_mode_replenishes_only_below_coin_reserve():
+    assert decide(19999, 1000, coin_target_mode=False) == ('meow', False)
+    assert decide(20000, 1000, coin_target_mode=False) == ('cl1', False)

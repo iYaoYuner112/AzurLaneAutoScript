@@ -14,7 +14,10 @@ class OpsiHazard1Leveling(OSMap):
             self.config.cross_set(keys='OpsiMeowfficerFarming.Scheduler.Enable', value=True)
         while True:
             # Limited action point preserve of hazard 1 to 200
-            self.config.OS_ACTION_POINT_PRESERVE = 200
+            self.config.OS_ACTION_POINT_PRESERVE = (
+                self.config.OpsiScheduling_ActionPointPreserve
+                if self.is_smart_scheduling_enabled else 200
+            )
             if self.config.is_task_enabled('OpsiAshBeacon') \
                     and not self._ash_fully_collected \
                     and self.config.cross_get("OpsiAshBeacon.OpsiAshBeacon.EnsureFullyCollected", True):
@@ -22,8 +25,16 @@ class OpsiHazard1Leveling(OSMap):
                 self.config.OS_ACTION_POINT_PRESERVE = 0
             logger.attr('OS_ACTION_POINT_PRESERVE', self.config.OS_ACTION_POINT_PRESERVE)
 
-            if self.get_yellow_coins() < self.cl1_yellow_coins_preserve:
-                logger.info(f'Reach the limit of yellow coins, preserve={self.cl1_yellow_coins_preserve}')
+            coin_preserve = (
+                self.config.OpsiScheduling_OperationCoinsPreserve
+                if self.is_smart_scheduling_enabled
+                else self.yellow_coins_preserve
+            )
+            if self.get_yellow_coins() < coin_preserve:
+                logger.info(f'Reach the limit of yellow coins, preserve={coin_preserve}')
+                if self.is_smart_scheduling_enabled:
+                    self.config.task_call('OpsiScheduling')
+                    self.config.task_stop()
                 with self.config.multi_set():
                     self.config.task_delay(server_update=True)
                     if not self.is_in_opsi_explore():
@@ -43,7 +54,7 @@ class OpsiHazard1Leveling(OSMap):
             if self.config.OpsiGeneral_BuyActionPointLimit > 0:
                 keep_current_ap = False
             self.action_point_set(cost=70, keep_current_ap=keep_current_ap, check_rest_ap=True)
-            if self._action_point_total >= 3000:
+            if self._action_point_total >= 3000 and not self.is_smart_scheduling_enabled:
                 with self.config.multi_set():
                     self.config.task_delay(server_update=True)
                     if not self.is_in_opsi_explore():
@@ -67,3 +78,6 @@ class OpsiHazard1Leveling(OSMap):
 
             self.handle_after_auto_search()
             self.config.check_task_switch()
+            if self.is_smart_scheduling_enabled:
+                self.config.task_call('OpsiScheduling')
+                self.config.task_stop()

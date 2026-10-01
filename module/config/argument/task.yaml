@@ -317,6 +317,9 @@ Opsi:
       - Scheduler
       - OpsiMonthBoss
       - OpsiFleetFilter
+    OpsiScheduling:
+      - Scheduler
+      - OpsiScheduling
     OpsiMeowfficerFarming:
       - Scheduler
       - OpsiMeowfficerFarming

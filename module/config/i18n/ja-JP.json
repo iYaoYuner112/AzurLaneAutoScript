@@ -2631,10 +2631,6 @@
     "TargetZone": {
       "name": "OpsiMeowfficerFarming.TargetZone.name",
       "help": "OpsiMeowfficerFarming.TargetZone.help"
-    },
-    "YellowCoinsTarget": {
-      "name": "侵蝕1に戻る黄色通貨目標",
-      "help": "侵蝕1レベリングが有効な場合、指揮官育成で黄色通貨がこの合計値に達すると侵蝕1に戻ります。既定値: 80000。この値が侵蝕1切り替えしきい値を下回る場合、切り替えしきい値を使用します。"
     }
   },
   "OpsiHazard1Leveling": {
@@ -2648,11 +2644,16 @@
       "0": "0",
       "44": "44",
       "22": "22"
-    },
-    "YellowCoinsPreserve": {
-      "name": "指揮官育成へ切り替える黄色通貨しきい値",
-      "help": "侵蝕1レベリング中、黄色通貨がこの値を下回ると一時停止して指揮官育成に切り替えます。既定値: 20000。"
     }
+  },
+  "OpsiScheduling": {
+    "_info": { "name": "黄色通貨と行動力の調整", "help": "黄色通貨と総行動力に応じて侵蝕1と指揮官育成を切り替えます。" },
+    "UseSmartSchedulingOperationCoinsPreserve": { "name": "黄色通貨目標まで補充", "help": "有効時は保留値と回復量の合計に達するまで補充します。" },
+    "OperationCoinsPreserve": { "name": "侵蝕1の黄色通貨保留値", "help": "この値を下回ると黄色通貨を補充します。既定値: 20000。" },
+    "ActionPointPreserve": { "name": "調整時の行動力下限", "help": "総行動力がこの値以下になると次回更新まで待機します。既定値: 200。" },
+    "OperationCoinsReturnThreshold": { "name": "黄色通貨の回復量", "help": "保留値に加えて補充する量です。既定値: 60000、合計目標は80000です。" },
+    "EnableMeowfficerFarming": { "name": "指揮官育成を許可", "help": "黄色通貨不足時に指揮官育成を実行します。" },
+    "EnableHazard1Leveling": { "name": "侵蝕1レベリングを許可", "help": "黄色通貨が目標に達した後、侵蝕1を実行します。" }
   },
   "IslandProduction": {
     "_info": {

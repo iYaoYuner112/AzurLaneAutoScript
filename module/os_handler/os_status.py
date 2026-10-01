@@ -37,6 +37,14 @@ class OSStatus(UI):
         return self.config.is_task_enabled('OpsiHazard1Leveling')
 
     @property
+    def is_smart_scheduling_enabled(self) -> bool:
+        return self.config.is_task_enabled('OpsiScheduling')
+
+    @property
+    def is_cl1_mode_enabled(self) -> bool:
+        return self.is_cl1_enabled or self.is_smart_scheduling_enabled
+
+    @property
     def nearest_task_cooling_down(self) -> t.Optional[Function]:
         """
         If having any tasks cooling down,
@@ -67,24 +75,12 @@ class OSStatus(UI):
 
     @cached_property
     def yellow_coins_preserve(self):
+        if self.is_smart_scheduling_enabled:
+            return self.config.OpsiScheduling_OperationCoinsPreserve
         if self.is_cl1_enabled and not self.bought_all_yellow_coin_items_in_port_shop:
             return 100000
         else:
             return 35000
-
-    @property
-    def cl1_yellow_coins_preserve(self):
-        return self.config.OpsiHazard1Leveling_YellowCoinsPreserve
-
-    @property
-    def cl1_yellow_coins_target(self):
-        return max(
-            self.config.OpsiMeowfficerFarming_YellowCoinsTarget,
-            self.cl1_yellow_coins_preserve,
-        )
-
-    def is_cl1_yellow_coins_target_reached(self, yellow_coins):
-        return yellow_coins >= self.cl1_yellow_coins_target
 
     def get_yellow_coins(self) -> int:
         yellow_coins = 0

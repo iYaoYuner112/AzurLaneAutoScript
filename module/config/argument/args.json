@@ -9196,6 +9196,81 @@
       }
     }
   },
+  "OpsiScheduling": {
+    "Scheduler": {
+      "Enable": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "NextRun": {
+        "type": "datetime",
+        "value": "2020-01-01 00:00:00",
+        "validate": "datetime"
+      },
+      "Command": {
+        "type": "input",
+        "value": "OpsiScheduling",
+        "display": "hide"
+      },
+      "SuccessInterval": {
+        "type": "input",
+        "value": 30,
+        "display": "hide"
+      },
+      "FailureInterval": {
+        "type": "input",
+        "value": 30,
+        "display": "hide"
+      },
+      "ServerUpdate": {
+        "type": "input",
+        "value": "00:00",
+        "display": "hide"
+      }
+    },
+    "OpsiScheduling": {
+      "UseSmartSchedulingOperationCoinsPreserve": {
+        "type": "checkbox",
+        "value": true,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "OperationCoinsPreserve": {
+        "type": "input",
+        "value": 20000
+      },
+      "ActionPointPreserve": {
+        "type": "input",
+        "value": 200
+      },
+      "OperationCoinsReturnThreshold": {
+        "type": "input",
+        "value": 60000
+      },
+      "EnableMeowfficerFarming": {
+        "type": "checkbox",
+        "value": true
+      },
+      "EnableHazard1Leveling": {
+        "type": "checkbox",
+        "value": true
+      }
+    },
+    "Storage": {
+      "Storage": {
+        "type": "storage",
+        "value": {},
+        "valuetype": "ignore",
+        "display": "disabled"
+      }
+    }
+  },
   "OpsiMeowfficerFarming": {
     "Scheduler": {
       "Enable": {
@@ -9236,10 +9311,6 @@
       "ActionPointPreserve": {
         "type": "input",
         "value": 1000
-      },
-      "YellowCoinsTarget": {
-        "type": "input",
-        "value": 80000
       },
       "HazardLevel": {
         "type": "select",
@@ -9319,10 +9390,6 @@
       }
     },
     "OpsiHazard1Leveling": {
-      "YellowCoinsPreserve": {
-        "type": "input",
-        "value": 20000
-      },
       "TargetZone": {
         "type": "select",
         "value": 0,

@@ -438,14 +438,20 @@ class GeneratedConfig:
     OpsiMonthBoss_CheckAdaptability = True
     OpsiMonthBoss_ForceRun = False
 
+    # Group `OpsiScheduling`
+    OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
+    OpsiScheduling_OperationCoinsPreserve = 20000
+    OpsiScheduling_ActionPointPreserve = 200
+    OpsiScheduling_OperationCoinsReturnThreshold = 60000
+    OpsiScheduling_EnableMeowfficerFarming = True
+    OpsiScheduling_EnableHazard1Leveling = True
+
     # Group `OpsiMeowfficerFarming`
     OpsiMeowfficerFarming_ActionPointPreserve = 1000
-    OpsiMeowfficerFarming_YellowCoinsTarget = 80000
     OpsiMeowfficerFarming_HazardLevel = 5  # 3, 4, 5, 6, 10
     OpsiMeowfficerFarming_TargetZone = 0
 
     # Group `OpsiHazard1Leveling`
-    OpsiHazard1Leveling_YellowCoinsPreserve = 20000
     OpsiHazard1Leveling_TargetZone = 0  # 0, 44, 22
 
     # Group `IslandProduction`

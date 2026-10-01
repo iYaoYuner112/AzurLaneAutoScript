@@ -41,16 +41,24 @@ class OSCampaignRun(OSMapOperation):
         except ActionPointLimit:
             self.config.opsi_task_delay(ap_limit=True)
 
+    def opsi_scheduling(self):
+        campaign = self.load_campaign()
+        campaign.os_scheduling()
+
     def opsi_meowfficer_farming(self):
         try:
             campaign = self.load_campaign()
             campaign.os_meowfficer_farming()
         except ActionPointLimit:
+            if self.config.is_task_enabled('OpsiScheduling'):
+                self.config.task_delay(server_update=True)
+                self.config.task_delay(server_update=True, task='OpsiScheduling')
+                self.config.task_stop()
             if get_os_reset_remain() > 0:
                 self.config.task_delay(server_update=True)
                 self.config.task_call('Reward')
                 if self.config.is_task_enabled('OpsiHazard1Leveling') \
-                        and self.is_cl1_yellow_coins_target_reached(self.get_yellow_coins()):
+                        and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE:
                     self.config.task_call('OpsiHazard1Leveling')
             else:
                 logger.info('Just less than 1 day to OpSi reset, delay 2.5 hours')
@@ -61,6 +69,10 @@ class OSCampaignRun(OSMapOperation):
             campaign = self.load_campaign()
             campaign.os_hazard1_leveling()
         except ActionPointLimit:
+            if self.config.is_task_enabled('OpsiScheduling'):
+                self.config.task_delay(server_update=True)
+                self.config.task_delay(server_update=True, task='OpsiScheduling')
+                self.config.task_stop()
             self.config.task_delay(server_update=True)
 
     def opsi_obscure(self):
@@ -68,9 +80,13 @@ class OSCampaignRun(OSMapOperation):
             campaign = self.load_campaign()
             campaign.os_obscure()
         except ActionPointLimit:
+            if self.config.is_task_enabled('OpsiScheduling'):
+                self.config.task_delay(server_update=True)
+                self.config.task_delay(server_update=True, task='OpsiScheduling')
+                self.config.task_stop()
             self.config.opsi_task_delay(ap_limit=True)
             if self.config.is_task_enabled('OpsiHazard1Leveling') \
-                    and self.get_yellow_coins() >= self.cl1_yellow_coins_preserve:
+                    and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE:
                 self.config.task_call('OpsiHazard1Leveling')           
 
     def opsi_month_boss(self):
@@ -91,9 +107,13 @@ class OSCampaignRun(OSMapOperation):
             campaign = self.load_campaign()
             campaign.os_abyssal()
         except ActionPointLimit:
+            if self.config.is_task_enabled('OpsiScheduling'):
+                self.config.task_delay(server_update=True)
+                self.config.task_delay(server_update=True, task='OpsiScheduling')
+                self.config.task_stop()
             self.config.opsi_task_delay(ap_limit=True)
             if self.config.is_task_enabled('OpsiHazard1Leveling') \
-                    and self.get_yellow_coins() >= self.cl1_yellow_coins_preserve:
+                    and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE:
                 self.config.task_call('OpsiHazard1Leveling')
 
     def opsi_archive(self):
@@ -108,9 +128,13 @@ class OSCampaignRun(OSMapOperation):
             campaign = self.load_campaign()
             campaign.os_stronghold()
         except ActionPointLimit:
+            if self.config.is_task_enabled('OpsiScheduling'):
+                self.config.task_delay(server_update=True)
+                self.config.task_delay(server_update=True, task='OpsiScheduling')
+                self.config.task_stop()
             self.config.opsi_task_delay(ap_limit=True)
             if self.config.is_task_enabled('OpsiHazard1Leveling') \
-                    and self.get_yellow_coins() >= self.cl1_yellow_coins_preserve:
+                    and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE:
                 self.config.task_call('OpsiHazard1Leveling')
 
     def opsi_cross_month(self):

@@ -18,6 +18,7 @@ class ManualConfig:
     > ShopFrequent > EventShop > ShopOnce > Shipyard > Freebies
     > PrivateQuarters
     > OpsiExplore
+    > OpsiScheduling
     > Minigame > Awaken
     > OpsiAshBeacon
     > OpsiDaily > OpsiShop > OpsiVoucher
@@ -351,6 +352,7 @@ class ManualConfig:
     """
     OS_ACTION_POINT_BOX_USE = True
     OS_ACTION_POINT_PRESERVE = 0
+    OS_CL1_YELLOW_COINS_PRESERVE = 100000
     OS_NORMAL_YELLOW_COINS_PRESERVE = 35000
     OS_NORMAL_PURPLE_COINS_PRESERVE = 100
 

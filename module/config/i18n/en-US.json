@@ -2631,16 +2631,12 @@
     "TargetZone": {
       "name": "Target Zone ID",
       "help": "Supports either Zone ID or Name in CN/EN/JP/TW, i.e. \"51\", \"NA Ocean SE Sector E\"\nIf specified, Alas will loop on this same zone after each clear\nUse default value 0 or clear the field to remove the specification\nZone information can be acquired from <./module/os/map_data.py>"
-    },
-    "YellowCoinsTarget": {
-      "name": "Yellow Coin Target Before Returning to CL1",
-      "help": "When CL1 leveling is enabled, return to CL1 after meowfficer farming reaches this total yellow coin amount. Default: 80000. If set below the CL1 switch threshold, the switch threshold is used."
     }
   },
   "OpsiHazard1Leveling": {
     "_info": {
       "name": "CL1 leveling",
-      "help": "Consume operation coins to gain a lot of experience and a little action points.\nRecommended to carry 1-2 pre-loaded CV to obtain the highest average hourly benefit.\n\nTo avoid being unable to buying goods from port shops, Alas will retain 100,000 operation coins\nSince buying action points at the mystery shop requires a large number of operation coins, this function will be supplemented by running meowfficer farming with overflow action points."
+      "help": "Consume operation coins to gain a lot of experience and a little action points.\nRecommended to carry 1-2 pre-loaded CV to obtain the highest average hourly benefit.\n\nWhen run independently, Alas retains 100,000 operation coins for port shops. When OpSi resource scheduling is enabled, its coin reserve and return target are controlled by that scheduler.\nSince buying action points at the mystery shop requires a large number of operation coins, CL1 leveling still uses overflow action points for meowfficer farming."
     },
     "TargetZone": {
       "name": "Target Zone ID",
@@ -2648,10 +2644,36 @@
       "0": "No Specification",
       "44": "44 | West Continental Shelf D",
       "22": "22 | NA Ocean SW Sector B"
+    }
+  },
+  "OpsiScheduling": {
+    "_info": {
+      "name": "Yellow Coin and Action Point Scheduling",
+      "help": "Coordinate CL1 leveling and meowfficer farming from current yellow coins and total action points. Coin target mode replenishes below the reserve and returns to CL1 at reserve plus the return threshold."
     },
-    "YellowCoinsPreserve": {
-      "name": "Yellow Coin Threshold for Switching to Meowfficer Farming",
-      "help": "Pause CL1 leveling and switch to meowfficer farming when yellow coins fall below this amount. Default: 20000."
+    "UseSmartSchedulingOperationCoinsPreserve": {
+      "name": "Replenish to Coin Target",
+      "help": "When enabled, keep farming until reaching the reserve plus return threshold. When disabled, replenish only while below the reserve."
+    },
+    "OperationCoinsPreserve": {
+      "name": "CL1 Yellow Coin Reserve",
+      "help": "Pause CL1 and replenish coins below this amount. Default: 20000."
+    },
+    "ActionPointPreserve": {
+      "name": "Scheduling Action Point Floor",
+      "help": "Pause resource tasks when total action points reach this amount and wait for the next server update. Default: 200."
+    },
+    "OperationCoinsReturnThreshold": {
+      "name": "Yellow Coin Return Increment",
+      "help": "Additional coins to earn above the reserve before returning to CL1 in coin target mode. Default: 60000, for a total target of 80000."
+    },
+    "EnableMeowfficerFarming": {
+      "name": "Allow Meowfficer Farming",
+      "help": "Allow meowfficer farming to replenish yellow coins."
+    },
+    "EnableHazard1Leveling": {
+      "name": "Allow CL1 Leveling",
+      "help": "Allow CL1 leveling after yellow coins reach the return target."
     }
   },
   "IslandProduction": {

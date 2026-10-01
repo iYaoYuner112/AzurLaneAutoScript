@@ -409,7 +409,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.info('Just less than 1 day to OpSi reset, '
                             'set ActionPointPreserve to 0 temporarily')
                 return 0
-        elif self.is_cl1_enabled and remain <= 2:
+        elif self.is_cl1_mode_enabled and remain <= 2:
             logger.info('Just less than 3 days to OpSi reset, '
                         'set ActionPointPreserve to 1000 temporarily for hazard 1 leveling')
             return 1000
@@ -433,8 +433,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         """
         Keeping enough startup AP to run CL1.
         """
+        if self.is_smart_scheduling_enabled:
+            return
         if self.is_cl1_enabled and get_os_reset_remain() > 2 \
-                and self.get_yellow_coins() >= self.cl1_yellow_coins_preserve:
+                and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE:
             logger.info('Keep 1000 AP when CL1 available')
             if not self.action_point_check(1000):
                 self.config.opsi_task_delay(cl1_preserve=True)
@@ -932,7 +934,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if self.zone.is_port:
             logger.info('Current zone is a port, do not need rescan')
             return False
-        if self.is_cl1_enabled and not self.config.is_task_enabled('OpsiMeowfficerFarming'):
+        if self.is_cl1_mode_enabled and not self.config.is_task_enabled('OpsiMeowfficerFarming'):
             return False
 
         for _ in range(5):
