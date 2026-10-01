@@ -77,6 +77,8 @@ class OpsiHazard1Leveling(OSMap):
                 self.globe_goto(self.name_to_zone(zone), types='SAFE', refresh=True)
             self.fleet_set(self.config.OpsiFleet_Fleet)
             self.run_strategic_search()
+            if self.is_smart_scheduling_enabled and self.config.OpsiScheduling_ExecuteFixedPatrolScan:
+                self.execute_fixed_patrol_scan()
 
             self.handle_after_auto_search()
             self.config.check_task_switch()

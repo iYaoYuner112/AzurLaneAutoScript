@@ -9264,6 +9264,10 @@
       "EnableHazard1Leveling": {
         "type": "checkbox",
         "value": true
+      },
+      "ExecuteFixedPatrolScan": {
+        "type": "checkbox",
+        "value": false
       }
     },
     "Storage": {

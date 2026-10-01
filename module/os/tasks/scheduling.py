@@ -57,6 +57,11 @@ class OpsiScheduling(OSMap):
             self.action_point_safe_get()
             total_ap = int(self._action_point_total)
             self.action_point_quit()
+            meow_ap_preserve = min(
+                self.get_action_point_limit(),
+                self.config.OpsiScheduling_MeowfficerActionPointPreserve,
+                2000,
+            )
 
             state = self.config.cross_get('OpsiScheduling.Storage.Storage', default={})
             if not isinstance(state, dict):
@@ -68,7 +73,7 @@ class OpsiScheduling(OSMap):
                 coin_preserve=self.config.OpsiScheduling_OperationCoinsPreserve,
                 coin_return_threshold=self.config.OpsiScheduling_OperationCoinsReturnThreshold,
                 ap_preserve=self.config.OpsiScheduling_ActionPointPreserve,
-                meow_ap_preserve=self.config.OpsiScheduling_MeowfficerActionPointPreserve,
+                meow_ap_preserve=meow_ap_preserve,
                 coin_target_mode=self.config.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve,
                 coin_replenish_active=coin_replenish_active,
             )

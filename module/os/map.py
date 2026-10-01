@@ -18,8 +18,20 @@ from module.os_handler.strategic import StrategicSearchHandler
 from module.ui.assets import GOTO_MAIN
 from module.ui.page import page_os
 
+ALREADY_SOLVED_MAP_EVENTS = frozenset({
+    'is_akashi',
+    'is_logging_tower',
+    'is_scanning_device',
+})
+
+
+def should_move_fleet_for_fixed_patrol(current_ap, question_unreachable):
+    return question_unreachable or current_ap > 7
+
 
 class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
+    _FIXED_PATROL_L2_AP = 7
+
     def os_init(self):
         """
         Call this method before doing any Operation functions.
@@ -663,12 +675,16 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             bool: If cleared
         """
         logger.hr('Clear question', level=2)
+        self._question_unreachable = False
+        question_seen = False
         for _ in range(3):
             grid = self.radar.predict_question(self.device.image, in_port=self.zone.is_port)
             if grid is None:
                 logger.info('No question mark above current fleet on this radar')
+                self._question_unreachable = question_seen
                 return False
 
+            question_seen = True
             logger.info(f'Found question mark on {grid}')
             self.handle_info_bar()
 
@@ -693,11 +709,144 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 return True
             else:
                 logger.warning(f'Arrive question with unexpected result: {result}, expected: {grid.str}')
+                self._question_unreachable = True
                 continue
 
         logger.warning('Failed to goto question mark after 5 trail, '
                        'this might be 2 adjacent fleet mechanism, stopped')
+        self._question_unreachable = question_seen
         return False
+
+    def clear_question_any_fleet(self):
+        primary = self.config.OpsiFleet_Fleet
+        solved_events = set()
+        question_unreachable = False
+        try:
+            for fleet in [primary] + [index for index in (1, 2, 3, 4) if index != primary]:
+                if not self._set_fixed_patrol_fleet(fleet):
+                    continue
+                self._solved_map_event = set()
+                self._solved_fleet_mechanism = False
+                self.clear_question()
+                solved_events.update(self._solved_map_event)
+                question_unreachable |= self._question_unreachable
+                if solved_events & ALREADY_SOLVED_MAP_EVENTS:
+                    return True
+        finally:
+            self._solved_map_event = solved_events
+            self._question_unreachable = question_unreachable
+            self.fleet_set(primary)
+        return False
+
+    def _read_current_action_point(self):
+        self.action_point_enter()
+        try:
+            self.action_point_safe_get()
+            return int(self._action_point_current)
+        finally:
+            self.action_point_quit()
+
+    def _set_fixed_patrol_fleet(self, fleet):
+        self.fleet_set(fleet)
+        current = self.fleet_selector.get()
+        if current != fleet:
+            logger.warning(
+                f'Fixed patrol expected fleet {fleet}, but current fleet is {current}; skip it'
+            )
+            return False
+        return True
+
+    def _fixed_patrol_candidate_grids(self, target_loc):
+        offsets = (
+            (0, 0), (0, 1), (0, 2), (-1, 1), (1, 1),
+            (-1, 2), (1, 2), (-1, 0), (1, 0), (0, 3),
+        )
+        candidates = []
+        seen = set()
+        occupied = set(self.map.select(is_fleet=True).location)
+        locations = [
+            (target_loc[0] + dx, target_loc[1] + dy)
+            for dx, dy in offsets
+        ]
+        locations.extend((target_loc[0], row) for row in (11, 12))
+
+        for location in locations:
+            if location in seen or location not in self.map or location in occupied:
+                continue
+            seen.add(location)
+            grid = self.map[location]
+            if (
+                grid.is_land
+                or grid.is_enemy
+                or grid.is_siren
+                or grid.is_boss
+                or grid.is_fortress
+                or getattr(grid, 'is_mechanism_block', False)
+                or getattr(grid, 'is_fleet', False)
+            ):
+                continue
+            candidates.append(grid)
+        return candidates
+
+    def _move_fleet_to_patrol(self, fleet, target_loc):
+        for grid in self._fixed_patrol_candidate_grids(target_loc)[:4]:
+            try:
+                self._goto(grid.location)
+                return True
+            except MapWalkError as error:
+                logger.warning(f'Fixed patrol fleet {fleet} cannot reach {grid}: {error}')
+        return False
+
+    def _move_fleets_and_rescan(self):
+        primary = self.config.OpsiFleet_Fleet
+        targets = {1: (2, 0), 2: (3, 0), 3: (4, 0), 4: (5, 0)}
+        order = [primary] + [fleet for fleet in (1, 2, 3, 4) if fleet != primary]
+        try:
+            for fleet in order:
+                if not self._set_fixed_patrol_fleet(fleet):
+                    continue
+                self._solved_map_event = set()
+                self._solved_fleet_mechanism = False
+                self.clear_question()
+                if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
+                    return True
+                if not self._move_fleet_to_patrol(fleet, targets[fleet]):
+                    continue
+
+                self._solved_map_event = set()
+                self._solved_fleet_mechanism = False
+                self.map_rescan(rescan_mode='full')
+                if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
+                    return True
+        finally:
+            self.fleet_set(primary)
+        return False
+
+    def execute_fixed_patrol_scan(self):
+        if not self.config.OpsiScheduling_ExecuteFixedPatrolScan:
+            return False
+        if not self.zone or self.zone.is_port or self.zone.hazard_level != 1:
+            return False
+        if self._solved_map_event:
+            return False
+
+        self.map_init(map_=None)
+        if not self.map.grids:
+            logger.warning('Fixed patrol scan skipped: no map grids detected')
+            return False
+        if self.clear_question_any_fleet():
+            return True
+
+        if not self._question_unreachable:
+            current_ap = self._read_current_action_point()
+            if not should_move_fleet_for_fixed_patrol(current_ap, False):
+                logger.info(
+                    f'Fixed patrol movement skipped: current AP {current_ap} '
+                    f'is not above {self._FIXED_PATROL_L2_AP}'
+                )
+                return False
+
+        return self._move_fleets_and_rescan()
 
     def run_auto_search(self, question=True, rescan=None, after_auto_search=True):
         """

@@ -446,6 +446,7 @@ class GeneratedConfig:
     OpsiScheduling_OperationCoinsReturnThreshold = 60000
     OpsiScheduling_EnableMeowfficerFarming = True
     OpsiScheduling_EnableHazard1Leveling = True
+    OpsiScheduling_ExecuteFixedPatrolScan = False
 
     # Group `OpsiMeowfficerFarming`
     OpsiMeowfficerFarming_ActionPointPreserve = 1000

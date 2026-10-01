@@ -1,3 +1,4 @@
+from module.os.map import OSMap, should_move_fleet_for_fixed_patrol
 from module.os.tasks.scheduling import OpsiScheduling, decide_resource_action
 from module.statistics.resource_monitor import record_dashboard_resource
 
@@ -103,3 +104,10 @@ def test_child_task_settings_are_bound_and_scheduler_binding_is_restored():
         raise AssertionError('expected child task failure')
 
     assert scheduler.config.bindings[-1] == ('OpsiScheduling', ())
+
+
+def test_fixed_patrol_uses_threshold_above_seven_ap():
+    assert OSMap._FIXED_PATROL_L2_AP == 7
+    assert not should_move_fleet_for_fixed_patrol(7, False)
+    assert should_move_fleet_for_fixed_patrol(8, False)
+    assert should_move_fleet_for_fixed_patrol(0, True)

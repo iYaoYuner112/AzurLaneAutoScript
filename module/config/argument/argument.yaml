@@ -770,6 +770,7 @@ OpsiScheduling:
   OperationCoinsReturnThreshold: 60000
   EnableMeowfficerFarming: true
   EnableHazard1Leveling: true
+  ExecuteFixedPatrolScan: false
 
 # =================== Island ====================
 

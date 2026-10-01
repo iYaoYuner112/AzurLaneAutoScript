@@ -2654,11 +2654,12 @@
     "_info": { "name": "智能調度", "help": "依黃幣與總行動力自動協調侵蝕1練級和短貓相接。" },
     "UseSmartSchedulingOperationCoinsPreserve": { "name": "按黃幣目標回補", "help": "開啟後補至保留值加回補增量；關閉後僅在低於保留值時補充。" },
     "OperationCoinsPreserve": { "name": "侵蝕1黃幣保留值", "help": "低於此數量時暫停侵蝕1並補充黃幣。預設20000。" },
-    "ActionPointPreserve": { "name": "調度行動力下限", "help": "總行動力達到此值後暫停資源任務，等待伺服器更新。預設200。" },
-    "MeowfficerActionPointPreserve": { "name": "短貓相接保留行動力", "help": "執行短貓相接時至少保留的總行動力；低於此值時暫停補黃幣，避免行動力過低。預設1000。" },
+    "ActionPointPreserve": { "name": "侵蝕1保留行動力", "help": "侵蝕1練級時最低保留的總行動力；低於或等於此值時暫停侵蝕1。短貓相接的保留行動力由獨立選項控制。預設200。" },
+    "MeowfficerActionPointPreserve": { "name": "短貓相接保留行動力", "help": "執行短貓相接時保留的總行動力；總行動力低於或等於此值時暫停補黃幣。預設1000，實際生效值最高為2000；大世界重置日會依跨月每日設定自動降至300或0，以便消耗剩餘行動力。" },
     "OperationCoinsReturnThreshold": { "name": "黃幣回補增量", "help": "保留值之外額外補充的數量。預設60000，總回切目標為80000。" },
     "EnableMeowfficerFarming": { "name": "允許短貓相接補黃幣", "help": "黃幣不足時允許調度器使用短貓相接補充。" },
-    "EnableHazard1Leveling": { "name": "允許侵蝕1練級", "help": "黃幣達到目標後允許調度器執行侵蝕1練級。" }
+    "EnableHazard1Leveling": { "name": "允許侵蝕1練級", "help": "黃幣達到目標後允許調度器執行侵蝕1練級。" },
+    "ExecuteFixedPatrolScan": { "name": "強制移動（侵蝕一）", "help": "侵蝕一戰後先逐隊掃描雷達；若看到但無法到達問號則直接嘗試移動艦隊，否則只有目前行動力大於7時才按C1至F1巡迴落點移動並重掃。短貓相接不使用固定落點移動。" }
   },
   "IslandProduction": {
     "_info": {

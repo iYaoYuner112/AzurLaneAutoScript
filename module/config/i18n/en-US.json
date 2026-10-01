@@ -2664,12 +2664,12 @@
       "help": "Pause CL1 and replenish coins below this amount. Default: 20000."
     },
     "ActionPointPreserve": {
-      "name": "Scheduling Action Point Floor",
-      "help": "Pause resource tasks when total action points reach this amount and wait for the next server update. Default: 200."
+      "name": "CL1 Action Point Reserve",
+      "help": "Minimum total action points to keep while running CL1. CL1 pauses at or below this value. Meowfficer farming has a separate reserve setting. Default: 200."
     },
     "MeowfficerActionPointPreserve": {
       "name": "Meowfficer Farming Action Point Reserve",
-      "help": "Minimum total action points to keep while running meowfficer farming. Coin replenishment pauses at or below this value. Default: 1000."
+      "help": "Total action points to keep while farming; coin replenishment pauses at or below this value. Default: 1000, capped at 2000. On the OpSi reset day this is automatically lowered to 300 or 0 according to Cross Month Daily, so remaining action points can be spent."
     },
     "OperationCoinsReturnThreshold": {
       "name": "Yellow Coin Return Increment",
@@ -2682,6 +2682,10 @@
     "EnableHazard1Leveling": {
       "name": "Allow CL1 Leveling",
       "help": "Allow CL1 leveling after yellow coins reach the return target."
+    },
+    "ExecuteFixedPatrolScan": {
+      "name": "Forced Movement (CL1)",
+      "help": "After a CL1 battle, scan each fleet's radar. If a question mark is seen but unreachable, attempt movement regardless of AP; otherwise move fleets through the C1-F1 patrol points and rescan only when current AP is above 7. Meowfficer farming does not use these fixed destinations."
     }
   },
   "IslandProduction": {
