@@ -32,6 +32,7 @@ def make_stub(zones=None, zone_id=10):
 def test_skip_siren_config_defaults():
     assert AzurLaneConfig.OpsiDaily_SkipSirenResearchMission is False
     assert AzurLaneConfig.OpsiDaily_KeepMissionZone is False
+    assert AzurLaneConfig.OpsiDaily_OnlyPortDailyBeforeFullControl is False
     assert AzurLaneConfig.OpsiDaily_MissionZones is None
 
 

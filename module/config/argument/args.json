@@ -8882,6 +8882,10 @@
         "type": "checkbox",
         "value": false
       },
+      "OnlyPortDailyBeforeFullControl": {
+        "type": "checkbox",
+        "value": false
+      },
       "MissionZones": {
         "type": "input",
         "value": null

@@ -1782,6 +1782,7 @@
       "UseTuningSample": true,
       "SkipSirenResearchMission": false,
       "KeepMissionZone": false,
+      "OnlyPortDailyBeforeFullControl": false,
       "MissionZones": null
     },
     "OpsiFleet": {

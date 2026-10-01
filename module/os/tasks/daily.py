@@ -210,6 +210,18 @@ class OpsiDaily(OSMap):
             self.config.OpsiDaily_KeepMissionZone = False
 
         skip_siren_mission = self.config.OpsiDaily_SkipSirenResearchMission
+
+        # Only-port-daily mode: while exploration is incomplete (OpsiExplore still
+        # running), skip sector missions (os_finish_daily_mission) and only run
+        # port missions. The exploration signal is read once here, not per mission.
+        exploration_incomplete = self.is_in_opsi_explore()
+        only_port_daily = self.config.OpsiDaily_OnlyPortDailyBeforeFullControl and exploration_incomplete
+        if self.config.OpsiDaily_OnlyPortDailyBeforeFullControl:
+            if only_port_daily:
+                logger.info('[OS DAILY] Exploration incomplete, only execute port daily tasks')
+            else:
+                logger.info('[OS DAILY] Exploration complete, execute normal daily schedule')
+
         while True:
             # If unable to receive more dailies, finish them and try again.
             success = self.os_mission_overview_accept(skip_siren_mission=skip_siren_mission)
@@ -218,11 +230,12 @@ class OpsiDaily(OSMap):
             # need to confirm that the animation has ended,
             # or it will click on MAP_GOTO_GLOBE
             self.zone_init()
-            if self.os_finish_daily_mission(
-                    skip_siren_mission=skip_siren_mission,
-                    keep_mission_zone=self.config.OpsiDaily_KeepMissionZone) and skip_siren_mission:
-                continue
-            if self.is_in_opsi_explore():
+            if not only_port_daily:
+                if self.os_finish_daily_mission(
+                        skip_siren_mission=skip_siren_mission,
+                        keep_mission_zone=self.config.OpsiDaily_KeepMissionZone) and skip_siren_mission:
+                    continue
+            if exploration_incomplete:
                 self.os_port_mission()
                 break
             if success:

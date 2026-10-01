@@ -749,6 +749,7 @@ OpsiDaily:
   UseTuningSample: true
   SkipSirenResearchMission: false
   KeepMissionZone: false
+  OnlyPortDailyBeforeFullControl: false
   MissionZones: null
 OpsiObscure:
   ForceRun: false

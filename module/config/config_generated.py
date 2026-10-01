@@ -429,6 +429,7 @@ class GeneratedConfig:
     OpsiDaily_UseTuningSample = True
     OpsiDaily_SkipSirenResearchMission = False
     OpsiDaily_KeepMissionZone = False
+    OpsiDaily_OnlyPortDailyBeforeFullControl = False
     OpsiDaily_MissionZones = None
 
     # Group `OpsiObscure`
