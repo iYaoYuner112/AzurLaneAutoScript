@@ -813,9 +813,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         question_unreachable = False
         try:
             for fleet in [primary] + [index for index in (1, 2, 3, 4) if index != primary]:
+                logger.info(f'[FIXED PATROL][L0] Check Fleet {fleet}')
                 if not self._set_fixed_patrol_fleet(fleet):
                     continue
-                logger.info(f'[OS] Check radar with Fleet{fleet} (looking for events)')
                 self._solved_map_event = set()
                 self._solved_fleet_mechanism = False
                 self.clear_question()
@@ -823,13 +823,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 question_unreachable |= self._question_unreachable
                 if solved_events & ALREADY_SOLVED_MAP_EVENTS:
                     logger.info(
-                        f'[OS] Fleet{fleet} solved an event on radar, stop switching'
+                        f'[FIXED PATROL][L0] Fleet {fleet} solved an event, stop'
                     )
                     return True
+                logger.info(f'[FIXED PATROL][L0] Fleet {fleet}: no actionable question')
         finally:
             self._solved_map_event = solved_events
             self._question_unreachable = question_unreachable
             self.fleet_set(primary)
+        logger.info('[FIXED PATROL][L0] All fleets checked')
         return False
 
     def _read_current_action_point(self):
@@ -1164,6 +1166,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         rescanned. A radar pre-check runs before each move; the move stops as soon
         as an event is solved, so it never blindly cycles all four fleets. The
         AntiLoopGuard is only a safety net, not a controller.
+
+        Returns:
+            bool: True if an event was found and solved, False otherwise.
         """
         primary = self.config.OpsiFleet_Fleet
         columns = {1: (2, 0), 2: (3, 0), 3: (4, 0), 4: (5, 0)}  # C1, D1, E1, F1
@@ -1174,14 +1179,16 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             for fleet in order:
                 # Radar pre-check: if the current fleet can solve an event nearby,
                 # do it now instead of moving this fleet.
+                logger.info(f'[FIXED PATROL][L2] Fleet {fleet} radar pre-check')
                 if not self._set_fixed_patrol_fleet(fleet):
                     continue
                 self._solved_map_event = set()
                 self._solved_fleet_mechanism = False
                 self.clear_question(drop=None)
                 if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
-                    logger.info('Fixed patrol L2: event solved during radar pre-check, stop')
+                    logger.info('[FIXED PATROL][L2] Event solved during radar pre-check, stop')
                     return True
+                logger.info('[FIXED PATROL][L2] Radar pre-check: no actionable event')
 
                 if self._fixed_patrol_loop_guard.check(None, None, fleet, 'move'):
                     logger.error(
@@ -1196,6 +1203,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # The blocking fleet is away, rescan the whole map to find events.
                 self._solved_map_event = set()
                 self._solved_fleet_mechanism = False
+                logger.info(f'[FIXED PATROL][L2] FULL RESCAN after Fleet {fleet} movement')
                 try:
                     self.map_rescan(rescan_mode='full')
                 except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
@@ -1206,10 +1214,16 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                         f'Fixed patrol L2: rescan after moving failed, continue: {e}', exc_info=True)
 
                 if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
-                    logger.info('Fixed patrol L2: event solved by rescan, stop moving fleets')
+                    logger.info(
+                        f'[FIXED PATROL][L2] Rescan result: event found '
+                        f'{sorted(self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS)}'
+                    )
+                    logger.info('[FIXED PATROL] Stop fixed patrol immediately')
                     return True
+                logger.info('[FIXED PATROL][L2] Rescan result: no actionable event')
         finally:
             backup.recover()
+        logger.info('[FIXED PATROL] L2 finished: result=NO_EVENT')
         return False
 
     def _forced_move_enabled(self):
@@ -1565,7 +1579,13 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if self.zone.is_port:
             logger.info('Current zone is a port, do not need rescan')
             return False
-        if self.is_cl1_mode_enabled and not self.config.is_task_enabled('OpsiMeowfficerFarming'):
+        # Only skip in STANDALONE CL1 (task.command == 'OpsiHazard1Leveling'),
+        # not under smart scheduling: standalone CL1 preserves AP, so visiting
+        # exploration events is skipped unless meowfficer farming is also enabled.
+        # Under OpsiScheduling the fixed patrol / resume barrier need this rescan
+        # to find missed events, so it must never be skipped there.
+        if self.is_in_task_cl1_leveling and not self.config.is_task_enabled('OpsiMeowfficerFarming'):
+            logger.info('Map rescan skipped: standalone CL1 without meowfficer farming')
             return False
 
         for _ in range(5):
