@@ -2631,6 +2631,10 @@
     "TargetZone": {
       "name": "Target Zone ID",
       "help": "Supports either Zone ID or Name in CN/EN/JP/TW, i.e. \"51\", \"NA Ocean SE Sector E\"\nIf specified, Alas will loop on this same zone after each clear\nUse default value 0 or clear the field to remove the specification\nZone information can be acquired from <./module/os/map_data.py>"
+    },
+    "YellowCoinsTarget": {
+      "name": "Yellow Coin Target Before Returning to CL1",
+      "help": "When CL1 leveling is enabled, return to CL1 after meowfficer farming reaches this total yellow coin amount. Default: 80000. If set below the CL1 switch threshold, the switch threshold is used."
     }
   },
   "OpsiHazard1Leveling": {
@@ -2644,6 +2648,10 @@
       "0": "No Specification",
       "44": "44 | West Continental Shelf D",
       "22": "22 | NA Ocean SW Sector B"
+    },
+    "YellowCoinsPreserve": {
+      "name": "Yellow Coin Threshold for Switching to Meowfficer Farming",
+      "help": "Pause CL1 leveling and switch to meowfficer farming when yellow coins fall below this amount. Default: 20000."
     }
   },
   "IslandProduction": {

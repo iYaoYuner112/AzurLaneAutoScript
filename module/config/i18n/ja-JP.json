@@ -2631,6 +2631,10 @@
     "TargetZone": {
       "name": "OpsiMeowfficerFarming.TargetZone.name",
       "help": "OpsiMeowfficerFarming.TargetZone.help"
+    },
+    "YellowCoinsTarget": {
+      "name": "侵蝕1に戻る黄色通貨目標",
+      "help": "侵蝕1レベリングが有効な場合、指揮官育成で黄色通貨がこの合計値に達すると侵蝕1に戻ります。既定値: 80000。この値が侵蝕1切り替えしきい値を下回る場合、切り替えしきい値を使用します。"
     }
   },
   "OpsiHazard1Leveling": {
@@ -2644,6 +2648,10 @@
       "0": "0",
       "44": "44",
       "22": "22"
+    },
+    "YellowCoinsPreserve": {
+      "name": "指揮官育成へ切り替える黄色通貨しきい値",
+      "help": "侵蝕1レベリング中、黄色通貨がこの値を下回ると一時停止して指揮官育成に切り替えます。既定値: 20000。"
     }
   },
   "IslandProduction": {

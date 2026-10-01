@@ -9237,6 +9237,10 @@
         "type": "input",
         "value": 1000
       },
+      "YellowCoinsTarget": {
+        "type": "input",
+        "value": 80000
+      },
       "HazardLevel": {
         "type": "select",
         "value": 5,
@@ -9315,6 +9319,10 @@
       }
     },
     "OpsiHazard1Leveling": {
+      "YellowCoinsPreserve": {
+        "type": "input",
+        "value": 20000
+      },
       "TargetZone": {
         "type": "select",
         "value": 0,

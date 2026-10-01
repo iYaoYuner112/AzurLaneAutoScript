@@ -753,12 +753,14 @@ OpsiMonthBoss:
   ForceRun: false
 OpsiMeowfficerFarming:
   ActionPointPreserve: 1000
+  YellowCoinsTarget: 80000
   HazardLevel:
     value: 5
     option: [ 3, 4, 5, 6, 10 ]
   TargetZone:
     value: 0
 OpsiHazard1Leveling:
+  YellowCoinsPreserve: 20000
   TargetZone:
     value: 0
     option: [ 0, 44, 22 ]

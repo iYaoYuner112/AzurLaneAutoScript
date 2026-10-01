@@ -40,6 +40,13 @@ class OpsiMeowfficerFarming(OSMap):
 
         ap_checked = False
         while True:
+            if self.is_cl1_enabled and self.is_cl1_yellow_coins_target_reached(self.get_yellow_coins()):
+                logger.info(f'Reach the yellow coin target, target={self.cl1_yellow_coins_target}')
+                with self.config.multi_set():
+                    self.config.task_delay(server_update=True)
+                    self.config.task_call('OpsiHazard1Leveling')
+                self.config.task_stop()
+
             self.config.OS_ACTION_POINT_PRESERVE = preserve
             if self.config.is_task_enabled('OpsiAshBeacon') \
                     and not self._ash_fully_collected \

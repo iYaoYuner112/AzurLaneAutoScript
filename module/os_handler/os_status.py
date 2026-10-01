@@ -72,6 +72,20 @@ class OSStatus(UI):
         else:
             return 35000
 
+    @property
+    def cl1_yellow_coins_preserve(self):
+        return self.config.OpsiHazard1Leveling_YellowCoinsPreserve
+
+    @property
+    def cl1_yellow_coins_target(self):
+        return max(
+            self.config.OpsiMeowfficerFarming_YellowCoinsTarget,
+            self.cl1_yellow_coins_preserve,
+        )
+
+    def is_cl1_yellow_coins_target_reached(self, yellow_coins):
+        return yellow_coins >= self.cl1_yellow_coins_target
+
     def get_yellow_coins(self) -> int:
         yellow_coins = 0
         timeout = Timer(2, count=3).start()
