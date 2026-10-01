@@ -92,6 +92,11 @@ ACTION_POINT_BOX = {
     2: 50,
     3: 100,
 }
+ACTION_POINT_BOX_PRIORITY = (1, 2, 3)
+
+
+def get_action_point_box_priority(boxes):
+    return [index for index in ACTION_POINT_BOX_PRIORITY if boxes[index] > 0]
 
 
 class ActionPointLimit(Exception):
@@ -402,14 +407,7 @@ class ActionPointHandler(UI, MapEventHandler):
                 self.action_point_quit()
                 raise ActionPointLimit
 
-            # Sort action point boxes
-            box = []
-            for index in [1, 2, 3]:
-                if self._action_point_box[index] > 0:
-                    if self._action_point_current + ACTION_POINT_BOX[index] >= 200:
-                        box.append(index)
-                    else:
-                        box.insert(0, index)
+            box = get_action_point_box_priority(self._action_point_box)
 
             # Use action point boxes
             if len(box):
