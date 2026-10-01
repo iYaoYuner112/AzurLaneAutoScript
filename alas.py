@@ -105,7 +105,7 @@ class AzurLaneAutoScript:
         try:
             from module.statistics.resource_collector import ResourceCollector
             collector = ResourceCollector(self.config, self.device, monitor=self.resource_monitor)
-            collector.refresh_main()
+            collector.refresh()
         except Exception as e:
             logger.warning(f'[ResourceMonitor] refresh failed: {e}')
 

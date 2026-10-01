@@ -665,12 +665,9 @@ class AlasGUI(Frame):
             resources = {}
 
         items = [
-            ("Oil", "ResourceOil"),
-            ("Coin", "ResourceCoin"),
-            ("EventPT", "ResourceEventPT"),
+            ("ActionPoint", "ResourceActionPoint"),
             ("YellowCoin", "ResourceYellowCoin"),
             ("PurpleCoin", "ResourcePurpleCoin"),
-            ("ActionPoint", "ResourceActionPoint"),
         ]
         cards = []
         now = datetime.now()
