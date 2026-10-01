@@ -2578,6 +2578,18 @@
     "UseTuningSample": {
       "name": "Use Tuning Samples",
       "help": "Use all tuning samples and quality tuning samples"
+    },
+    "SkipSirenResearchMission": {
+      "name": "Skip Siren Research",
+      "help": "Skip Siren Research I/II missions to avoid exchanging yellow coins for purple coins."
+    },
+    "KeepMissionZone": {
+      "name": "Keep Mission Zones",
+      "help": "Exit zones after daily missions without clearing them; auto-clear on the last day of the month."
+    },
+    "MissionZones": {
+      "name": "Mission Zones",
+      "help": "Internally saved uncleared zones (auto-managed, do not edit)"
     }
   },
   "OpsiObscure": {

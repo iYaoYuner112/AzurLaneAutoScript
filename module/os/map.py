@@ -561,11 +561,14 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     logger.attr('CL1 time cost', f'{cost}s/round')
                 self._auto_search_round_timer = time.time()
 
-    def os_auto_search_daemon(self, drop=None, strategic=False):
+    def os_auto_search_daemon(self, drop=None, strategic=False, interrupt=None):
         """
         Args:
             drop (DropRecord):
             strategic (bool): True if running in strategic search
+            interrupt (callable | list[callable]): Interrupt callback. A single
+                callable means `is_interrupt`; a 2-element list is
+                `[is_interrupt, not_interrupt]` for debouncing.
 
         Returns:
             int: Number of finished battle
@@ -585,7 +588,18 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         unlock_check_timer = Timer(5, count=10).start()
         self.ash_popup_canceled = False
 
+        def false_func(*args, **kwargs):
+            return False
+
         success = True
+        interrupt_confirm = False
+        if callable(interrupt):
+            is_interrupt, not_interrupt = interrupt, false_func
+        elif isinstance(interrupt, list) and len(interrupt) == 2:
+            is_interrupt = interrupt[0] if callable(interrupt[0]) else false_func
+            not_interrupt = interrupt[1] if callable(interrupt[1]) else false_func
+        else:
+            is_interrupt, not_interrupt = false_func, false_func
         finished_combat = 0
         died_timer = Timer(1.5, count=3)
         self.hp_reset()
@@ -603,6 +617,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                         logger.warning('Fleet died confirm')
                         break
                 else:
+                    if not interrupt_confirm and is_interrupt():
+                        interrupt_confirm = True
+                    if interrupt_confirm and not_interrupt():
+                        interrupt_confirm = False
                     died_timer.reset()
             else:
                 died_timer.reset()
@@ -629,6 +647,8 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.on_auto_search_battle_count_add()
                 if strategic and self.config.task_switched():
                     self.interrupt_auto_search()
+                if interrupt_confirm:
+                    self.interrupt_auto_search(goto_main=False)
                 result = self.auto_search_combat(drop=drop)
                 if result:
                     finished_combat += 1
@@ -644,28 +664,37 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         return finished_combat
 
-    def interrupt_auto_search(self):
+    def interrupt_auto_search(self, goto_main=True):
         """
+        Args:
+            goto_main (bool): If go to main page. Set False to stop auto search
+                while staying in the map (used by keep-mission-zone).
+
         Raises:
             TaskEnd: If auto search interrupted
 
         Pages:
             in: Any, usually to be is_combat_executing
-            out: page_main
+            out: page_main or IN_MAP
         """
         logger.info('Interrupting auto search')
         is_loading = False
         pause_interval = Timer(0.5, count=1)
         in_main_timer = Timer(3, count=6)
+        in_map_timer = Timer(1, count=6)
         for _ in self.loop():
             # End
             if self.is_in_main():
                 logger.info('Auto search interrupted')
                 self.config.task_stop()
+            if not goto_main and self.is_in_map() and in_map_timer.reached():
+                logger.info('Auto search interrupted (stay in map)')
+                self.config.task_stop()
 
             if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
                 self.interval_clear(GOTO_MAIN)
                 in_main_timer.reset()
+                in_map_timer.reset()
                 continue
             if pause_interval.reached():
                 pause = self.is_combat_executing()
@@ -675,19 +704,22 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     is_loading = False
                     pause_interval.reset()
                     in_main_timer.reset()
+                    in_map_timer.reset()
                     continue
             if self.handle_combat_quit():
                 self.interval_reset(MAINTENANCE_ANNOUNCE)
                 pause_interval.reset()
                 in_main_timer.reset()
+                in_map_timer.reset()
                 continue
             if self.handle_combat_quit_reconfirm():
                 self.interval_reset(MAINTENANCE_ANNOUNCE)
                 pause_interval.reset()
                 in_main_timer.reset()
+                in_map_timer.reset()
                 continue
 
-            if self.appear_then_click(GOTO_MAIN, offset=(20, 20), interval=3):
+            if goto_main and self.appear_then_click(GOTO_MAIN, offset=(20, 20), interval=3):
                 in_main_timer.reset()
                 continue
             if self.ui_additional():
@@ -699,6 +731,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 if self.is_combat_loading():
                     is_loading = True
                     in_main_timer.clear()
+                    in_map_timer.clear()
                     continue
                 # Random background from page_main may trigger EXP_INFO_*, don't check them
                 if in_main_timer.reached():
@@ -710,13 +743,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             elif self.is_combat_executing():
                 is_loading = False
                 in_main_timer.clear()
+                in_map_timer.clear()
                 continue
 
-    def os_auto_search_run(self, drop=None, strategic=False):
+    def os_auto_search_run(self, drop=None, strategic=False, interrupt=None):
         """
         Args:
             drop (DropRecord):
             strategic (bool): True to use strategic search
+            interrupt (callable | list[callable]): Interrupt callback for auto search.
 
         Returns:
             int: Number of finished combat
@@ -727,7 +762,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             try:
                 if strategic:
                     self.strategic_search_start()
-                combat = self.os_auto_search_daemon(drop=drop, strategic=strategic)
+                combat = self.os_auto_search_daemon(drop=drop, strategic=strategic, interrupt=interrupt)
                 finished_combat += combat
             except CampaignEnd:
                 finished_combat += self._auto_search_battle_count
@@ -1338,7 +1373,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             # Restore the primary fleet, so that later steps do not work on a wrong fleet.
             self.fleet_set(self.config.OpsiFleet_Fleet)
 
-    def run_auto_search(self, question=True, rescan=None, after_auto_search=True):
+    def run_auto_search(self, question=True, rescan=None, after_auto_search=True, interrupt=None):
         """
         Clear current zone by running auto search.
         OpSi story mode must be cleared to unlock auto search.
@@ -1355,6 +1390,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 This option should be disabled in special tasks like OpsiObscure, OpsiAbyssal, OpsiStronghold.
             after_auto_search (bool):
                 Whether to call handle_after_auto_search() after auto search
+            interrupt (callable | list[callable]): Interrupt callback for auto search.
 
         Returns:
             int: Number of finished combat
@@ -1372,7 +1408,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 method=self.config.DropRecord_OpsiRecord
         ) as drop:
             while 1:
-                combat = self.os_auto_search_run(drop)
+                combat = self.os_auto_search_run(drop, interrupt=interrupt)
                 finished_combat += combat
 
                 # Record current zone, skip this if no rewards from auto search.

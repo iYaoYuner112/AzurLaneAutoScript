@@ -8873,6 +8873,18 @@
       "UseTuningSample": {
         "type": "checkbox",
         "value": true
+      },
+      "SkipSirenResearchMission": {
+        "type": "checkbox",
+        "value": false
+      },
+      "KeepMissionZone": {
+        "type": "checkbox",
+        "value": false
+      },
+      "MissionZones": {
+        "type": "input",
+        "value": null
       }
     },
     "OpsiFleet": {

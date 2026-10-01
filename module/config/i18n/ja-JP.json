@@ -2578,6 +2578,18 @@
     "UseTuningSample": {
       "name": "OpsiDaily.UseTuningSample.name",
       "help": "OpsiDaily.UseTuningSample.help"
+    },
+    "SkipSirenResearchMission": {
+      "name": "セイレーン研究をスキップ",
+      "help": "セイレーン研究I/IIをスキップし、黄コインの紫コイン交換を避けます。"
+    },
+    "KeepMissionZone": {
+      "name": "海域を保持",
+      "help": "デイリー完了後に海域を退出して掃討せず、月末最終日に自動掃討します。"
+    },
+    "MissionZones": {
+      "name": "任務海域の記録",
+      "help": "内部保存された未掃討海域（自動管理、編集しないでください）"
     }
   },
   "OpsiObscure": {

@@ -427,6 +427,9 @@ class GeneratedConfig:
     # Group `OpsiDaily`
     OpsiDaily_DoMission = True
     OpsiDaily_UseTuningSample = True
+    OpsiDaily_SkipSirenResearchMission = False
+    OpsiDaily_KeepMissionZone = False
+    OpsiDaily_MissionZones = None
 
     # Group `OpsiObscure`
     OpsiObscure_ForceRun = False

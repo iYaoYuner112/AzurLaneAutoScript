@@ -1,7 +1,15 @@
 import numpy as np
 
+from module.config.config import TaskEnd
+from module.config.utils import get_os_reset_remain
+from module.exception import ScriptError
 from module.logger import logger
+from module.map.map_grids import SelectedGrids
 from module.os.map import OSMap
+from module.os_handler.action_point import ActionPointLimit
+from module.os_handler.assets import MISSION_COMPLETE_POPUP
+from module.ui.assets import OS_CHECK
+from module.ui.page import page_os
 
 
 class OpsiDaily(OSMap):
@@ -22,12 +30,127 @@ class OpsiDaily(OSMap):
             self.run_auto_search()
             self.handle_after_auto_search()
 
-    def os_finish_daily_mission(self, question=True, rescan=None):
+    def _os_daily_mission_complete_check(self):
+        """Check if the mission complete popup appeared (out of OS map)."""
+        return not self.appear(OS_CHECK, offset=(20, 20)) and \
+            self.appear(MISSION_COMPLETE_POPUP, offset=(20, 20))
+
+    _os_mission_complete = False
+
+    def daily_interrupt_check(self):
+        """
+        Check if the daily mission auto search should be interrupted.
+
+        Returns:
+            bool: True when the mission is complete and no meowfficer is searching.
+        """
+        if not self._os_mission_complete and self._os_daily_mission_complete_check():
+            self._os_mission_complete = True
+
+        if self._os_mission_complete and not self.is_meowfficer_searching():
+            return True
+        return False
+
+    def os_daily_set_keep_mission_zone(self):
+        """Save the current zone into OpsiDaily_MissionZones config."""
+        zones = prev = self.config.OpsiDaily_MissionZones
+        zones = [] if zones is None else str(zones).split()
+        if str(self.zone.zone_id) not in zones:
+            zones.append(str(self.zone.zone_id))
+        new = ' '.join(zones)
+        if prev != new:
+            self.config.OpsiDaily_MissionZones = new
+            logger.info(f'[OS DAILY] Save uncleared sector {self.zone.zone_id}')
+
+    def os_daily_clear_all_mission_zones(self):
+        """
+        Clear all zones recorded in OpsiDaily_MissionZones.
+
+        Only runs on the last day before OS reset (get_os_reset_remain() == 0).
+        """
+        if get_os_reset_remain() > 0:
+            logger.info('[OS DAILY] Not the last day of month, skip clearing mission zones')
+            return
+
+        logger.info('[OS DAILY] Last day of month, cleanup all uncleared sectors')
+
+        def os_daily_check_zone(zone):
+            return zone.hazard_level in [3, 4, 5, 6] and zone.region != 5 and not zone.is_port
+
+        try:
+            zones = self.config.OpsiDaily_MissionZones
+            zones = [] if zones is None else str(zones).split()
+            clear_zones = SelectedGrids([self.name_to_zone(zone) for zone in zones]) \
+                .delete(SelectedGrids([self.zone])) \
+                .filter(os_daily_check_zone) \
+                .sort_by_clock_degree(center=(1252, 1012), start=self.zone.location)
+        except ScriptError:
+            logger.warning('Mission zones config invalid, skip clearing mission zones')
+            zones = []
+
+        for zone in clear_zones:
+            logger.hr(f'[OS DAILY] Cleaning uncleared sector {zone.zone_id}', level=1)
+            try:
+                self.globe_goto(zone, types='SAFE', refresh=True)
+            except ActionPointLimit:
+                continue
+            self.fleet_set(self.config.OpsiFleet_Fleet)
+            self.os_order_execute(recon_scan=False, submarine_call=False)
+            self.run_auto_search(question=False, rescan=False)
+            self._os_daily_retrieve_events()
+            self.handle_after_auto_search()
+            if str(zone.zone_id) in zones:
+                zones.remove(str(zone.zone_id))
+                self.config.OpsiDaily_MissionZones = ' '.join(zones)
+
+        if not len(zones):
+            self.config.OpsiDaily_MissionZones = None
+        logger.info('[OS DAILY] Monthly cleanup finished')
+
+    def _os_daily_retrieve_events(self):
+        """Retrieve events after clearing a mission zone.
+
+        Order: clear primary fleet question -> map rescan -> switch fleet 2/3/4 to
+        clear questions. Stops as soon as any event is solved.
+        """
+        primary = self.config.OpsiFleet_Fleet
+        self._solved_map_event = set()
+        self._solved_fleet_mechanism = False
+        event_solved = False
+
+        # Step 1: clear primary fleet question.
+        self.fleet_set(primary)
+        self.device.screenshot()
+        if self.clear_question():
+            event_solved = True
+
+        # Step 2: rescan map if not solved.
+        if not event_solved:
+            self.map_rescan()
+            if self._solved_map_event:
+                event_solved = True
+
+        # Step 3: switch fleet 2/3/4 to clear questions if not solved.
+        if not event_solved:
+            for fleet in [1, 2, 3, 4]:
+                if fleet == primary:
+                    continue
+                self.fleet_set(fleet)
+                self.device.screenshot()
+                if self.clear_question():
+                    event_solved = True
+                    break
+            self.fleet_set(primary)
+
+    def os_finish_daily_mission(self, skip_siren_mission=False, keep_mission_zone=False, question=True, rescan=None):
         """
         Finish all daily mission in Operation Siren.
         Suggest to run os_port_daily to accept missions first.
 
         Args:
+            skip_siren_mission (bool): Skip siren research missions.
+            keep_mission_zone (bool): Keep the mission zone, interrupt auto search
+                when the mission is complete instead of fully clearing the zone.
             question (bool): refer to run_auto_search
             rescan (None, bool): refer to run_auto_search
 
@@ -37,7 +160,7 @@ class OpsiDaily(OSMap):
         logger.hr('OS finish daily mission', level=1)
         count = 0
         while True:
-            result = self.os_get_next_mission()
+            result = self.os_get_next_mission(skip_siren_mission=skip_siren_mission)
             if not result:
                 break
 
@@ -51,10 +174,21 @@ class OpsiDaily(OSMap):
             self.os_order_execute(
                 recon_scan=False,
                 submarine_call=self.config.OpsiFleet_Submarine and result != 'pinned_at_archive_zone')
-            self.run_auto_search(question, rescan)
-            self.handle_after_auto_search()
+            if keep_mission_zone and not self.zone.is_port:
+                interrupt = [self.daily_interrupt_check, self.is_meowfficer_searching]
+                self._os_mission_complete = False
+            else:
+                interrupt = None
+            try:
+                self.run_auto_search(question, rescan, interrupt=interrupt)
+                self.handle_after_auto_search()
+            except TaskEnd:
+                self.ui_ensure(page_os)
+                if keep_mission_zone:
+                    self.os_daily_set_keep_mission_zone()
             count += 1
-            self.config.check_task_switch()
+            if not keep_mission_zone:
+                self.config.check_task_switch()
 
         return count
 
@@ -67,19 +201,37 @@ class OpsiDaily(OSMap):
         if self.config.OpsiDaily_UseTuningSample:
             self.tuning_sample_use()
 
+        # Siren research skip and keep mission zone are only supported on CN server.
+        if self.config.OpsiDaily_SkipSirenResearchMission and self.config.SERVER not in ['cn']:
+            logger.warning('Skip Siren Research mission is only supported on CN server')
+            self.config.OpsiDaily_SkipSirenResearchMission = False
+        if self.config.OpsiDaily_KeepMissionZone and self.config.SERVER not in ['cn']:
+            logger.warning('Keep mission zone is only supported on CN server')
+            self.config.OpsiDaily_KeepMissionZone = False
+
+        skip_siren_mission = self.config.OpsiDaily_SkipSirenResearchMission
         while True:
             # If unable to receive more dailies, finish them and try again.
-            success = self.os_mission_overview_accept()
+            success = self.os_mission_overview_accept(skip_siren_mission=skip_siren_mission)
             # Re-init zone name
             # MISSION_ENTER appear from the right,
             # need to confirm that the animation has ended,
             # or it will click on MAP_GOTO_GLOBE
             self.zone_init()
-            self.os_finish_daily_mission()
+            if self.os_finish_daily_mission(
+                    skip_siren_mission=skip_siren_mission,
+                    keep_mission_zone=self.config.OpsiDaily_KeepMissionZone) and skip_siren_mission:
+                continue
             if self.is_in_opsi_explore():
                 self.os_port_mission()
                 break
             if success:
                 break
 
+        if self.config.OpsiDaily_KeepMissionZone:
+            if self.zone.is_azur_port:
+                logger.info('[OS DAILY] Already at azur port')
+            else:
+                self.globe_goto(self.zone_nearest_azur_port(self.zone))
+            self.os_daily_clear_all_mission_zones()
         self.config.task_delay(server_update=True)

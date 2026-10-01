@@ -2578,6 +2578,18 @@
     "UseTuningSample": {
       "name": "使用效能样本",
       "help": "使用所有六种效能样本和强力效能样本"
+    },
+    "SkipSirenResearchMission": {
+      "name": "不做塞壬研究任务",
+      "help": "开启后跳过塞壬研究 I/II，避免用黄币兑换紫币。"
+    },
+    "KeepMissionZone": {
+      "name": "保留海域不清理",
+      "help": "每日任务完成后退出海域、不主动清理；每月最后一天自动清理未清理海域。"
+    },
+    "MissionZones": {
+      "name": "任务海域记录",
+      "help": "内部保存的未清理海域（自动管理，请勿手动修改）"
     }
   },
   "OpsiObscure": {
