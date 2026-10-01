@@ -9,6 +9,7 @@
 
 from types import SimpleNamespace
 
+from module.os.fixed_patrol import AntiLoopGuard
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 
 
@@ -59,6 +60,7 @@ class ScanStub:
         )
         self.zone = SimpleNamespace(is_port=is_port, hazard_level=hazard_level)
         self.map = SimpleNamespace(grids=[object()] if has_grids else [])
+        self._fixed_patrol_loop_guard = AntiLoopGuard(max_repeats=3)
         self.enabled = enabled
         self.radar_solved = radar_solved
         self.current_ap = current_ap
@@ -73,6 +75,10 @@ class ScanStub:
 
     def map_init(self, map_=None):
         pass
+
+    def _fixed_patrol_targets(self):
+        # 测试里不读真实地图，直接返回空目标，走「无已知目标」分支。
+        return []
 
     def _forced_move_enabled(self):
         return self.enabled
@@ -90,7 +96,7 @@ class ScanStub:
         self.ap_reads += 1
         return self.current_ap
 
-    def _move_fleets_and_rescan(self):
+    def _move_fleets_and_rescan(self, best_target=None):
         self.move_calls += 1
 
     def fleet_set(self, index=1):
