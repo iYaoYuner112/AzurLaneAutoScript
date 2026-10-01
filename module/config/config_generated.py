@@ -442,6 +442,7 @@ class GeneratedConfig:
     OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
     OpsiScheduling_OperationCoinsPreserve = 20000
     OpsiScheduling_ActionPointPreserve = 200
+    OpsiScheduling_MeowfficerActionPointPreserve = 1000
     OpsiScheduling_OperationCoinsReturnThreshold = 60000
     OpsiScheduling_EnableMeowfficerFarming = True
     OpsiScheduling_EnableHazard1Leveling = True

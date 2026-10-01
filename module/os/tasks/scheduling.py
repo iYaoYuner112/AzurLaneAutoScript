@@ -8,6 +8,7 @@ def decide_resource_action(
         coin_preserve,
         coin_return_threshold,
         ap_preserve,
+        meow_ap_preserve,
         coin_target_mode,
         coin_replenish_active,
 ):
@@ -15,6 +16,7 @@ def decide_resource_action(
     coin_preserve = max(int(coin_preserve), 0)
     coin_return_threshold = max(int(coin_return_threshold), 0)
     ap_preserve = max(int(ap_preserve), 0)
+    meow_ap_preserve = max(int(meow_ap_preserve), 0)
 
     if total_ap <= ap_preserve:
         return 'wait', coin_replenish_active
@@ -23,10 +25,16 @@ def decide_resource_action(
         coin_replenish_active = coin_replenish_active or yellow_coins < coin_preserve
         coin_target = coin_preserve + coin_return_threshold
         if coin_replenish_active and yellow_coins < coin_target:
+            if total_ap <= max(ap_preserve, meow_ap_preserve):
+                return 'wait', True
             return 'meow', True
         return 'cl1', False
 
-    return ('meow', False) if yellow_coins < coin_preserve else ('cl1', False)
+    if yellow_coins < coin_preserve:
+        if total_ap <= max(ap_preserve, meow_ap_preserve):
+            return 'wait', False
+        return 'meow', False
+    return 'cl1', False
 
 
 class OpsiScheduling(OSMap):
@@ -52,6 +60,7 @@ class OpsiScheduling(OSMap):
             coin_preserve=self.config.OpsiScheduling_OperationCoinsPreserve,
             coin_return_threshold=self.config.OpsiScheduling_OperationCoinsReturnThreshold,
             ap_preserve=self.config.OpsiScheduling_ActionPointPreserve,
+            meow_ap_preserve=self.config.OpsiScheduling_MeowfficerActionPointPreserve,
             coin_target_mode=self.config.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve,
             coin_replenish_active=coin_replenish_active,
         )

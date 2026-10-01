@@ -254,6 +254,10 @@
       "name": "侵蝕1練級",
       "help": ""
     },
+    "OpsiScheduling": {
+      "name": "智能調度",
+      "help": ""
+    },
     "OpsiCrossMonth": {
       "name": "跨月每日",
       "help": "    Alas將在大世界跨月重置之前10分鐘進入大世界，等待大世界重置但不退出大世界，然後完成新一天的大世界每日、隱秘海域、深淵海域和短貓相接，以獲得額外的金菜。運行大世界每日時，按\"大世界每日\"任務設定運行，其餘同理。\n    重要：Alas等待跨月期間，請不要操作遊戲。"
@@ -2647,10 +2651,11 @@
     }
   },
   "OpsiScheduling": {
-    "_info": { "name": "黃幣與行動力調度", "help": "依黃幣與總行動力自動協調侵蝕1練級和短貓相接。" },
+    "_info": { "name": "智能調度", "help": "依黃幣與總行動力自動協調侵蝕1練級和短貓相接。" },
     "UseSmartSchedulingOperationCoinsPreserve": { "name": "按黃幣目標回補", "help": "開啟後補至保留值加回補增量；關閉後僅在低於保留值時補充。" },
     "OperationCoinsPreserve": { "name": "侵蝕1黃幣保留值", "help": "低於此數量時暫停侵蝕1並補充黃幣。預設20000。" },
     "ActionPointPreserve": { "name": "調度行動力下限", "help": "總行動力達到此值後暫停資源任務，等待伺服器更新。預設200。" },
+    "MeowfficerActionPointPreserve": { "name": "短貓相接保留行動力", "help": "執行短貓相接時至少保留的總行動力；低於此值時暫停補黃幣，避免行動力過低。預設1000。" },
     "OperationCoinsReturnThreshold": { "name": "黃幣回補增量", "help": "保留值之外額外補充的數量。預設60000，總回切目標為80000。" },
     "EnableMeowfficerFarming": { "name": "允許短貓相接補黃幣", "help": "黃幣不足時允許調度器使用短貓相接補充。" },
     "EnableHazard1Leveling": { "name": "允許侵蝕1練級", "help": "黃幣達到目標後允許調度器執行侵蝕1練級。" }

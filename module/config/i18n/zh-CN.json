@@ -254,6 +254,10 @@
       "name": "侵蚀1练级",
       "help": ""
     },
+    "OpsiScheduling": {
+      "name": "智能调度",
+      "help": ""
+    },
     "OpsiCrossMonth": {
       "name": "跨月每日",
       "help": "    Alas将在大世界跨月重置之前10分钟进入大世界，等待大世界重置但不退出大世界，然后完成新一天的大世界每日、隐秘海域、深渊海域和短猫相接，以获得额外的金菜。运行大世界每日时，按\"大世界每日\"任务设置运行，其余同理。\n    重要：Alas等待跨月期间，请不要操作游戏。"
@@ -2648,7 +2652,7 @@
   },
   "OpsiScheduling": {
     "_info": {
-      "name": "黄币与行动力调度",
+      "name": "智能调度",
       "help": "按黄币和总行动力自动协调侵蚀1练级与短猫相接。黄币目标模式会在低于保留值时补充，达到保留值加回补增量后返回侵蚀1。"
     },
     "UseSmartSchedulingOperationCoinsPreserve": {
@@ -2662,6 +2666,10 @@
     "ActionPointPreserve": {
       "name": "调度行动力下限",
       "help": "总行动力达到此值后暂停资源任务，并等待服务器刷新。默认200。"
+    },
+    "MeowfficerActionPointPreserve": {
+      "name": "短猫相接保留行动力",
+      "help": "运行短猫相接时至少保留的总行动力；低于此值时暂停补黄币，避免行动力过低。默认1000。"
     },
     "OperationCoinsReturnThreshold": {
       "name": "黄币回补增量",

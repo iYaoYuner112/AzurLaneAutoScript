@@ -15,7 +15,7 @@ class OpsiMeowfficerFarming(OSMap):
             logger.info('With CL1 leveling enabled, set action point preserve to 1000')
             self.config.OpsiMeowfficerFarming_ActionPointPreserve = 1000
         action_point_preserve = (
-            self.config.OpsiScheduling_ActionPointPreserve
+            self.config.OpsiScheduling_MeowfficerActionPointPreserve
             if self.is_smart_scheduling_enabled
             else self.config.OpsiMeowfficerFarming_ActionPointPreserve
         )

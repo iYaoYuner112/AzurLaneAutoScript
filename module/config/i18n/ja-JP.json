@@ -254,6 +254,10 @@
       "name": "CL1 Leveling",
       "help": ""
     },
+    "OpsiScheduling": {
+      "name": "スマートスケジューリング",
+      "help": ""
+    },
     "OpsiCrossMonth": {
       "name": "Cross Month Daily",
       "help": "    ALAS will enter OpSi 10min before OpSi reset, wait until OpSi reset but not exit OpSi. Then do the daily, obscure, abyssal and meowfficer farming to get extra gold plates. When running dailies, settings in task \"OpSiDaily\" are used, the rest function are the same.\n    IMPORTANT: Please do not touch the game while ALAS is waiting for OpSi reset."
@@ -2647,10 +2651,11 @@
     }
   },
   "OpsiScheduling": {
-    "_info": { "name": "黄色通貨と行動力の調整", "help": "黄色通貨と総行動力に応じて侵蝕1と指揮官育成を切り替えます。" },
+    "_info": { "name": "スマートスケジューリング", "help": "黄色通貨と総行動力に応じて侵蝕1と指揮官育成を切り替えます。" },
     "UseSmartSchedulingOperationCoinsPreserve": { "name": "黄色通貨目標まで補充", "help": "有効時は保留値と回復量の合計に達するまで補充します。" },
     "OperationCoinsPreserve": { "name": "侵蝕1の黄色通貨保留値", "help": "この値を下回ると黄色通貨を補充します。既定値: 20000。" },
     "ActionPointPreserve": { "name": "調整時の行動力下限", "help": "総行動力がこの値以下になると次回更新まで待機します。既定値: 200。" },
+    "MeowfficerActionPointPreserve": { "name": "指揮官育成時の行動力保留", "help": "指揮官育成中に保留する総行動力です。この値以下になると黄幣補充を一時停止します。既定値: 1000。" },
     "OperationCoinsReturnThreshold": { "name": "黄色通貨の回復量", "help": "保留値に加えて補充する量です。既定値: 60000、合計目標は80000です。" },
     "EnableMeowfficerFarming": { "name": "指揮官育成を許可", "help": "黄色通貨不足時に指揮官育成を実行します。" },
     "EnableHazard1Leveling": { "name": "侵蝕1レベリングを許可", "help": "黄色通貨が目標に達した後、侵蝕1を実行します。" }

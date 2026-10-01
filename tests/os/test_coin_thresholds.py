@@ -8,6 +8,7 @@ def decide(yellow_coins, total_ap, active=False, coin_target_mode=True):
         coin_preserve=20000,
         coin_return_threshold=60000,
         ap_preserve=200,
+        meow_ap_preserve=1000,
         coin_target_mode=coin_target_mode,
         coin_replenish_active=active,
     )
@@ -28,8 +29,11 @@ def test_coin_target_mode_does_not_replenish_before_threshold():
 
 def test_insufficient_ap_waits_without_clearing_replenishment_state():
     assert decide(30000, 200, active=True) == ('wait', True)
+    assert decide(30000, 1000, active=True) == ('wait', True)
+    assert decide(30000, 1001, active=True) == ('meow', True)
 
 
 def test_action_point_mode_replenishes_only_below_coin_reserve():
-    assert decide(19999, 1000, coin_target_mode=False) == ('meow', False)
-    assert decide(20000, 1000, coin_target_mode=False) == ('cl1', False)
+    assert decide(19999, 1001, coin_target_mode=False) == ('meow', False)
+    assert decide(20000, 1001, coin_target_mode=False) == ('cl1', False)
+    assert decide(19999, 1000, coin_target_mode=False) == ('wait', False)

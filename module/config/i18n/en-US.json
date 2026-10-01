@@ -254,6 +254,10 @@
       "name": "CL1 Leveling",
       "help": ""
     },
+    "OpsiScheduling": {
+      "name": "Smart Scheduling",
+      "help": ""
+    },
     "OpsiCrossMonth": {
       "name": "Cross Month Daily",
       "help": "    ALAS will enter OpSi 10min before OpSi reset, wait until OpSi reset but not exit OpSi. Then do the daily, obscure, abyssal and meowfficer farming to get extra gold plates. When running dailies, settings in task \"OpSiDaily\" are used, the rest function are the same.\n    IMPORTANT: Please do not touch the game while ALAS is waiting for OpSi reset."
@@ -2648,7 +2652,7 @@
   },
   "OpsiScheduling": {
     "_info": {
-      "name": "Yellow Coin and Action Point Scheduling",
+      "name": "Smart Scheduling",
       "help": "Coordinate CL1 leveling and meowfficer farming from current yellow coins and total action points. Coin target mode replenishes below the reserve and returns to CL1 at reserve plus the return threshold."
     },
     "UseSmartSchedulingOperationCoinsPreserve": {
@@ -2662,6 +2666,10 @@
     "ActionPointPreserve": {
       "name": "Scheduling Action Point Floor",
       "help": "Pause resource tasks when total action points reach this amount and wait for the next server update. Default: 200."
+    },
+    "MeowfficerActionPointPreserve": {
+      "name": "Meowfficer Farming Action Point Reserve",
+      "help": "Minimum total action points to keep while running meowfficer farming. Coin replenishment pauses at or below this value. Default: 1000."
     },
     "OperationCoinsReturnThreshold": {
       "name": "Yellow Coin Return Increment",

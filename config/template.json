@@ -1894,6 +1894,7 @@
       "UseSmartSchedulingOperationCoinsPreserve": true,
       "OperationCoinsPreserve": 20000,
       "ActionPointPreserve": 200,
+      "MeowfficerActionPointPreserve": 1000,
       "OperationCoinsReturnThreshold": 60000,
       "EnableMeowfficerFarming": true,
       "EnableHazard1Leveling": true
