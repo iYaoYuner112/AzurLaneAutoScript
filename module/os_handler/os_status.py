@@ -10,6 +10,7 @@ from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.ocr.ocr import Digit
 from module.os_shop.assets import OS_SHOP_CHECK, OS_SHOP_PURPLE_COINS, SHOP_PURPLE_COINS, SHOP_YELLOW_COINS
+from module.statistics.resource_monitor import record_dashboard_resource
 from module.ui.ui import UI
 
 if server.server != 'jp':
@@ -99,13 +100,17 @@ class OSStatus(UI):
             else:
                 break
 
+        if yellow_coins >= 100:
+            record_dashboard_resource(self.config, 'YellowCoin', yellow_coins)
         return yellow_coins
 
     def get_purple_coins(self) -> int:
         if self.appear(OS_SHOP_CHECK):
-            return OCR_OS_SHOP_PURPLE_COINS.ocr(self.device.image)
+            purple_coins = OCR_OS_SHOP_PURPLE_COINS.ocr(self.device.image)
         else:
-            return OCR_SHOP_PURPLE_COINS.ocr(self.device.image)
+            purple_coins = OCR_SHOP_PURPLE_COINS.ocr(self.device.image)
+        record_dashboard_resource(self.config, 'PurpleCoin', purple_coins)
+        return purple_coins
 
     def os_shop_get_coins(self):
         self._shop_yellow_coins = self.get_yellow_coins()

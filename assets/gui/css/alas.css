@@ -382,6 +382,59 @@ pre.rich-traceback-code {
     height: 100%;
     overflow: auto;
     display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+#pywebio-scope-resources {
+    grid-column: 1 / -1;
+    min-width: 0;
+    margin: .3125rem;
+    padding: .625rem;
+    border-radius: .5rem;
+    background-color: rgba(128, 128, 128, .08);
+}
+
+#pywebio-scope-resource-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin: 0 .25rem .5rem;
+}
+
+*[style*="--overview-resource-row--"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: .5rem;
+}
+
+*[style*="--overview-resource-card--"],
+*[style*="--overview-resource-card-stale--"] {
+    min-width: 0;
+    padding: .5rem .625rem;
+    border: 1px solid rgba(128, 128, 128, .3);
+    border-radius: .375rem;
+    background-color: rgba(128, 128, 128, .05);
+}
+
+*[style*="--overview-resource-card-stale--"] {
+    opacity: .65;
+}
+
+*[style*="--overview-resource-label--"] {
+    color: #777;
+    font-size: .85rem;
+}
+
+*[style*="--overview-resource-value--"] {
+    font-size: 1.2rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+*[style*="--overview-resource-updated--"] {
+    color: #777;
+    font-size: .7rem;
 }
 
 #pywebio-scope-running,

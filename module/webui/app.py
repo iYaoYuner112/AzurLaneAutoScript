@@ -413,7 +413,24 @@ class AlasGUI(Frame):
         self.init_menu(name="Overview")
         self.set_title(t(f"Gui.MenuAlas.Overview"))
 
-        put_scope("overview", [put_scope("schedulers"), put_scope("logs")])
+        put_scope(
+            "overview",
+            [put_scope("resources"), put_scope("schedulers"), put_scope("logs")],
+        )
+
+        with use_scope("resources"):
+            put_scope(
+                "resource-heading",
+                [
+                    put_text(t("Gui.Overview.Resources")).style(
+                        "font-size: 1.25rem; margin: auto .5rem auto;"
+                    ),
+                    put_text(t("Gui.Overview.ResourceHint")).style(
+                        "--arg-help--"
+                    ),
+                ],
+            )
+            put_scope("resource-cards")
 
         with use_scope("schedulers"):
             put_scope(
@@ -587,6 +604,7 @@ class AlasGUI(Frame):
             return
         self.alas_config.load()
         self.alas_config.get_next_task()
+        self._update_overview_resources()
 
         if len(self.alas_config.pending_task) >= 1:
             if self.alas.alive:
@@ -636,6 +654,72 @@ class AlasGUI(Frame):
                     put_task(task)
             else:
                 put_text(t("Gui.Overview.NoTask")).style("--overview-notask-text--")
+
+    def _update_overview_resources(self) -> None:
+        resources = deep_get(
+            self.alas_config.data,
+            keys="Alas.Storage.Storage.ResourceMonitor",
+            default={},
+        )
+        if not isinstance(resources, dict):
+            resources = {}
+
+        items = [
+            ("Oil", "ResourceOil"),
+            ("Coin", "ResourceCoin"),
+            ("EventPT", "ResourceEventPT"),
+            ("YellowCoin", "ResourceYellowCoin"),
+            ("PurpleCoin", "ResourcePurpleCoin"),
+            ("ActionPoint", "ResourceActionPoint"),
+        ]
+        cards = []
+        now = datetime.now()
+        for name, label in items:
+            resource = resources.get(name, {})
+            if not isinstance(resource, dict):
+                resource = {}
+            value = resource.get("Value")
+            record = resource.get("Record")
+            total = resource.get("Total")
+            value_text = f"{value:,}" if isinstance(value, int) else "—"
+            if name == "ActionPoint" and isinstance(total, int):
+                value_text = f"{value_text} / {total:,}"
+
+            try:
+                record_time = datetime.strptime(record, "%Y-%m-%d %H:%M:%S")
+                is_stale = (now - record_time).total_seconds() > 86400
+            except (TypeError, ValueError):
+                record_time = None
+                is_stale = False
+            if record_time is None:
+                updated = t("Gui.Overview.ResourceWaiting")
+            elif is_stale:
+                updated = f"{t('Gui.Overview.ResourceStale')} · {record}"
+            else:
+                updated = f"{t('Gui.Overview.ResourceUpdated')} · {record}"
+            if name == "ActionPoint" and isinstance(total, int):
+                updated = f"{updated} · {t('Gui.Overview.ResourceActionPointTotal')}"
+
+            card = put_column(
+                [
+                    put_text(t(f"Gui.Overview.{label}")).style(
+                        "--overview-resource-label--"
+                    ),
+                    put_text(value_text).style("--overview-resource-value--"),
+                    put_text(updated).style("--overview-resource-updated--"),
+                ],
+                size="auto auto auto",
+            )
+            card.style(
+                "--overview-resource-card-stale--"
+                if is_stale
+                else "--overview-resource-card--"
+            )
+            cards.append(card)
+
+        clear("resource-cards")
+        with use_scope("resource-cards"):
+            put_row(cards).style("--overview-resource-row--")
 
     @use_scope("content", clear=True)
     def alas_daemon_overview(self, task: str) -> None:

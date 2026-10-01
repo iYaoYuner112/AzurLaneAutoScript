@@ -10,6 +10,7 @@ from module.base.utils import color_similar, get_color
 from module.campaign.assets import OCR_COIN, OCR_EVENT_PT, OCR_OIL, OCR_OIL_CHECK
 from module.logger import logger
 from module.ocr.ocr import Digit, Ocr
+from module.statistics.resource_monitor import record_dashboard_resource
 from module.ui.ui import UI
 
 if server.server != 'jp':
@@ -55,6 +56,7 @@ class CampaignStatus(UI):
         if res:
             pt = int(res.group(1))
             logger.attr('Event_PT', pt)
+            record_dashboard_resource(self.config, 'EventPT', pt)
             return pt
         else:
             logger.warning(f'Invalid pt result: {pt}')
@@ -81,6 +83,8 @@ class CampaignStatus(UI):
             if amount >= 100:
                 break
 
+        if amount >= 100:
+            record_dashboard_resource(self.config, 'Coin', amount)
         return amount
 
     def _get_oil(self):
@@ -128,6 +132,8 @@ class CampaignStatus(UI):
             if amount >= 100:
                 break
 
+        if amount >= 100:
+            record_dashboard_resource(self.config, 'Oil', amount)
         return amount
 
     def is_balancer_task(self):

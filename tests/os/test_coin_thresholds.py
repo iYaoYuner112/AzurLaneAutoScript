@@ -1,4 +1,5 @@
 from module.os.tasks.scheduling import decide_resource_action
+from module.statistics.resource_monitor import record_dashboard_resource
 
 
 def decide(yellow_coins, total_ap, active=False, coin_target_mode=True):
@@ -37,3 +38,33 @@ def test_action_point_mode_replenishes_only_below_coin_reserve():
     assert decide(19999, 1001, coin_target_mode=False) == ('meow', False)
     assert decide(20000, 1001, coin_target_mode=False) == ('cl1', False)
     assert decide(19999, 1000, coin_target_mode=False) == ('wait', False)
+
+
+class FakeResourceConfig:
+    def __init__(self):
+        self.resources = {}
+
+    def cross_get(self, keys, default=None):
+        return self.resources.get('ResourceMonitor', default)
+
+    def cross_set(self, keys, value):
+        self.resources['ResourceMonitor'] = value
+
+
+def test_resource_monitor_records_value_and_action_point_total():
+    config = FakeResourceConfig()
+
+    recorded = record_dashboard_resource(
+        config,
+        'ActionPoint',
+        value=125,
+        total=1125,
+        now=__import__('datetime').datetime(2026, 10, 1, 12, 0, 0),
+    )
+
+    assert recorded
+    assert config.resources['ResourceMonitor']['ActionPoint'] == {
+        'Value': 125,
+        'Total': 1125,
+        'Record': '2026-10-01 12:00:00',
+    }

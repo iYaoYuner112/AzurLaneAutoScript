@@ -9,6 +9,7 @@ from module.logger import logger
 from module.ocr.ocr import Digit, DigitCounter
 from module.os_handler.assets import *
 from module.os_handler.map_event import MapEventHandler
+from module.statistics.resource_monitor import record_dashboard_resource
 from module.statistics.item import Item, ItemGrid
 from module.ui.assets import OS_CHECK
 from module.ui.ui import UI
@@ -141,6 +142,7 @@ class ActionPointHandler(UI, MapEventHandler):
         self._action_point_current = current
         self._action_point_box = box
         self._action_point_total = total
+        record_dashboard_resource(self.config, 'ActionPoint', current, total=total)
         # handle exceeds
         if total > 3000:
             self.config.override(OpsiGeneral_DoRandomMapEvent=False)

@@ -10,7 +10,7 @@
 }
 
 #pywebio-scope-overview {
-    grid-auto-flow: column;
+    grid-auto-flow: row;
     grid-template-columns: minmax(16rem, 20rem) minmax(24rem, 1fr);
 }
 
