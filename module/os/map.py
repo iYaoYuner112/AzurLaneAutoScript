@@ -1597,26 +1597,3 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         logger.warning('Too many trial on map rescan, stop')
         self.fleet_set(self.config.OpsiFleet_Fleet)
         return False
-
-    def consume_resume_extra_scan(self):
-        """
-        Run one extra full map scan after OpsiScheduling resumes from an
-        interruption by another task.
-
-        The `_resume_extra_scan` flag is set on this object by
-        OpsiScheduling.os_scheduling() when it detects a resume, so it is only
-        present while running inside the scheduling loop. It is consumed on the
-        first farming round to catch map events (exploration containers and
-        rewards), Akashi's shop, and the two kinds of Siren devices (scanning
-        device and logging tower) that spawned while we were away.
-        """
-        if not getattr(self, '_resume_extra_scan', False):
-            return
-        self._resume_extra_scan = False
-        logger.info('Extra map scan after OpsiScheduling resumed')
-        # Reset the scan state before rescanning, matching run_auto_search and
-        # run_strategic_search. Otherwise `_solved_map_event` may still be the
-        # class-level shared set and would leak solved events across objects.
-        self._solved_map_event = set()
-        self._solved_fleet_mechanism = False
-        self.map_rescan(rescan_mode='full')

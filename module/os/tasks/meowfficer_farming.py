@@ -78,7 +78,6 @@ class OpsiMeowfficerFarming(OSMap):
                     logger.hr(f'OS meowfficer farming, zone_id={zone.zone_id}', level=1)
                     self.globe_goto(zone, refresh=True)
                     self.fleet_set(self.config.OpsiFleet_Fleet)
-                    self.consume_resume_extra_scan()
                     self.os_order_execute(
                         recon_scan=False,
                         submarine_call=self.config.OpsiFleet_Submarine)
@@ -95,7 +94,6 @@ class OpsiMeowfficerFarming(OSMap):
                 logger.hr(f'OS meowfficer farming, zone_id={zones[0].zone_id}', level=1)
                 self.globe_goto(zones[0])
                 self.fleet_set(self.config.OpsiFleet_Fleet)
-                self.consume_resume_extra_scan()
                 self.os_order_execute(
                     recon_scan=False,
                     submarine_call=self.config.OpsiFleet_Submarine)

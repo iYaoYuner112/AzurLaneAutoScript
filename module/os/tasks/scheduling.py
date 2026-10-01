@@ -45,35 +45,11 @@ class OpsiScheduling(OSMap):
         finally:
             self.config.bind('OpsiScheduling')
 
-    def _scheduling_storage(self):
-        state = self.config.cross_get('OpsiScheduling.Storage.Storage', default={})
-        if not isinstance(state, dict):
-            state = {}
-        return state
-
-    def _scheduling_interrupted(self):
-        return bool(self._scheduling_storage().get('SchedulingInterrupted', False))
-
-    def _set_scheduling_interrupted(self, interrupted):
-        state = self._scheduling_storage()
-        state['SchedulingInterrupted'] = bool(interrupted)
-        self.config.cross_set('OpsiScheduling.Storage.Storage', state)
-
     def os_scheduling(self):
         if self.is_in_opsi_explore():
             logger.info('OpsiExplore is still running, delay resource scheduling')
-            self._set_scheduling_interrupted(False)
             self.config.task_delay(server_update=True)
             self.config.task_stop()
-
-        # If the previous run was interrupted by another task (task switch),
-        # do one extra map scan on the first farming round so map events that
-        # spawned while we were away are not missed. A clean stop clears the
-        # flag, an interruption leaves it set, so it survives until this resume.
-        self._resume_extra_scan = self._scheduling_interrupted()
-        if self._resume_extra_scan:
-            logger.info('OpsiScheduling resumed after interruption, do an extra map scan')
-        self._set_scheduling_interrupted(True)
 
         while True:
             yellow_coins = self.get_yellow_coins()
@@ -111,7 +87,6 @@ class OpsiScheduling(OSMap):
                 f'action={action}, coin_replenish_active={coin_replenish_active}'
             )
             if action == 'wait':
-                self._set_scheduling_interrupted(False)
                 self.config.task_delay(server_update=True)
                 self.config.task_stop()
 
@@ -123,7 +98,6 @@ class OpsiScheduling(OSMap):
                 enabled = self.config.OpsiScheduling_EnableHazard1Leveling
             if not enabled:
                 logger.warning(f'{task} is disabled in OpsiScheduling')
-                self._set_scheduling_interrupted(False)
                 self.config.task_delay(server_update=True)
                 self.config.task_stop()
 
