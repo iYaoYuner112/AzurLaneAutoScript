@@ -62,6 +62,53 @@ class AzurLaneAutoScript:
             logger.exception(e)
             exit(1)
 
+    @cached_property
+    def resource_monitor(self):
+        """
+        Persistent resource monitor: holds resource state, history and change
+        events across the whole run. It is a low-priority, non-blocking tracker
+        (no background OCR thread); the collector feeds it at safe points.
+        """
+        from module.statistics.resource_monitor import ResourceMonitor
+        monitor = ResourceMonitor(confirm_reads=1)
+        monitor.on_change(self._log_resource_change)
+        monitor.start()
+        return monitor
+
+    def _log_resource_change(self, event):
+        logger.info(
+            f'[ResourceMonitor] changed: {event.resource} '
+            f'{event.old_value} -> {event.new_value} ({event.delta:+d})'
+        )
+
+    def refresh_resources(self):
+        """
+        Refresh resources at a safe point (game idle on the main page).
+
+        Only runs when ResourceMonitor.Enabled is on and the configured interval
+        has elapsed. Never raises into the main loop: any collector failure is
+        logged and swallowed so monitoring can not crash automation.
+        """
+        try:
+            enabled = self.config.ResourceMonitor_Enabled
+            interval = int(self.config.ResourceMonitor_Interval)
+        except Exception:
+            enabled, interval = False, 10
+        if not enabled:
+            return
+        interval = max(interval, 1) * 60  # minutes -> seconds
+        now = time.time()
+        last = getattr(self, '_resource_last_refresh', 0)
+        if now - last < interval:
+            return
+        self._resource_last_refresh = now
+        try:
+            from module.statistics.resource_collector import ResourceCollector
+            collector = ResourceCollector(self.config, self.device, monitor=self.resource_monitor)
+            collector.refresh_main()
+        except Exception as e:
+            logger.warning(f'[ResourceMonitor] refresh failed: {e}')
+
     def run(self, command, skip_first_screenshot=False):
         try:
             if not skip_first_screenshot:
@@ -526,6 +573,8 @@ class AzurLaneAutoScript:
                 elif method == 'goto_main':
                     logger.info('Goto main page during wait')
                     self.run('goto_main')
+                    # Safe point: game is idle on the main page. Refresh resources.
+                    self.refresh_resources()
                     release_resources()
                     self.device.release_during_wait()
                     if not self.wait_until(task.next_run):

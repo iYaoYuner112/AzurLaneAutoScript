@@ -684,6 +684,10 @@ class AlasGUI(Frame):
             value_text = f"{value:,}" if isinstance(value, int) else "—"
             if name == "ActionPoint" and isinstance(total, int):
                 value_text = f"{value_text} / {total:,}"
+            delta = resource.get("Delta")
+            if isinstance(delta, int) and delta != 0:
+                sign = "+" if delta > 0 else ""
+                value_text = f"{value_text} ({sign}{delta:,})"
 
             try:
                 record_time = datetime.strptime(record, "%Y-%m-%d %H:%M:%S")

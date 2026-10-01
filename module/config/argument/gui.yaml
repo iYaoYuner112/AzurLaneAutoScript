@@ -47,6 +47,18 @@ MenuDevelop:
 Overview:
   Scheduler:
   Log:
+  Resources:
+  ResourceHint:
+  ResourceOil:
+  ResourceCoin:
+  ResourceEventPT:
+  ResourceYellowCoin:
+  ResourcePurpleCoin:
+  ResourceActionPoint:
+  ResourceActionPointTotal:
+  ResourceWaiting:
+  ResourceUpdated:
+  ResourceStale:
   Running:
   Pending:
   Waiting:

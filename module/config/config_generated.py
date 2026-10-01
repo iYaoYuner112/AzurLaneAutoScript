@@ -43,6 +43,10 @@ class GeneratedConfig:
     Optimization_TaskHoardingDuration = 0
     Optimization_WhenTaskQueueEmpty = 'goto_main'  # stay_there, goto_main, close_game
 
+    # Group `ResourceMonitor`
+    ResourceMonitor_Enabled = False  # True, False
+    ResourceMonitor_Interval = 10
+
     # Group `DropRecord`
     DropRecord_SaveFolder = './screenshots'
     DropRecord_AzurStatsID = None
@@ -438,6 +442,14 @@ class GeneratedConfig:
     OpsiMonthBoss_CheckAdaptability = True
     OpsiMonthBoss_ForceRun = False
 
+    # Group `OpsiMeowfficerFarming`
+    OpsiMeowfficerFarming_ActionPointPreserve = 1000
+    OpsiMeowfficerFarming_HazardLevel = 5  # 3, 4, 5, 6, 10
+    OpsiMeowfficerFarming_TargetZone = 0
+
+    # Group `OpsiHazard1Leveling`
+    OpsiHazard1Leveling_TargetZone = 0  # 0, 44, 22
+
     # Group `OpsiScheduling`
     OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
     OpsiScheduling_OperationCoinsPreserve = 20000
@@ -447,14 +459,6 @@ class GeneratedConfig:
     OpsiScheduling_EnableMeowfficerFarming = True
     OpsiScheduling_EnableHazard1Leveling = True
     OpsiScheduling_ExecuteFixedPatrolScan = False
-
-    # Group `OpsiMeowfficerFarming`
-    OpsiMeowfficerFarming_ActionPointPreserve = 1000
-    OpsiMeowfficerFarming_HazardLevel = 5  # 3, 4, 5, 6, 10
-    OpsiMeowfficerFarming_TargetZone = 0
-
-    # Group `OpsiHazard1Leveling`
-    OpsiHazard1Leveling_TargetZone = 0  # 0, 44, 22
 
     # Group `IslandProduction`
     IslandProduction_HardFloorItems = '{}'

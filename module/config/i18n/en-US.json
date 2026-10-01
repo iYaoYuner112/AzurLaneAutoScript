@@ -246,16 +246,16 @@
       "name": "Monthly Boss",
       "help": "To clear (easy/difficult) monthly bosses, the following conditions must be met to use this function:\n- Clear the main task of the big world\n- Enable the Great World Land Reclamation Mission or use the Battle Information Recorder (5000 oil props)\nIf the easy difficulty fails, the attack will be repeated according to the submarine settings; if the difficult difficulty fails, the mission will be terminated directly"
     },
+    "OpsiScheduling": {
+      "name": "Smart Scheduling",
+      "help": ""
+    },
     "OpsiMeowfficerFarming": {
       "name": "Meowfficer Farming",
       "help": ""
     },
     "OpsiHazard1Leveling": {
       "name": "CL1 Leveling",
-      "help": ""
-    },
-    "OpsiScheduling": {
-      "name": "Smart Scheduling",
       "help": ""
     },
     "OpsiCrossMonth": {
@@ -568,6 +568,22 @@
       "stay_there": "Stay There",
       "goto_main": "Goto Main Page",
       "close_game": "Close Game"
+    }
+  },
+  "ResourceMonitor": {
+    "_info": {
+      "name": "Resource Monitor",
+      "help": "Periodically read game resources (oil, coins, event PT, etc.) and record change history."
+    },
+    "Enabled": {
+      "name": "Enable",
+      "help": "When enabled, resources are refreshed while idle in Operation Siren.",
+      "True": "Enabled",
+      "False": "False"
+    },
+    "Interval": {
+      "name": "Refresh interval (minutes)",
+      "help": "Minimum interval between two resource refreshes, to avoid frequent screenshots."
     }
   },
   "DropRecord": {

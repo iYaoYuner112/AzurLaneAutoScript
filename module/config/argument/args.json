@@ -221,6 +221,21 @@
         ]
       }
     },
+    "ResourceMonitor": {
+      "Enabled": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "Interval": {
+        "type": "input",
+        "value": 10,
+        "validate": "^\\d+$"
+      }
+    },
     "DropRecord": {
       "SaveFolder": {
         "type": "input",
@@ -9235,11 +9250,7 @@
     "OpsiScheduling": {
       "UseSmartSchedulingOperationCoinsPreserve": {
         "type": "checkbox",
-        "value": true,
-        "option": [
-          true,
-          false
-        ]
+        "value": true
       },
       "OperationCoinsPreserve": {
         "type": "input",

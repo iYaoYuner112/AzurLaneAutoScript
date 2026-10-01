@@ -246,16 +246,16 @@
       "name": "月度Boss",
       "help": ""
     },
+    "OpsiScheduling": {
+      "name": "智能调度",
+      "help": ""
+    },
     "OpsiMeowfficerFarming": {
       "name": "短猫相接",
       "help": ""
     },
     "OpsiHazard1Leveling": {
       "name": "侵蚀1练级",
-      "help": ""
-    },
-    "OpsiScheduling": {
-      "name": "智能调度",
       "help": ""
     },
     "OpsiCrossMonth": {
@@ -568,6 +568,22 @@
       "stay_there": "停在原处",
       "goto_main": "前往主界面",
       "close_game": "关闭游戏"
+    }
+  },
+  "ResourceMonitor": {
+    "_info": {
+      "name": "资源监视器",
+      "help": "定时读取游戏资源（石油、物资、活动PT等）并记录数值变化历史。"
+    },
+    "Enabled": {
+      "name": "启用",
+      "help": "开启后在大世界空闲时定时刷新资源数据。",
+      "True": "已启用",
+      "False": "False"
+    },
+    "Interval": {
+      "name": "刷新间隔（分钟）",
+      "help": "两次资源刷新之间的最小间隔，避免频繁截图识别。"
     }
   },
   "DropRecord": {

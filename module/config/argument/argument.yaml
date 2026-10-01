@@ -96,6 +96,14 @@ Optimization:
   WhenTaskQueueEmpty:
     value: goto_main
     option: [ stay_there, goto_main, close_game ]
+ResourceMonitor:
+  Enabled:
+    type: checkbox
+    value: false
+    option: [ true, false ]
+  Interval:
+    value: 10
+    validate: '^\d+$'
 DropRecord:
   SaveFolder: ./screenshots
   AzurStatsID: null
