@@ -76,6 +76,7 @@ class OpsiHazard1Leveling(OSMap):
             if self.zone.zone_id != zone or not self.is_zone_name_hidden:
                 self.globe_goto(self.name_to_zone(zone), types='SAFE', refresh=True)
             self.fleet_set(self.config.OpsiFleet_Fleet)
+            self.consume_resume_extra_scan()
             self.run_strategic_search()
             # Fixed patrol: read the radars of all fleets without moving any of
             # them first, then move fleets away and rescan the whole map when
