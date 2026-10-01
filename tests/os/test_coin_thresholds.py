@@ -1,4 +1,4 @@
-from module.os.tasks.scheduling import decide_resource_action
+from module.os.tasks.scheduling import OpsiScheduling, decide_resource_action
 from module.statistics.resource_monitor import record_dashboard_resource
 
 
@@ -43,12 +43,17 @@ def test_action_point_mode_replenishes_only_below_coin_reserve():
 class FakeResourceConfig:
     def __init__(self):
         self.resources = {}
+        self.modified = {}
 
     def cross_get(self, keys, default=None):
         return self.resources.get('ResourceMonitor', default)
 
     def cross_set(self, keys, value):
         self.resources['ResourceMonitor'] = value
+
+    def save(self):
+        self.resources['ResourceMonitor'] = self.modified['Alas.Storage.Storage.ResourceMonitor']
+        self.modified.clear()
 
 
 def test_resource_monitor_records_value_and_action_point_total():
@@ -68,3 +73,33 @@ def test_resource_monitor_records_value_and_action_point_total():
         'Total': 1125,
         'Record': '2026-10-01 12:00:00',
     }
+
+
+def test_child_task_settings_are_bound_and_scheduler_binding_is_restored():
+    class FakeConfig:
+        def __init__(self):
+            self.task = SimpleNamespace(command='OpsiScheduling')
+            self.bindings = []
+
+        def bind(self, task, func_list=None):
+            self.bindings.append((task, tuple(func_list or ())))
+
+    scheduler = SimpleNamespace(config=FakeConfig())
+
+    def run_child():
+        assert scheduler.config.bindings[-1] == (
+            'OpsiScheduling', ('OpsiHazard1Leveling',)
+        )
+        assert scheduler.config.task.command == 'OpsiScheduling'
+        raise RuntimeError('child task failed')
+
+    try:
+        OpsiScheduling._run_with_child_config(
+            scheduler, 'OpsiHazard1Leveling', run_child
+        )
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('expected child task failure')
+
+    assert scheduler.config.bindings[-1] == ('OpsiScheduling', ())

@@ -11,7 +11,8 @@ class OpsiMeowfficerFarming(OSMap):
         Recommend 3 or 5 for higher meowfficer searching point per action points ratio.
         """
         logger.hr(f'OS meowfficer farming, hazard_level={self.config.OpsiMeowfficerFarming_HazardLevel}', level=1)
-        if self.is_cl1_mode_enabled and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
+        if self.is_cl1_mode_enabled and not self.is_smart_scheduling_enabled \
+            and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
             logger.info('With CL1 leveling enabled, set action point preserve to 1000')
             self.config.OpsiMeowfficerFarming_ActionPointPreserve = 1000
         action_point_preserve = (

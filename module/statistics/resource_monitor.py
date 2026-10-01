@@ -35,5 +35,6 @@ def record_dashboard_resource(config, name, value, total=None, limit=None, now=N
     if limit is not None:
         record['Limit'] = limit
     resources[name] = record
-    config.cross_set(RESOURCE_STORAGE_PATH, resources)
+    config.modified[RESOURCE_STORAGE_PATH] = resources
+    config.save()
     return True

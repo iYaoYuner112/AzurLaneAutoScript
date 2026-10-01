@@ -38,6 +38,13 @@ def decide_resource_action(
 
 
 class OpsiScheduling(OSMap):
+    def _run_with_child_config(self, task, func):
+        self.config.bind('OpsiScheduling', func_list=[task])
+        try:
+            func()
+        finally:
+            self.config.bind('OpsiScheduling')
+
     def os_scheduling(self):
         if self.is_in_opsi_explore():
             logger.info('OpsiExplore is still running, delay resource scheduling')
@@ -90,7 +97,11 @@ class OpsiScheduling(OSMap):
                 self.config.task_stop()
 
             if action == 'meow':
-                self.os_meowfficer_farming()
+                self._run_with_child_config(
+                    'OpsiMeowfficerFarming', self.os_meowfficer_farming
+                )
             else:
-                self.os_hazard1_leveling()
+                self._run_with_child_config(
+                    'OpsiHazard1Leveling', self.os_hazard1_leveling
+                )
             self.config.check_task_switch()
