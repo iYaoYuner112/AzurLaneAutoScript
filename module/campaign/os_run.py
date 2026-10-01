@@ -43,7 +43,10 @@ class OSCampaignRun(OSMapOperation):
 
     def opsi_scheduling(self):
         campaign = self.load_campaign()
-        campaign.os_scheduling()
+        try:
+            campaign.os_scheduling()
+        except ActionPointLimit:
+            self.config.task_delay(server_update=True)
 
     def opsi_meowfficer_farming(self):
         try:

@@ -101,5 +101,7 @@ class OpsiMeowfficerFarming(OSMap):
                 self.config.check_task_switch()
 
             if self.is_smart_scheduling_enabled:
+                if self.config.task.command == 'OpsiScheduling':
+                    return
                 self.config.task_call('OpsiScheduling')
                 self.config.task_stop()

@@ -10,7 +10,7 @@ class OpsiHazard1Leveling(OSMap):
             OpsiGeneral_DoRandomMapEvent=True,
             OpsiGeneral_AkashiShopFilter='ActionPoint',
         )
-        if not self.config.is_task_enabled('OpsiMeowfficerFarming'):
+        if not self.is_smart_scheduling_enabled and not self.config.is_task_enabled('OpsiMeowfficerFarming'):
             self.config.cross_set(keys='OpsiMeowfficerFarming.Scheduler.Enable', value=True)
         while True:
             # Limited action point preserve of hazard 1 to 200
@@ -33,6 +33,8 @@ class OpsiHazard1Leveling(OSMap):
             if self.get_yellow_coins() < coin_preserve:
                 logger.info(f'Reach the limit of yellow coins, preserve={coin_preserve}')
                 if self.is_smart_scheduling_enabled:
+                    if self.config.task.command == 'OpsiScheduling':
+                        return
                     self.config.task_call('OpsiScheduling')
                     self.config.task_stop()
                 with self.config.multi_set():
@@ -79,5 +81,7 @@ class OpsiHazard1Leveling(OSMap):
             self.handle_after_auto_search()
             self.config.check_task_switch()
             if self.is_smart_scheduling_enabled:
+                if self.config.task.command == 'OpsiScheduling':
+                    return
                 self.config.task_call('OpsiScheduling')
                 self.config.task_stop()
