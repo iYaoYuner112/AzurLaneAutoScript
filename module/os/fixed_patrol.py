@@ -28,6 +28,19 @@ TARGET_PRIORITY = {
 }
 
 
+# 塞壬装置交互的子状态。描述「点击装置 → 弹窗 → 确认 → 完成」这条链走到了哪一步，
+# 使任务在弹窗进行到一半被抢占时，恢复后能「重新观察 UI」而不是回放过期的点击序列。
+# 状态可恢复、点击序列不可恢复。
+DEVICE_NONE = 'DEVICE_NONE'
+DEVICE_TARGETED = 'DEVICE_TARGETED'
+DEVICE_DIALOG_OPEN = 'DEVICE_DIALOG_OPEN'
+DEVICE_COMPLETED = 'DEVICE_COMPLETED'
+DEVICE_RECOVERY_REQUIRED = 'DEVICE_RECOVERY_REQUIRED'
+
+# 处于这些状态时被任务抢占，说明装置交互进行到一半，恢复后需重新观察 UI。
+DEVICE_INTERRUPTIBLE_STATES = frozenset({DEVICE_TARGETED, DEVICE_DIALOG_OPEN})
+
+
 class FixedPatrolTarget:
     """固定巡逻的一个候选目标。
 

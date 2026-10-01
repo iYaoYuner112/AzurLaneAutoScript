@@ -14,6 +14,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from module.config.config import AzurLaneConfig, Function, OS_MAP_STALE_KEY
+from module.os.fixed_patrol import DEVICE_NONE
 from module.os.map import OSMap
 
 
@@ -82,7 +83,7 @@ class StatefulConfig:
 
 
 def make_resume_stub(stale):
-    return SimpleNamespace(
+    stub = SimpleNamespace(
         config=StatefulConfig(stale),
         zone=SimpleNamespace(zone_id=22),
         _solved_map_event={'is_akashi'},
@@ -90,6 +91,10 @@ def make_resume_stub(stale):
         rescan_calls=[],
         map_rescan=lambda **kw: None,
     )
+    # Bind the real OSMap helpers used by ensure_map_state_current().
+    stub._os_map_was_interrupted = lambda: OSMap._os_map_was_interrupted(stub)
+    stub._device_state = DEVICE_NONE
+    return stub
 
 
 def test_os_map_was_interrupted_reads_flag():
@@ -97,19 +102,19 @@ def test_os_map_was_interrupted_reads_flag():
     assert OSMap._os_map_was_interrupted(make_resume_stub(False)) is False
 
 
-def test_handle_os_resume_does_full_rescan_and_invalidates():
+def test_ensure_map_state_current_does_full_rescan_and_invalidates():
     stub = make_resume_stub(True)
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
-    OSMap._handle_os_resume(stub)
+    OSMap.ensure_map_state_current(stub)
     assert stub.rescan_calls == [{'rescan_mode': 'full'}]
     assert stub._solved_map_event == set()
     assert stub._solved_fleet_mechanism is False
 
 
-def test_handle_os_resume_clears_stale_flag():
+def test_ensure_map_state_current_clears_stale_flag():
     stub = make_resume_stub(True)
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
-    OSMap._handle_os_resume(stub)
+    OSMap.ensure_map_state_current(stub)
     assert stub.config.stale is False
 
 
@@ -117,7 +122,7 @@ def test_resume_barrier_runs_once_per_interruption():
     """恢复屏障只做一次：清了标记后，后续进入不会再触发 rescan。"""
     stub = make_resume_stub(True)
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
-    OSMap._handle_os_resume(stub)
+    OSMap.ensure_map_state_current(stub)
     assert len(stub.rescan_calls) == 1
     # 标记已清除，第二次进入不会再次 FULL RESCAN
     assert OSMap._os_map_was_interrupted(stub) is False

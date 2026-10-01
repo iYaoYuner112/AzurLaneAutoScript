@@ -15,13 +15,20 @@ from module.map.map_base import location2node
 from module.os.assets import FLEET_EMP_DEBUFF, MAP_GOTO_GLOBE_FOG
 from module.os.fixed_patrol import (
     AKASHI_SHOP,
+    DEVICE_COMPLETED,
+    DEVICE_DIALOG_OPEN,
+    DEVICE_INTERRUPTIBLE_STATES,
+    DEVICE_NONE,
+    DEVICE_TARGETED,
     NORMAL_BATTLE,
     SIREN_PROBE,
     SIREN_INFORMATION_DEVICE,
     SPECIAL_RESOURCE,
     AntiLoopGuard,
+    FixedPatrolFleet,
     build_targets,
     choose_best_target,
+    choose_fleet_for_target,
 )
 from module.os.fleet import OSFleet
 from module.os.globe_camera import GlobeCamera
@@ -38,6 +45,11 @@ ALREADY_SOLVED_MAP_EVENTS = frozenset({
     'is_scanning_device',
 })
 
+# Cross-storage key for the Siren device interaction sub-state. It survives task
+# activations so a task interruption mid-dialog can be recovered by re-observing
+# the UI instead of replaying a stale click sequence.
+DEVICE_STATE_KEY = 'Opsi.Storage.DeviceState'
+
 
 def should_move_fleet_for_fixed_patrol(current_ap, question_unreachable):
     return question_unreachable or current_ap > 7
@@ -48,26 +60,50 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     def _os_map_was_interrupted(self):
         """
-        Whether the previous Opsi task was interrupted by another task.
+        Whether the in-memory Opsi map context can no longer be trusted.
 
         The flag is set by `AzurLaneConfig.task_switched()` when an Opsi task is
-        switched away from, and cleared here once the resume barrier runs.
+        switched away from (via `invalidate_map_state()`), and cleared once the
+        map state is re-synced.
         """
         return bool(self.config.cross_get(OS_MAP_STALE_KEY, default=False))
 
-    def _handle_os_resume(self):
+    def invalidate_map_state(self, reason=''):
         """
-        Resume barrier: re-establish the Operation Siren map context after a
-        task interruption.
+        Mark the in-memory Opsi map context as stale.
 
-        When an Opsi task is interrupted by another task, the game map may have
-        changed (enemies killed, zone refreshed, events spawned, fleet switched,
-        page changed). The pre-interruption map data must not be trusted, so do a
-        full rescan and invalidate stale caches. This barrier runs once per
-        interruption, not on every loop.
+        "Stale" does not mean the map definitely changed; it means we can no
+        longer guarantee it did not, so the cached targets / events / fleet
+        positions must be re-derived before use.
+
+        Args:
+            reason (str): Why the map state is being invalidated, for logging.
         """
-        logger.info('[OS RESUME] Opsi was interrupted by task switch, restoring map state')
+        logger.info(f'[OS][MAP] Mark stale: {reason or "UNKNOWN"}')
+        self.config.cross_set(OS_MAP_STALE_KEY, True)
+
+    def ensure_map_state_current(self):
+        """
+        Resume barrier: if the map state is stale, re-establish it before any
+        Opsi operation. Runs once per invalidation, not on every loop.
+
+        The re-sync does: invalidate stale scan caches -> FULL MAP RESCAN ->
+        rebuild targets (done later by the target selector). Fleet positions are
+        re-read by the fixed patrol / radar check when they are actually needed.
+        """
+        if not self._os_map_was_interrupted():
+            logger.info('[OS RESUME] Continue without interruption')
+            return
+        logger.info('[OS][MAP] Resync map state (stale detected)')
         logger.info(f'[OS RESUME] Current zone: {self.zone}')
+
+        # If a Siren device interaction was in progress when the task was
+        # interrupted, do NOT replay any stale click. Re-observe the UI: the full
+        # rescan below re-detects the device and re-decides from the real state.
+        if self._device_state in DEVICE_INTERRUPTIBLE_STATES:
+            logger.info(f'[OS][DEVICE] interruption detected during state={self._device_state}')
+            logger.info('[OS][DEVICE] recovery: re-observing current UI (no stale click)')
+
         # Invalidate stale scan caches before re-observing the map.
         self._solved_map_event = set()
         self._solved_fleet_mechanism = False
@@ -81,7 +117,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             logger.warning(f'[OS RESUME] full rescan failed, continue: {e}')
         # The barrier runs once per interruption.
         self.config.cross_set(OS_MAP_STALE_KEY, False)
-        logger.info('[OS RESUME] Map state restored, continuing')
+        logger.info('[OS][MAP] Map state resynced')
+
+    @property
+    def _device_state(self):
+        return self.config.cross_get(DEVICE_STATE_KEY, default=DEVICE_NONE) or DEVICE_NONE
+
+    def _set_device_state(self, state):
+        self.config.cross_set(DEVICE_STATE_KEY, state)
+        logger.info(f'[OS][DEVICE] state={state}')
 
     def os_init(self):
         """
@@ -133,8 +177,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         # Resume barrier: if the previous Opsi task was interrupted by another
         # task, the game map may have changed. Re-scan fully before continuing.
-        if self._os_map_was_interrupted():
-            self._handle_os_resume()
+        self.ensure_map_state_current()
 
         # Exit from special zones types, only SAFE and DANGEROUS are acceptable.
         if self.is_in_special_zone():
@@ -814,6 +857,18 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 f'Fixed patrol expected fleet {fleet}, but current fleet is {current}; skip it'
             )
             return False
+        # Record the fleet's position while it is the focused fleet, so that
+        # target-driven fleet selection (choose_fleet_for_target) can use real
+        # positions instead of blindly cycling. Re-sync the camera so `self.camera`
+        # reflects the fleet's grid, not the previously focused fleet's.
+        try:
+            self.update()
+            location = self.camera
+        except Exception as e:
+            logger.debug(f'Fixed patrol: failed to read Fleet{fleet} position: {e}')
+            location = None
+        self._fixed_patrol_fleet_positions[fleet] = location
+        logger.info(f'[OS][FLEET] Fleet{fleet} position={location}')
         return True
 
     def _fixed_patrol_candidate_grids(self, target_loc, occupied_locations=None):
@@ -1120,19 +1175,23 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         return moved
 
-    def _move_fleets_and_rescan(self, best_target=None):
+    def _move_fleets_and_rescan(self, best_target=None, fleets=None):
         """
         L2 of fixed patrol: move fleets away one by one and rescan the whole map.
 
         Each fleet is moved to its landing column (1 -> C1, 2 -> D1, 3 -> E1,
         4 -> F1) to get a blocking fleet out of the way, then the whole map is
         rescanned. The move stops as soon as an event is solved, so it never
-        blindly cycles all four fleets. A no-progress guard stops the loop and
-        logs a clear error if the same target + fleet repeats too often.
+        blindly cycles all four fleets. Fleets are ordered nearest-first to the
+        target (using the recorded positions), so the fleet most likely blocking
+        the target is moved first. A no-progress guard stops the loop and logs a
+        clear error if the same target + fleet repeats too often.
 
         Args:
             best_target (FixedPatrolTarget | None): The highest-priority target,
-                used to explain the fleet choice in the logs.
+                used to order fleets by distance and explain the choice in logs.
+            fleets (list[FixedPatrolFleet] | None): Fleet positions recorded
+                during the radar check. May be None when positions are unknown.
 
         Returns:
             bool: True if the target event was found and solved.
@@ -1140,12 +1199,22 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         primary = self.config.OpsiFleet_Fleet
         columns = {1: (2, 0), 2: (3, 0), 3: (4, 0), 4: (5, 0)}  # C1, D1, E1, F1
         order = [primary] + [fleet for fleet in (1, 2, 3, 4) if fleet != primary]
+        # Target-driven ordering: move the nearest fleet first. This is the real
+        # "choose fleet for target" decision; the fixed column is only the
+        # destination, not a rotation.
+        if fleets and best_target is not None and best_target.location is not None:
+            known = [f for f in fleets if f.location is not None]
+            known.sort(key=lambda f: (f.distance_to(best_target), f.index))
+            order = [f.index for f in known]
+            for index in (1, 2, 3, 4):
+                if index not in order:
+                    order.append(index)
         target_kind = best_target.kind if best_target is not None else None
         target_loc = best_target.location if best_target is not None else None
         if target_kind is not None:
             logger.info(
                 f'[OS] L2 target={target_kind} pos={target_loc}, '
-                f'moving fleets to their landing columns to unblock it'
+                f'fleet order={order}, moving nearest first to unblock it'
             )
         else:
             logger.info('[OS] L2 no known target, moving fleets to spread out and rescan')
@@ -1225,6 +1294,20 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             return bool(value)
 
     _fixed_patrol_loop_guard = AntiLoopGuard(max_repeats=3)
+    _fixed_patrol_fleet_positions = {}
+
+    def _fixed_patrol_fleets(self):
+        """
+        Describe the four fleets for target-driven selection, using the positions
+        recorded while each fleet was focused during the radar check. Fleets whose
+        position is unknown have `location=None`; `choose_fleet_for_target` then
+        prefers the nearest known fleet and falls back to the primary fleet.
+        """
+        fleets = []
+        for index in (1, 2, 3, 4):
+            location = self._fixed_patrol_fleet_positions.get(index)
+            fleets.append(FixedPatrolFleet(index, location=location))
+        return fleets
 
     def _fixed_patrol_targets(self):
         """
@@ -1309,8 +1392,26 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             logger.hr('Fixed patrol: read radar with all fleets, without moving')
             self._solved_map_event = set()
             self._solved_fleet_mechanism = False
+            self._fixed_patrol_fleet_positions = {}
             if self.clear_question_any_fleet():
                 return True
+
+            # ---- Target-driven fleet selection ----
+            # Now that every fleet's position is known (recorded during the radar
+            # check), pick the fleet best suited to reach the highest-priority
+            # target, instead of blindly cycling 1->2->3->4.
+            fleets = self._fixed_patrol_fleets()
+            selected_fleet = None
+            if best_target is not None:
+                selected_fleet = choose_fleet_for_target(best_target, fleets)
+                if selected_fleet is not None:
+                    logger.info(f'[OS][FLEET] Target={best_target.kind} pos={best_target.location}')
+                    for f in fleets:
+                        if f.location is not None:
+                            logger.info(f'[OS][FLEET] Candidate Fleet{f.index} distance={f.distance_to(best_target)}')
+                    logger.info(f'[OS][FLEET] Selected Fleet{selected_fleet.index}')
+                else:
+                    logger.info('[OS][FLEET] No valid fleet candidate for target')
 
             # ---- L2: move fleets ----
             # "Saw it but cannot reach it" can only be solved by moving a fleet and
@@ -1335,7 +1436,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     f'{self._FIXED_PATROL_L2_AP}, going to L2'
                 )
             logger.hr('Fixed patrol L2: move fleets and rescan the whole map')
-            self._move_fleets_and_rescan(best_target=best_target)
+            self._move_fleets_and_rescan(best_target=best_target, fleets=fleets)
             return bool(self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS)
         finally:
             # Restore the primary fleet, so that later steps do not work on a wrong fleet.
@@ -1483,29 +1584,37 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             # The probe is a special map event, not a normal battle target: click it,
             # wait for the operation popup, confirm it, then rescan. Never skip it to
             # continue the battle plan, otherwise its hidden events are missed.
+            self._set_device_state(DEVICE_TARGETED)
             self.device.click(grid)
+            self._set_device_state(DEVICE_DIALOG_OPEN)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 result = self.wait_until_walk_stable(
                     drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
             self.os_auto_search_run(drop=drop)
             if 'event' in result:
                 self._solved_map_event.add('is_scanning_device')
+                self._set_device_state(DEVICE_COMPLETED)
                 return True
             else:
+                self._set_device_state(DEVICE_NONE)
                 return False
 
         grids = self.view.select(is_logging_tower=True)
         if 'is_logging_tower' not in self._solved_map_event and grids and grids[0].is_logging_tower:
             grid = grids[0]
             logger.info(f'Found siren information device (logging tower) on {grid}, stop battle plan to handle it')
+            self._set_device_state(DEVICE_TARGETED)
             self.device.click(grid)
+            self._set_device_state(DEVICE_DIALOG_OPEN)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 result = self.wait_until_walk_stable(
                     drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
             if 'event' in result:
                 self._solved_map_event.add('is_logging_tower')
+                self._set_device_state(DEVICE_COMPLETED)
                 return True
             else:
+                self._set_device_state(DEVICE_NONE)
                 return False
 
         grids = self.view.select(is_fleet_mechanism=True)
