@@ -11,8 +11,6 @@
 from module.logger import logger
 from module.statistics.resource_monitor import (
     RESOURCE_COIN,
-    RESOURCE_EVENT_PT,
-    RESOURCE_OIL,
     RESOURCE_PURPLE_COIN,
     RESOURCE_YELLOW_COIN,
     ResourceMonitor,
@@ -26,7 +24,7 @@ class ResourceCollector:
         self.monitor = monitor
 
     def refresh_main(self):
-        """导航到主界面，读 Oil / Coin / EventPT 并提交。
+        """导航到主界面，读 Coin（物资）并提交。
 
         调用前应在主线安全点（如游戏空闲在主界面）。
         """
@@ -37,15 +35,11 @@ class ResourceCollector:
         if not ui.ui_page_appear(page_main):
             ui.ui_ensure(page_main)
 
-        oil = ui.get_oil()
         coin = ui.get_coin()
-        event_pt = ui.get_event_pt()
 
-        # get_oil/get_coin 失败返回 0；get_event_pt 无活动返回 0。都当 None 提交，保留旧值。
-        self.monitor.submit(RESOURCE_OIL, oil if oil >= 100 else None, source='collector')
+        # get_coin 失败返回 0，当 None 提交，保留旧值。
         self.monitor.submit(RESOURCE_COIN, coin if coin >= 100 else None, source='collector')
-        self.monitor.submit(RESOURCE_EVENT_PT, event_pt if event_pt > 0 else None, source='collector')
-        logger.info(f'[ResourceMonitor] scan: oil={oil}, coin={coin}, event_pt={event_pt}')
+        logger.info(f'[ResourceMonitor] scan: coin={coin}')
 
     def refresh_os(self):
         """导航到大世界，读黄币 / 紫币并提交。"""

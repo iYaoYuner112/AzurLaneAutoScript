@@ -415,7 +415,7 @@ class AlasGUI(Frame):
 
         put_scope(
             "overview",
-            [put_scope("resources"), put_scope("schedulers"), put_scope("logs")],
+            [put_scope("schedulers"), put_scope("resources"), put_scope("logs")],
         )
 
         with use_scope("resources"):
@@ -665,9 +665,7 @@ class AlasGUI(Frame):
             resources = {}
 
         items = [
-            ("Oil", "ResourceOil"),
             ("Coin", "ResourceCoin"),
-            ("EventPT", "ResourceEventPT"),
             ("YellowCoin", "ResourceYellowCoin"),
             ("PurpleCoin", "ResourcePurpleCoin"),
             ("ActionPoint", "ResourceActionPoint"),
