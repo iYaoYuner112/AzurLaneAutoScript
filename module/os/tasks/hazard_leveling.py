@@ -77,7 +77,11 @@ class OpsiHazard1Leveling(OSMap):
                 self.globe_goto(self.name_to_zone(zone), types='SAFE', refresh=True)
             self.fleet_set(self.config.OpsiFleet_Fleet)
             self.run_strategic_search()
-            if self.is_smart_scheduling_enabled and self.config.OpsiScheduling_ExecuteFixedPatrolScan:
+            # Fixed patrol: read the radars of all fleets without moving any of
+            # them first, then move fleets away and rescan the whole map when
+            # needed. Skipped when an event is already solved.
+            if self.is_smart_scheduling_enabled and self._forced_move_enabled() \
+                    and not self._solved_map_event:
                 self.execute_fixed_patrol_scan()
 
             self.handle_after_auto_search()

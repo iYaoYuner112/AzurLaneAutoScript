@@ -1,13 +1,16 @@
 import time
+from contextlib import suppress
 
 import inflection
 
 from module.base.timer import Timer
 from module.config.utils import get_os_reset_remain
-from module.exception import CampaignEnd, GameTooManyClickError, MapWalkError, RequestHumanTakeover, ScriptError
+from module.exception import CampaignEnd, GameStuckError, GameTooManyClickError, MapDetectionError, \
+    MapWalkError, RequestHumanTakeover, ScriptEnd, ScriptError
 from module.handler.login import LoginHandler, MAINTENANCE_ANNOUNCE
 from module.logger import logger
 from module.map.map import Map
+from module.map.map_base import location2node
 from module.os.assets import FLEET_EMP_DEBUFF, MAP_GOTO_GLOBE_FOG
 from module.os.fleet import OSFleet
 from module.os.globe_camera import GlobeCamera
@@ -756,19 +759,36 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             return False
         return True
 
-    def _fixed_patrol_candidate_grids(self, target_loc):
+    def _fixed_patrol_candidate_grids(self, target_loc, occupied_locations=None):
+        """
+        Generate candidate landing grids for fixed patrol.
+
+        The target grid may be out of the fleet's move range, so nearby empty sea
+        grids are used as fallbacks. A fleet which only reached a fallback still
+        counts as moved, because the fleet that blocked the event is no longer on
+        its original grid, so the following full rescan can find the event again.
+
+        Args:
+            target_loc (tuple[int, int]): Target location, (2, 0) is C1.
+            occupied_locations (iterable): Locations to avoid.
+
+        Returns:
+            list: Candidate grids, the target grid first.
+        """
+        occupied = set(occupied_locations or [])
         offsets = (
             (0, 0), (0, 1), (0, 2), (-1, 1), (1, 1),
             (-1, 2), (1, 2), (-1, 0), (1, 0), (0, 3),
         )
+        # Absolute fallback rows, which are row 12 and 13 on screen.
+        absolute_fallback_rows = (11, 12)
         candidates = []
         seen = set()
-        occupied = set(self.map.select(is_fleet=True).location)
         locations = [
             (target_loc[0] + dx, target_loc[1] + dy)
             for dx, dy in offsets
         ]
-        locations.extend((target_loc[0], row) for row in (11, 12))
+        locations.extend((target_loc[0], row) for row in absolute_fallback_rows)
 
         for location in locations:
             if location in seen or location not in self.map or location in occupied:
@@ -788,65 +808,416 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             candidates.append(grid)
         return candidates
 
-    def _move_fleet_to_patrol(self, fleet, target_loc):
-        for grid in self._fixed_patrol_candidate_grids(target_loc)[:4]:
+    def safe_swipe(self, start, end, duration=0.5, retries=2):
+        """
+        Swipe with retries.
+
+        Args:
+            start (tuple[int, int]): Swipe start point.
+            end (tuple[int, int]): Swipe end point.
+            duration (float): Swipe duration in seconds.
+            retries (int): Max attempts.
+
+        Returns:
+            bool: True if any attempt succeeded.
+        """
+        for attempt in range(1, retries + 1):
             try:
-                self._goto(grid.location)
+                with suppress(Exception):
+                    self.device.stuck_record_clear()
+                self.device.swipe(start, end, duration=duration)
+                time.sleep(0.45)
                 return True
-            except MapWalkError as error:
-                logger.warning(f'Fixed patrol fleet {fleet} cannot reach {grid}: {error}')
+            except Exception as e:
+                logger.warning(f'Fixed patrol: safe swipe attempt {attempt} failed: {e}')
+                time.sleep(0.4)
         return False
 
+    def _fixed_patrol_soft_recover(self):
+        """
+        Rebuild map data after a walk or click error, without restarting the game.
+
+        Returns:
+            bool: True if the map view is usable again.
+        """
+        logger.info('Fixed patrol: soft recover, screenshot and rebuild view')
+        self.device.screenshot()
+        try:
+            self.ui_ensure(page_os)
+            self.map_init(map_=None)
+            self.update()
+            return True
+        except Exception:
+            logger.debug('Fixed patrol: soft recover failed', exc_info=True)
+            return False
+
+    def _fixed_patrol_app_restart(self):
+        """
+        Last resort of fixed patrol: restart the game and rebuild map data.
+
+        Returns:
+            bool: True if the map view is usable again.
+        """
+        logger.warning('Fixed patrol: restarting game to recover')
+        try:
+            self.device.app_stop()
+            time.sleep(1.0)
+            self.device.app_start()
+            LoginHandler(self.config, self.device).handle_app_login()
+            self.ui_ensure(page_os)
+            time.sleep(0.8)
+            self.map_init(map_=None)
+            self.update()
+            return True
+        except Exception:
+            logger.error('Fixed patrol: restarting game failed', exc_info=True)
+            return False
+
+    def _try_fixed_patrol_move(self, fleet, target_grid, primary_target):
+        """
+        Move a fleet to one candidate grid by clicking it.
+
+        Fixed patrol only needs the fleet to leave its current grid, so the grid
+        is clicked directly instead of walking a planned path. This avoids the 20s
+        walk timeout, the camera rebuild and the repeated clicks on the same grid
+        that happen when path walking cannot reach the destination.
+
+        Args:
+            fleet (int): Fleet index, 1-4.
+            target_grid (Grid): Candidate grid to move to.
+            primary_target (tuple[int, int]): Target location of this fleet.
+
+        Returns:
+            bool: True if the fleet arrived.
+        """
+        try:
+            self.focus_to(target_grid.location)
+            self.update()
+            clickable_grid = self.convert_global_to_local(target_grid.location)
+        except KeyError:
+            logger.warning(
+                f'Fixed patrol: focused {location2node(target_grid.location)}, '
+                f'but no clickable grid in sight'
+            )
+            return False
+        except MapDetectionError:
+            # The map view is broken. Rebuilding it here is cheaper than letting the
+            # error reach the scheduler, which would restart the whole game.
+            logger.warning('Fixed patrol: map detection failed while focusing, skip candidate')
+            self._fixed_patrol_soft_recover()
+            return False
+
+        for try_index in range(2):
+            try:
+                with suppress(Exception):
+                    self.device.stuck_record_clear()
+                time.sleep(0.1)
+                self.device.click(clickable_grid)
+                self.wait_until_walk_stable(confirm_timer=Timer(1.5, count=4))
+                if target_grid.location == primary_target:
+                    logger.info(
+                        f'Fixed patrol: fleet {fleet} arrived '
+                        f'{location2node(target_grid.location)}'
+                    )
+                else:
+                    logger.info(
+                        f'Fixed patrol: fleet {fleet} cannot reach '
+                        f'{location2node(primary_target)}, '
+                        f'stopped at {location2node(target_grid.location)}'
+                    )
+                return True
+            except MapWalkError as error:
+                if str(error) == 'walk_out_of_step':
+                    logger.warning(
+                        f'Fixed patrol: fleet {fleet} moving to '
+                        f'{location2node(target_grid.location)} is out of range, '
+                        f'try another candidate'
+                    )
+                    return False
+                logger.warning(
+                    f'Fixed patrol: fleet {fleet} walk error: {error} ({try_index + 1}/2)'
+                )
+            except GameTooManyClickError as error:
+                logger.warning(
+                    f'Fixed patrol: fleet {fleet} click error: {error} ({try_index + 1}/2)'
+                )
+
+            if try_index == 0:
+                recovered = self._fixed_patrol_soft_recover()
+            else:
+                recovered = self._fixed_patrol_app_restart()
+            if not recovered:
+                return False
+            # The recovery may have changed the current fleet, ensure it again.
+            self.fleet_set(fleet)
+            try:
+                clickable_grid = self.convert_global_to_local(target_grid.location)
+            except KeyError:
+                logger.warning(
+                    f'Fixed patrol: fleet {fleet} lost '
+                    f'{location2node(target_grid.location)} after recovery'
+                )
+                return False
+            time.sleep(0.5)
+
+        return False
+
+    def _move_fleet_to_patrol(self, fleet, target_loc):
+        """
+        Force a fleet to leave its current grid.
+
+        Tries the target grid first, then nearby empty grids. The fleet counts as
+        moved as long as it left its original grid, because the fleet that blocked
+        the event is gone, and the following full rescan can find the event again.
+
+        Args:
+            fleet (int): Fleet index, 1-4.
+            target_loc (tuple[int, int]): Target location, (2, 0) is C1.
+
+        Returns:
+            bool: True if the fleet left its original grid.
+        """
+        target_grid_group = self.map.select(location=target_loc)
+        if not target_grid_group:
+            logger.warning(f'Fixed patrol: grid {target_loc} not found, skip fleet {fleet}')
+            return False
+        target_grid = target_grid_group[0]
+
+        logger.hr(
+            f'Fixed patrol: move fleet {fleet} to {location2node(target_grid.location)}', level=2)
+        if not self._set_fixed_patrol_fleet(fleet):
+            return False
+
+        # Reset the camera to a known corner first, so that the following
+        # focus_to() does not start from a stale camera position.
+        logger.info('Fixed patrol: reset camera position')
+        top_point = (640, 150)
+        bottom_point = (640, 600)
+        quick_ok = True
+        try:
+            for _ in range(2):
+                self.device.swipe(top_point, bottom_point, duration=0.3)
+                time.sleep(0.18)
+        except Exception:
+            quick_ok = False
+            logger.debug('Fixed patrol: quick swipe reset failed, trying safe swipe')
+        if not quick_ok and not self.safe_swipe(top_point, bottom_point, duration=0.55, retries=2):
+            logger.warning('Fixed patrol: camera reset failed, continue anyway')
+        time.sleep(0.45)
+
+        candidate_grids = self._fixed_patrol_candidate_grids(target_loc)
+        if not candidate_grids:
+            logger.warning(
+                f'Fixed patrol: fleet {fleet} has no available landing grid near '
+                f'{location2node(target_loc)}'
+            )
+            return False
+
+        moved = False
+        fallback_location = None
+        for candidate_index, candidate_grid in enumerate(candidate_grids[:4]):
+            if candidate_index > 0:
+                logger.info(
+                    f'Fixed patrol: fleet {fleet} try fallback '
+                    f'{location2node(candidate_grid.location)} '
+                    f'(target {location2node(target_loc)})'
+                )
+            if self._try_fixed_patrol_move(fleet, candidate_grid, target_loc):
+                if candidate_grid.location == target_loc:
+                    moved = True
+                    break
+
+                fallback_location = candidate_grid.location
+                logger.info(
+                    f'Fixed patrol: fleet {fleet} stopped at fallback '
+                    f'{location2node(candidate_grid.location)}, '
+                    f'trying the real target {location2node(target_loc)}'
+                )
+                if self._try_fixed_patrol_move(fleet, target_grid, target_loc):
+                    moved = True
+                    logger.info(
+                        f'Fixed patrol: fleet {fleet} returned to the real target '
+                        f'{location2node(target_loc)}'
+                    )
+                    break
+
+                logger.warning(
+                    f'Fixed patrol: fleet {fleet} cannot return to '
+                    f'{location2node(target_loc)} from '
+                    f'{location2node(candidate_grid.location)}, try another candidate'
+                )
+
+        if not moved:
+            if fallback_location is not None:
+                logger.info(
+                    f'Fixed patrol: fleet {fleet} cannot return to '
+                    f'{location2node(target_loc)}, stays at fallback '
+                    f'{location2node(fallback_location)}'
+                )
+                moved = True
+            else:
+                logger.warning(
+                    f'Fixed patrol: fleet {fleet} failed on {location2node(target_loc)} '
+                    f'and all of its fallbacks'
+                )
+
+        return moved
+
     def _move_fleets_and_rescan(self):
+        """
+        L2 of fixed patrol: move every fleet away, rescan the whole map after each.
+
+        Fleets are handled as "primary fleet first, then the rest in index order".
+        After switching, the radar of that fleet is read first: an event nearby
+        (a question mark; akashi and siren devices are also question marks on the
+        radar) is solved right away with the current fleet, which saves a pointless
+        move. Only when nothing is seen is the fleet moved to the column of its
+        index (1 -> C1, 2 -> D1, 3 -> E1, 4 -> F1), each move followed by a full
+        map rescan, and it stops as soon as an event is solved.
+
+        Returns:
+            bool: True if the target event was found and solved.
+        """
         primary = self.config.OpsiFleet_Fleet
-        targets = {1: (2, 0), 2: (3, 0), 3: (4, 0), 4: (5, 0)}
+        targets = {1: (2, 0), 2: (3, 0), 3: (4, 0), 4: (5, 0)}  # C1, D1, E1, F1
         order = [primary] + [fleet for fleet in (1, 2, 3, 4) if fleet != primary]
+        backup = self.config.temporary(
+            OpsiGeneral_RepairThreshold=-1, Campaign_UseAutoSearch=False)
         try:
             for fleet in order:
+                # Radar pre-check: if the current fleet can solve an event nearby,
+                # do it now instead of moving this fleet.
                 if not self._set_fixed_patrol_fleet(fleet):
                     continue
                 self._solved_map_event = set()
                 self._solved_fleet_mechanism = False
-                self.clear_question()
+                self.clear_question(drop=None)
                 if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
+                    logger.info('Fixed patrol L2: event solved during radar pre-check, stop')
                     return True
+
                 if not self._move_fleet_to_patrol(fleet, targets[fleet]):
                     continue
 
+                # The blocking fleet is away, rescan the whole map to find events.
                 self._solved_map_event = set()
                 self._solved_fleet_mechanism = False
-                self.map_rescan(rescan_mode='full')
+                try:
+                    self.map_rescan(rescan_mode='full')
+                except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
+                        RequestHumanTakeover):
+                    raise
+                except Exception as e:
+                    logger.debug(
+                        f'Fixed patrol L2: rescan after moving failed, continue: {e}', exc_info=True)
+
                 if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
+                    logger.info('Fixed patrol L2: event solved by rescan, stop moving fleets')
                     return True
         finally:
-            self.fleet_set(primary)
+            backup.recover()
         return False
 
+    def _forced_move_enabled(self):
+        """
+        Read the fixed patrol switch, tolerating the legacy level numbers.
+
+        Returns:
+            bool: True if fixed patrol is enabled.
+        """
+        value = self.config.OpsiScheduling_ExecuteFixedPatrolScan
+        if isinstance(value, str):
+            value = value.strip().lower()
+            if value in ('true', '1', '2', '3'):
+                return True
+            if value in ('false', '0', ''):
+                return False
+            return bool(value)
+        if isinstance(value, bool):
+            return value
+        # Legacy level config: 0 is off, 1 is the efficiency mode and 2 is the
+        # conservative mode. The conservative mode was merged into the efficiency
+        # mode, so every level above 0 counts as enabled.
+        try:
+            return int(value) > 0
+        except (TypeError, ValueError):
+            return bool(value)
+
     def execute_fixed_patrol_scan(self):
-        if not self.config.OpsiScheduling_ExecuteFixedPatrolScan:
+        """
+        Run fixed patrol and rescan the map.
+
+        After the auto search of hazard level 1, when a normal rescan finds nothing
+        (usually akashi is hidden behind a fleet, or spawned out of radar range),
+        fixed patrol searches in two stages:
+
+        L0/L1 (zero movement): read the radars of fleet 1-4, switching fleets only
+                and moving none of them, which is the fastest way to find akashi,
+                logging towers and scanning devices. It stops on the first hit.
+        L2 (move fleets): move fleets one by one, rescanning the whole map after
+                each move, to get the blocking fleet out of the way. Whether to
+                move depends on the situation:
+                ① a fleet saw a question mark but cannot reach it (blocked by
+                   another fleet, or out of move range): must move, and it does not
+                   depend on action points, because a seen event should not be
+                   given up;
+                ② no clue on any radar: only move when the current action point shown
+                   on the UI is above `_FIXED_PATROL_L2_AP`, otherwise leave it to
+                   the next farming round.
+
+        Returns:
+            bool: True if an event was found and solved.
+        """
+        if not self._forced_move_enabled():
+            logger.info('Fixed patrol: switch is off, skipped')
             return False
         if not self.zone or self.zone.is_port or self.zone.hazard_level != 1:
+            # The landing grids are defined for the hazard level 1 map.
             return False
         if self._solved_map_event:
             return False
 
         self.map_init(map_=None)
         if not self.map.grids:
-            logger.warning('Fixed patrol scan skipped: no map grids detected')
+            logger.warning('Fixed patrol: no map grids detected, skipped')
             return False
-        if self.clear_question_any_fleet():
-            return True
 
-        if not self._question_unreachable:
-            current_ap = self._read_current_action_point()
-            if not should_move_fleet_for_fixed_patrol(current_ap, False):
+        try:
+            # ---- L0/L1: switch fleets to read the radar, move nothing ----
+            logger.hr('Fixed patrol: read radar with all fleets, without moving')
+            self._solved_map_event = set()
+            self._solved_fleet_mechanism = False
+            if self.clear_question_any_fleet():
+                return True
+
+            # ---- L2: move fleets ----
+            # "Saw it but cannot reach it" can only be solved by moving a fleet and
+            # has nothing to do with action points. Only the "no clue at all" case
+            # checks action points, because this round is an extra round opened for
+            # hunting events, and a low action point is left to the next farming round.
+            if self._question_unreachable:
                 logger.info(
-                    f'Fixed patrol movement skipped: current AP {current_ap} '
-                    f'is not above {self._FIXED_PATROL_L2_AP}'
+                    'Fixed patrol: a fleet saw a question mark but cannot reach it, '
+                    'going to L2'
                 )
-                return False
-
-        return self._move_fleets_and_rescan()
+            else:
+                current_ap = self._read_current_action_point()
+                if not should_move_fleet_for_fixed_patrol(current_ap, False):
+                    logger.info(
+                        f'Fixed patrol: no event seen and current AP {current_ap} is not above '
+                        f'{self._FIXED_PATROL_L2_AP}, skipped, left to the next farming round'
+                    )
+                    return False
+                logger.info(
+                    f'Fixed patrol: no event seen and current AP {current_ap} is above '
+                    f'{self._FIXED_PATROL_L2_AP}, going to L2'
+                )
+            logger.hr('Fixed patrol L2: move fleets and rescan the whole map')
+            self._move_fleets_and_rescan()
+            return bool(self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS)
+        finally:
+            # Restore the primary fleet, so that later steps do not work on a wrong fleet.
+            self.fleet_set(self.config.OpsiFleet_Fleet)
 
     def run_auto_search(self, question=True, rescan=None, after_auto_search=True):
         """

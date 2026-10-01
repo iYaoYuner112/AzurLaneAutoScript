@@ -95,7 +95,11 @@ class Fleet(Camera, AmbushHandler):
 
     def fleet_ensure(self, index):
         if self.fleet_set(index=index):
-            self.camera = self.fleet_current
+            # Right after entering a map, or after the map data was reset, the
+            # fleet location may still be unknown. Never use such a value as the
+            # camera position, or the map coordinates cannot be converted.
+            if self.fleet_current:
+                self.camera = self.fleet_current
             self.update()
             self.find_path_initial()
             self.map.show_cost()
