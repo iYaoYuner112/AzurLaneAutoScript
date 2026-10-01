@@ -1457,21 +1457,27 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if 'is_akashi' not in self._solved_map_event and grids and grids[0].is_akashi:
             grid = grids[0]
             logger.info(f'Found Akashi on {grid}')
-            fleet = self.convert_radar_to_local((0, 0))
-            if fleet.distance_to(grid) > 1:
-                self.device.click(grid)
-                with self.config.temporary(STORY_ALLOW_SKIP=False):
-                    result = self.wait_until_walk_stable(drop=drop, walk_out_of_step=False)
-                if 'akashi' in result:
-                    self._solved_map_event.add('is_akashi')
-                    return True
-                else:
-                    return False
-            else:
-                logger.info(f'Akashi ({grid}) is near current fleet ({fleet})')
+            # Only take the "already adjacent" shortcut when the current fleet is
+            # actually visible AND within one grid of Akashi. During a full rescan
+            # the camera is panned away from the fleet, so convert_radar_to_local()
+            # would fall back to "camera center is fleet" and wrongly trigger the
+            # shortcut, then click Akashi repeatedly while the fleet is far away.
+            fleets = self.view.select(is_current_fleet=True)
+            if fleets.count == 1 and fleets[0].distance_to(grid) <= 1:
+                logger.info(f'Akashi ({grid}) is near current fleet ({fleets[0]})')
                 self.handle_akashi_supply_buy(grid)
                 self._solved_map_event.add('is_akashi')
                 return True
+            # Fleet not in sight (or far away): click Akashi and walk to it;
+            # wait_until_walk_stable opens the shop once the fleet arrives.
+            self.device.click(grid)
+            with self.config.temporary(STORY_ALLOW_SKIP=False):
+                result = self.wait_until_walk_stable(drop=drop, walk_out_of_step=False)
+            if 'akashi' in result:
+                self._solved_map_event.add('is_akashi')
+                return True
+            else:
+                return False
 
         grids = self.view.select(is_scanning_device=True)
         if 'is_scanning_device' not in self._solved_map_event and grids and grids[0].is_scanning_device:
