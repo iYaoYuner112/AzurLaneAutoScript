@@ -46,6 +46,7 @@ def make_map_stub(values):
     )
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
     stub._os_map_was_interrupted = lambda: OSMap._os_map_was_interrupted(stub)
+    stub._os_resume_recovery_available = lambda: OSMap._os_resume_recovery_available(stub)
     stub._device_state = OSMap._device_state.fget(stub)
     return stub
 

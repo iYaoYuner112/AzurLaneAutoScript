@@ -26,6 +26,13 @@ class TaskEnd(Exception):
 # cleared by the resume barrier in `OSMap.os_init()` after a full map rescan.
 OS_MAP_STALE_KEY = 'Alas.Storage.Storage.OpsiMapStale'
 
+# One-shot cross-storage flag marking that OpsiScheduling itself was preempted
+# by another task (see `task_switched()`). Consumed by the resume barrier in
+# `OSMap.ensure_map_state_current()` when OpsiScheduling is resumed: instead of
+# rescanning unconditionally, it first tries one auto search probe and only
+# falls back to a full map rescan when the probe has no effect.
+OS_RESUME_RECOVERY_KEY = 'Alas.Storage.Storage.OpsiSchedulingResumeRecovery'
+
 
 class Function:
     def __init__(self, data):
@@ -628,6 +635,11 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             # instead of trusting the pre-interruption map data.
             if str(getattr(prev, 'command', '')).startswith('Opsi'):
                 self.cross_set(OS_MAP_STALE_KEY, True)
+                # When OpsiScheduling itself is preempted, leave the one-shot
+                # resume-recovery flag so its resume path first probes with one
+                # auto search instead of rescanning unconditionally.
+                if str(getattr(prev, 'command', '')) == 'OpsiScheduling':
+                    self.cross_set(OS_RESUME_RECOVERY_KEY, True)
             return True
 
     def check_task_switch(self, message=""):
