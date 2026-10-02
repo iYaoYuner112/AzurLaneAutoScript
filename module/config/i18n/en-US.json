@@ -2587,10 +2587,6 @@
       "name": "Keep Mission Zones",
       "help": "Exit zones after daily missions without clearing them; auto-clear on the last day of the month."
     },
-    "OnlyPortDailyBeforeFullControl": {
-      "name": "Only port daily before full control",
-      "help": "When enabled, only port daily missions run while exploration is incomplete (OpsiExplore still running); sector missions are skipped until exploration completes."
-    },
     "MissionZones": {
       "name": "Mission Zones",
       "help": "Internally saved uncleared zones (auto-managed, do not edit)"
