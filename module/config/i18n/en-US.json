@@ -2684,8 +2684,8 @@
       "help": "Coordinate CL1 leveling and meowfficer farming from current yellow coins and total action points. Coin target mode replenishes below the reserve and returns to CL1 at reserve plus the return threshold."
     },
     "UseSmartSchedulingOperationCoinsPreserve": {
-      "name": "Replenish to Coin Target",
-      "help": "When enabled, keep farming until reaching the reserve plus return threshold. When disabled, replenish only while below the reserve."
+      "name": "Replenish by coin target",
+      "help": "On: coin-target scheduling — replenish coins until reaching \"CL1 coin preserve + coin return increment\", then return to CL1. Off: action-point scheduling — replenish only while coins are below the CL1 coin preserve."
     },
     "OperationCoinsPreserve": {
       "name": "CL1 Yellow Coin Reserve",

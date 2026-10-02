@@ -2685,7 +2685,7 @@
     },
     "UseSmartSchedulingOperationCoinsPreserve": {
       "name": "按黄币目标回补",
-      "help": "开启后，黄币低于保留值时持续短猫，直到达到保留值加回补增量；关闭后仅在黄币低于保留值时补充。"
+      "help": "开启：黄币目标调度，黄币补到「侵蚀1黄币保留值 + 黄币回补增量」才回侵蚀1；关闭：体力调度，黄币低于侵蚀1黄币保留值才补。"
     },
     "OperationCoinsPreserve": {
       "name": "侵蚀1黄币保留值",

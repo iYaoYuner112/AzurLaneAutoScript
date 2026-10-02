@@ -2685,7 +2685,7 @@
     },
     "UseSmartSchedulingOperationCoinsPreserve": {
       "name": "按黃幣目標回補",
-      "help": "開啟後補至保留值加回補增量；關閉後僅在低於保留值時補充。"
+      "help": "開啟：黃幣目標調度，黃幣補到「侵蝕1黃幣保留值 + 黃幣回補增量」才回侵蝕1；關閉：體力調度，黃幣低於侵蝕1黃幣保留值才補。"
     },
     "OperationCoinsPreserve": {
       "name": "侵蝕1黃幣保留值",
