@@ -1630,6 +1630,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             logger.info('Map rescan skipped: standalone CL1 without meowfficer farming')
             return False
 
+        last_map_error = None
         for _ in range(5):
             if not self._solved_fleet_mechanism:
                 self.fleet_set(self.config.OpsiFleet_Fleet)
@@ -1640,12 +1641,23 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.attr('Solved_map_event', self._solved_map_event)
                 self.fleet_set(self.config.OpsiFleet_Fleet)
                 return False
-            result = self.map_rescan_once(rescan_mode=rescan_mode, drop=drop)
+            try:
+                result = self.map_rescan_once(rescan_mode=rescan_mode, drop=drop)
+            except MapDetectionError as e:
+                # The game may be on a black/loading screen right after auto search,
+                # so the first map detection can fail with "no free tile". Retry a few
+                # times instead of letting the error kill the whole task.
+                last_map_error = e
+                logger.warning('Map rescan: map detection failed (black screen), retrying')
+                self.device.screenshot()
+                continue
             if not result:
                 logger.attr('Solved_map_event', self._solved_map_event)
                 self.fleet_set(self.config.OpsiFleet_Fleet)
                 return True
 
+        if last_map_error is not None:
+            raise last_map_error
         logger.attr('Solved_map_event', self._solved_map_event)
         logger.warning('Too many trial on map rescan, stop')
         self.fleet_set(self.config.OpsiFleet_Fleet)
