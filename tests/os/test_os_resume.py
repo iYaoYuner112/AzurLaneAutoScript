@@ -216,15 +216,75 @@ def test_ensure_defers_rescan_to_probe_on_scheduling_resume():
     assert stub.config.stale is True
 
 
-def test_ensure_ash_beacon_zone_falls_back_to_full_rescan():
-    """灰烬信标海域（22/44/154）没有探测点，保持原有直接重扫行为。"""
-    stub = make_probe_stub(stale=True, recovery=True, zone_id=22)
-    stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
-    OSMap.ensure_map_state_current(stub)
-    assert stub.rescan_calls == [{'rescan_mode': 'full'}]
-    assert stub.config.stale is False
-    assert stub.config.recovery is False
-    assert stub._os_resume_probe_pending is False
+def test_ensure_defers_to_probe_in_ash_beacon_zone_too():
+    """灰烬信标海域（22/44/154）同样先探测自律寻敌，不再直接全图重扫。
+
+    这些海域 os_init 本来不跑首次自律寻敌，所以探针在 os_init 里另有调用点；
+    屏障这一层对所有海域一视同仁。
+    """
+    for zone_id in (22, 44, 154):
+        stub = make_probe_stub(stale=True, recovery=True, zone_id=zone_id)
+        stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
+        OSMap.ensure_map_state_current(stub)
+        assert stub.rescan_calls == [], f'zone {zone_id} should not rescan in the barrier'
+        assert stub._os_resume_probe_pending is True, f'zone {zone_id} should defer to the probe'
+        assert stub.config.recovery is False
+        assert stub.config.stale is True
+
+
+def make_os_init_stub(zone_id=22, recovery=True):
+    """带完整 os_init 依赖的 stub，按调用顺序记录发生了什么。"""
+    stub = make_probe_stub(stale=True, recovery=recovery, zone_id=zone_id)
+    sequence = []
+    stub.map_rescan = lambda **kw: sequence.append('full_rescan')
+    stub.ensure_map_state_current = lambda: OSMap.ensure_map_state_current(stub)
+    stub.config.override = lambda **kwargs: None
+    stub.is_in_map = lambda: True
+    stub.is_in_globe = lambda: False
+    stub.zone_init = lambda *a, **kw: None
+    stub.hp_reset = lambda *a, **kw: None
+    stub.handle_after_auto_search = lambda *a, **kw: sequence.append('after_auto_search')
+    stub.handle_current_fleet_resolve = lambda *a, **kw: None
+    stub.is_in_special_zone = lambda: False
+    stub.handle_ash_beacon_attack = lambda *a, **kw: sequence.append('ash_beacon')
+
+    def probe():
+        sequence.append('probe')
+        stub.config.store[OS_MAP_STALE_KEY] = False
+
+    stub._os_resume_recovery_auto_search = probe
+    stub.run_auto_search = lambda **kw: sequence.append('first_auto_search')
+    return stub, sequence
+
+
+def test_os_init_probes_before_ash_beacon_in_ash_zone():
+    """22/44/154：恢复时先探测自律寻敌，再走原有的信标处理。"""
+    for zone_id in (22, 44, 154):
+        stub, sequence = make_os_init_stub(zone_id=zone_id, recovery=True)
+        OSMap.os_init(stub)
+        assert 'probe' in sequence, f'zone {zone_id} should probe'
+        assert 'first_auto_search' not in sequence, f'zone {zone_id} must not run the default first auto search'
+        assert 'ash_beacon' in sequence, f'zone {zone_id} must still handle the ash beacon'
+        assert sequence.index('probe') < sequence.index('ash_beacon')
+
+
+def test_os_init_keeps_ash_zone_behaviour_without_a_resume():
+    """没有恢复（无 stale/recovery）：信标海域流程完全不变。"""
+    stub, sequence = make_os_init_stub(zone_id=44, recovery=False)
+    stub.config.store[OS_MAP_STALE_KEY] = False
+    OSMap.os_init(stub)
+    assert 'probe' not in sequence
+    assert 'first_auto_search' not in sequence
+    assert 'ash_beacon' in sequence
+
+
+def test_os_init_probe_replaces_first_auto_search_in_normal_zone():
+    """普通海域：探针替代原本的首次寻敌，不会多跑一次。"""
+    stub, sequence = make_os_init_stub(zone_id=10, recovery=True)
+    OSMap.os_init(stub)
+    assert 'probe' in sequence
+    assert 'first_auto_search' not in sequence
+    assert 'ash_beacon' not in sequence
 
 
 def test_ensure_ignores_recovery_flag_for_other_tasks():

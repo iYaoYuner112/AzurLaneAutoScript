@@ -84,10 +84,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         Smart scheduling resume: when OpsiScheduling itself was preempted by
         another task (OS_RESUME_RECOVERY_KEY set), the barrier does NOT rescan
-        unconditionally. It defers to the first auto search in `os_init()` as
-        a probe: if the auto search starts normally the map state is considered
-        still valid; only when the probe has no effect does it fall back to one
-        full map rescan (see `_os_resume_recovery_auto_search()`).
+        unconditionally. It defers to the one-shot Auto Search probe in
+        `os_init()`: if the auto search starts normally the map state is
+        considered still valid; only when the probe has no effect does it fall
+        back to one full map rescan (see `_os_resume_recovery_auto_search()`).
+        This applies to every zone, including 22/44/154 which normally skip the
+        first auto search -- those get an extra probe call site in `os_init()`.
         """
         if not self._os_map_was_interrupted():
             logger.info('[OS RESUME] Continue without interruption')
@@ -111,17 +113,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         # is taken below, so a later resume can never probe twice.
         if self._os_resume_recovery_available():
             self.config.cross_set(OS_RESUME_RECOVERY_KEY, False)
-            if self.zone is not None and self.zone.zone_id in [22, 44, 154]:
-                # Ash beacon zones skip the first auto search in os_init, so
-                # there is no probe point; keep the unconditional full rescan.
-                logger.info('[OS][RESUME] Ash beacon zone has no auto search probe point, fallback to full rescan')
-            else:
-                logger.info('[OS][RESUME] OpsiScheduling resumed after external task interruption')
-                logger.info('[OS][RESUME] Map state marked stale')
-                logger.info('[OS][RESUME] Deferring resync to the one-shot Auto Search recovery probe')
-                self._os_resume_probe_pending = True
-                # Stale flag stays set; it is cleared by the probe result.
-                return
+            logger.info('[OS][RESUME] OpsiScheduling resumed after external task interruption')
+            logger.info('[OS][RESUME] Map state marked stale')
+            logger.info('[OS][RESUME] Deferring resync to the one-shot Auto Search recovery probe')
+            self._os_resume_probe_pending = True
+            # Stale flag stays set; it is cleared by the probe result.
+            return
 
         logger.info('[OS RESUME] Running FULL MAP RESCAN after interruption')
         try:
@@ -289,6 +286,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         # Clear current zone
         if self.zone.zone_id in [22, 44, 154]:
             logger.info('In zone 22, 44, 154, skip running first auto search')
+            if self._os_resume_probe_pending:
+                # These zones do not run a first auto search of their own, so
+                # the resume probe gets its own call site here. Without it a
+                # resume in these zones could only ever do a full map rescan.
+                self._os_resume_recovery_auto_search()
+                self.handle_after_auto_search()
             self.handle_ash_beacon_attack()
         else:
             if self._os_resume_probe_pending:
