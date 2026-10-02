@@ -136,6 +136,8 @@ def make_probe_stub(stale=True, recovery=True, command='OpsiScheduling', zone_id
     stub.zone = SimpleNamespace(zone_id=zone_id)
     stub.probe_calls = []
     stub._os_resume_probe_pending = False
+    stub._os_resume_recovery_finished = (
+        lambda: OSMap._os_resume_recovery_finished(stub))
 
     def run_auto_search(**kwargs):
         stub.probe_calls.append(kwargs)
@@ -290,3 +292,71 @@ def test_recovery_available_requires_scheduling_command():
     assert OSMap._os_resume_recovery_available(stub) is False
     stub = make_probe_stub(recovery=False, command='OpsiScheduling')
     assert OSMap._os_resume_recovery_available(stub) is False
+
+
+# ---- 验收场景 ----
+
+def test_case1_no_interruption_adds_no_probe_and_no_rescan():
+    """Case 1：OpsiScheduling 没被抢占（无 stale）→ 不探测、不额外重扫。"""
+    stub = make_probe_stub(stale=False, recovery=False)
+    stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
+    OSMap.ensure_map_state_current(stub)
+    assert stub.rescan_calls == []
+    assert stub.probe_calls == []
+    assert stub._os_resume_probe_pending is False
+
+
+def test_case3_probe_runs_at_most_once_per_resume():
+    """Case 3/11：一次抢占恢复只探测一次；探测成功后第二次 ensure 不再挂起。"""
+    stub = make_probe_stub(stale=True, recovery=True)
+    stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
+    # 恢复入口：挂起探测并消费一次性标志
+    OSMap.ensure_map_state_current(stub)
+    assert stub._os_resume_probe_pending is True
+    assert stub.config.recovery is False
+    # 第一次探测：自律真正启动 → 不重扫
+    stub.probe_result = 2
+    OSMap._os_resume_recovery_auto_search(stub)
+    assert len(stub.probe_calls) == 1
+    assert stub.rescan_calls == []
+    assert stub._os_resume_probe_pending is False
+    # 再次进入 ensure：stale 已清 + 标志已消费 → 完全不动作
+    OSMap.ensure_map_state_current(stub)
+    assert stub._os_resume_probe_pending is False
+    assert stub.rescan_calls == []
+    assert len(stub.probe_calls) == 1
+
+
+def test_case4_no_effect_triggers_exactly_one_rescan():
+    """Case 4：第一次自律无反应 → 只探测一次 + 只重扫一次，绝不重复点击。"""
+    stub = make_probe_stub()
+    stub.probe_result = 0
+
+    def run_auto_search_fail(**kwargs):
+        stub.probe_calls.append(kwargs)
+        raise RequestHumanTakeover('Unable to use auto search')
+
+    stub.run_auto_search = run_auto_search_fail
+    stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
+    OSMap._os_resume_recovery_auto_search(stub)
+    assert len(stub.probe_calls) == 1
+    assert stub.rescan_calls == [{'rescan_mode': 'full'}]
+    assert stub.config.stale is False
+
+
+def test_case5_rescan_invalidates_stale_event_cache():
+    """Case 5/6：恢复重扫前失效旧事件缓存，避免沿用抢占前的旧地图数据。"""
+    stub = make_probe_stub()
+    stub._solved_map_event = {'is_akashi', 'is_scanning_device'}
+    stub._solved_fleet_mechanism = True
+    stub.probe_result = 0
+
+    def run_auto_search_fail(**kwargs):
+        stub.probe_calls.append(kwargs)
+        raise RequestHumanTakeover('Unable to use auto search')
+
+    stub.run_auto_search = run_auto_search_fail
+    stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
+    OSMap._os_resume_recovery_auto_search(stub)
+    assert stub._solved_map_event == set()
+    assert stub._solved_fleet_mechanism is False

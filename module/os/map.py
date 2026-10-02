@@ -116,7 +116,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # there is no probe point; keep the unconditional full rescan.
                 logger.info('[OS][RESUME] Ash beacon zone has no auto search probe point, fallback to full rescan')
             else:
-                logger.info('[OS][RESUME] OpsiScheduling resume after external preemption, defer resync to first auto search probe')
+                logger.info('[OS][RESUME] OpsiScheduling resumed after external task interruption')
+                logger.info('[OS][RESUME] Map state marked stale')
+                logger.info('[OS][RESUME] Deferring resync to the one-shot Auto Search recovery probe')
                 self._os_resume_probe_pending = True
                 # Stale flag stays set; it is cleared by the probe result.
                 return
@@ -153,21 +155,29 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def _os_resume_recovery_auto_search(self):
         """
         First auto search probe after OpsiScheduling is resumed from an external
-        preemption (smart scheduling recover barrier).
+        preemption (smart scheduling resume barrier).
 
         Try ONE auto search with the existing functions:
-        - If it truly starts (auto search runs, combats finish or it ends
-          normally), the map state is still valid: resume scheduling directly
+        - If auto search really runs (it starts and the daemon loop completes
+          normally, with combat activity detected by the existing battle-count
+          detector), the map state is still valid: resume scheduling directly
           and skip the full map rescan.
-        - If it has no effect (auto search unavailable / unexpected failure,
-          never by repeated clicking), fall back to ONE FULL MAP RESCAN to
-          re-sync fleets and targets, then resume scheduling.
+        - If it has no effect (auto search can not even start / unexpected
+          failure, never by repeated clicking), fall back to ONE FULL MAP RESCAN
+          to re-sync fleets and targets, then resume scheduling.
+
+        "Real" activity is judged with the existing in-project signals only:
+        the daemon's own unlock check (which raises RequestHumanTakeover when the
+        auto search option stays invisible), and `_auto_search_battle_count`,
+        incremented by `on_auto_search_battle_count_add()` whenever
+        `combat_appear()` sees a battle actually start.
 
         One-shot: the probe flag is consumed at entry, so this runs at most
         once per preemption-resume cycle and can never loop.
         """
         self._os_resume_probe_pending = False
         logger.hr('OS resume recovery: first auto search probe', level=2)
+        logger.info('[OS][RESUME] Trying one Auto Search recovery')
         self.on_auto_search_battle_count_reset()
         started = False
         combat = 0
@@ -176,19 +186,22 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 question=False, rescan=False, after_auto_search=False)
             started = True
         except RequestHumanTakeover:
-            # Auto search can not even start (option invisible / unclickable,
-            # detected by the daemon's unlock check). Fall back to a rescan.
-            logger.warning('[OS][RESUME] Auto search attempt failed to start, treat as no effect')
+            # The daemon's unlock check could not see the auto search option.
+            # Auto search can not even start: treat as no effect, do not click
+            # again, fall back to a full map rescan.
+            logger.warning('[OS][RESUME] Auto search option unavailable, treat as no effect')
+        battle_count = self._auto_search_battle_count
         if started:
             logger.info(
-                f'[OS][RESUME] Auto search started normally '
-                f'(combat={combat}, battle_count={self._auto_search_battle_count}), map state kept')
+                f'[OS][RESUME] Auto Search started successfully '
+                f'(combat={combat}, battle_count={battle_count})')
             self.config.cross_set(OS_MAP_STALE_KEY, False)
-            logger.info('[OS][MAP] Map state resynced')
+            self._os_resume_recovery_finished()
             return
 
         logger.warning('[OS][RESUME] Auto Search attempt had no effect')
-        logger.info('[OS][RESUME] Running FULL MAP RESCAN as fallback')
+        logger.info('[OS][RESUME] Falling back to FULL MAP RESCAN')
+        logger.info('[OS][RESUME] FULL MAP RESCAN after scheduling interruption')
         # Same cache invalidation as the regular resume barrier: events solved
         # during the probe belong to the pre-resumption map data.
         self._solved_map_event = set()
@@ -201,7 +214,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         except Exception as e:
             logger.warning(f'[OS RESUME] full rescan failed, continue: {e}')
         self.config.cross_set(OS_MAP_STALE_KEY, False)
-        logger.info('[OS][MAP] Map state resynced')
+        self._os_resume_recovery_finished()
+
+    def _os_resume_recovery_finished(self):
+        """Log the resume barrier completion and hand back to the scheduler."""
+        logger.info('[OS][RESUME] Map state synchronized')
+        logger.info('[OS][RESUME] Rebuilding scheduling targets')
 
     @property
     def _device_state(self):
