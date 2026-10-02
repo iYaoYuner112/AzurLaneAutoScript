@@ -709,9 +709,9 @@ class AlasGUI(Frame):
             if record_time is None:
                 updated = t("Gui.Overview.ResourceWaiting")
             elif is_stale:
-                updated = f"{t('Gui.Overview.ResourceStale')} · {record}"
+                updated = f"{t('Gui.Overview.ResourceStale')} {record[11:16]}"
             else:
-                updated = f"{t('Gui.Overview.ResourceUpdated')} · {record}"
+                updated = f"{t('Gui.Overview.ResourceUpdated')} {record[11:16]}"
             if name == "ActionPoint" and isinstance(total, int):
                 updated = f"{updated} · {t('Gui.Overview.ResourceActionPointTotal')}"
 
