@@ -96,11 +96,22 @@ ACTION_POINT_BOX_PRIORITY = (1, 2, 3)
 
 
 def get_action_point_box_priority(boxes, current_ap, max_current_ap=200):
-    """Return available boxes in color priority that keep current AP within its cap."""
-    return [
-        index for index in ACTION_POINT_BOX_PRIORITY
-        if boxes[index] > 0 and current_ap + ACTION_POINT_BOX[index] <= max_current_ap
-    ]
+    """Return available boxes in color priority, the non-overflowing ones first.
+
+    Boxes whose use would push current AP over its cap are still returned, but
+    after the ones that fit, so they are only opened as a last resort instead of
+    being dropped (AzurPilot behaviour). Ordering is blue > purple > gold.
+    """
+    fits = []
+    overflows = []
+    for index in ACTION_POINT_BOX_PRIORITY:
+        if boxes[index] <= 0:
+            continue
+        if current_ap + ACTION_POINT_BOX[index] <= max_current_ap:
+            fits.append(index)
+        else:
+            overflows.append(index)
+    return fits + overflows
 
 
 class ActionPointLimit(Exception):
@@ -392,18 +403,11 @@ class ActionPointHandler(UI, MapEventHandler):
         for _ in range(12):
             # Having enough action points
             if self._action_point_current >= cost:
-                # Only smart scheduling tops up with small boxes while keeping
-                # current AP within its cap. Other tasks keep the official logic:
-                # just quit once the current AP reaches the cost.
-                if self.is_smart_scheduling_enabled:
-                    box = get_action_point_box_priority(
-                        self._action_point_box, self._action_point_current
-                    )
-                    if box and self._action_point_total > self.config.OS_ACTION_POINT_PRESERVE:
-                        logger.info('Top up action points with boxes without exceeding 200')
-                        self.action_point_set_button(box[0])
-                        self.action_point_use()
-                        continue
+                # AzurPilot order: run as soon as AP is enough -- never top up to
+                # the cap with boxes here. Boxes are only opened when AP is not
+                # enough to start (and after the oil purchase below), otherwise
+                # they preempt "buy action points with oil" and the purchase can
+                # never be reached.
                 logger.info('Having enough action points')
                 self.action_point_quit()
                 return True
