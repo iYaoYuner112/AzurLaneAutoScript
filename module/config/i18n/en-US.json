@@ -2684,8 +2684,8 @@
       "help": "Coordinate CL1 leveling and meowfficer farming from current yellow coins and total action points. Coin target mode replenishes below the reserve and returns to CL1 at reserve plus the return threshold."
     },
     "UseSmartSchedulingOperationCoinsPreserve": {
-      "name": "Replenish by coin target",
-      "help": "On: coin-target scheduling — replenish coins until reaching \"CL1 coin preserve + coin return increment\", then return to CL1. Off: action-point scheduling — replenish only while coins are below the CL1 coin preserve."
+      "name": "Enable coin scheduling",
+      "help": "On: coin scheduling — replenish coins until reaching \"CL1 coin preserve + replenish X coins\", then return to CL1. Off: action-point scheduling — replenish only while coins are below the CL1 coin preserve."
     },
     "OperationCoinsPreserve": {
       "name": "CL1 Yellow Coin Reserve",
@@ -2700,8 +2700,8 @@
       "help": "Total action points to keep while farming; coin replenishment pauses at or below this value. Default: 1000, capped at 2000. On the OpSi reset day this is automatically lowered to 300 or 0 according to Cross Month Daily, so remaining action points can be spent."
     },
     "OperationCoinsReturnThreshold": {
-      "name": "Yellow Coin Return Increment",
-      "help": "Additional coins to earn above the reserve before returning to CL1 in coin target mode. Default: 60000, for a total target of 80000."
+      "name": "Replenish X coins",
+      "help": "In coin-target mode, gain this many coins (net increase) before returning to CL1. Default 60000, so the default return target is 80000."
     },
     "EnableMeowfficerFarming": {
       "name": "Allow Meowfficer Farming",
