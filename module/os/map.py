@@ -817,7 +817,16 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.view.predict()
             self.view.show()
 
-            grid = self.convert_radar_to_local(grid)
+            try:
+                grid = self.convert_radar_to_local(grid)
+            except KeyError:
+                # The question mark sits outside the current local view (e.g. the
+                # fleet is at the map edge and the question is one grid beyond it).
+                # It can not be clicked now; mark it unreachable so the fixed patrol
+                # L2 moves a fleet to bring it into view.
+                logger.warning('Question mark is outside the local view, mark unreachable')
+                self._question_unreachable = True
+                return False
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 result = self.wait_until_walk_stable(
