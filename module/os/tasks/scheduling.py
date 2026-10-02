@@ -11,30 +11,43 @@ def decide_resource_action(
         meow_ap_preserve,
         coin_target_mode,
         coin_replenish_active,
+        ap_replenish_active=False,
 ):
-    """Choose the next Operation Siren task from current coin and AP totals."""
+    """Choose the next Operation Siren task from current coin and AP totals.
+
+    Returns:
+        tuple[str, bool, bool]: (action, coin_replenish_active, ap_replenish_active)
+    """
     coin_preserve = max(int(coin_preserve), 0)
     coin_return_threshold = max(int(coin_return_threshold), 0)
     ap_preserve = max(int(ap_preserve), 0)
     meow_ap_preserve = max(int(meow_ap_preserve), 0)
 
     if total_ap <= ap_preserve:
-        return 'wait', coin_replenish_active
+        return 'wait', coin_replenish_active, ap_replenish_active
 
     if coin_target_mode:
         coin_replenish_active = coin_replenish_active or yellow_coins < coin_preserve
         coin_target = coin_preserve + coin_return_threshold
         if coin_replenish_active and yellow_coins < coin_target:
-            if total_ap <= max(ap_preserve, meow_ap_preserve):
-                return 'wait', True
-            return 'meow', True
-        return 'cl1', False
+            if total_ap <= meow_ap_preserve:
+                return 'wait', True, ap_replenish_active
+            return 'meow', True, ap_replenish_active
+        return 'cl1', False, ap_replenish_active
 
-    if yellow_coins < coin_preserve:
-        if total_ap <= max(ap_preserve, meow_ap_preserve):
-            return 'wait', False
-        return 'meow', False
-    return 'cl1', False
+    # Action point scheduling (non coin-target): once coins drop below the
+    # preserve value, keep replenishing coins until AP drops to the meow preserve
+    # (hysteresis), matching AzurPilot's ap_replenish_active.
+    if yellow_coins < coin_preserve or ap_replenish_active:
+        ap_replenish_active = True
+        if total_ap <= meow_ap_preserve:
+            ap_replenish_active = False
+            if yellow_coins < coin_preserve:
+                return 'wait', coin_replenish_active, False
+            return 'cl1', coin_replenish_active, False
+        return 'meow', coin_replenish_active, True
+
+    return 'cl1', coin_replenish_active, ap_replenish_active
 
 
 class OpsiScheduling(OSMap):
@@ -67,7 +80,8 @@ class OpsiScheduling(OSMap):
             if not isinstance(state, dict):
                 state = {}
             coin_replenish_active = bool(state.get('CoinReplenishActive', False))
-            action, coin_replenish_active = decide_resource_action(
+            ap_replenish_active = bool(state.get('ApReplenishActive', False))
+            action, coin_replenish_active, ap_replenish_active = decide_resource_action(
                 yellow_coins=yellow_coins,
                 total_ap=total_ap,
                 coin_preserve=self.config.OpsiScheduling_OperationCoinsPreserve,
@@ -76,15 +90,23 @@ class OpsiScheduling(OSMap):
                 meow_ap_preserve=meow_ap_preserve,
                 coin_target_mode=self.config.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve,
                 coin_replenish_active=coin_replenish_active,
+                ap_replenish_active=ap_replenish_active,
             )
 
+            state_changed = False
             if state.get('CoinReplenishActive', False) != coin_replenish_active:
                 state['CoinReplenishActive'] = coin_replenish_active
+                state_changed = True
+            if state.get('ApReplenishActive', False) != ap_replenish_active:
+                state['ApReplenishActive'] = ap_replenish_active
+                state_changed = True
+            if state_changed:
                 self.config.cross_set('OpsiScheduling.Storage.Storage', state)
 
             logger.info(
                 f'OpSi resource scheduling: coins={yellow_coins}, total_ap={total_ap}, '
-                f'action={action}, coin_replenish_active={coin_replenish_active}'
+                f'action={action}, coin_replenish_active={coin_replenish_active}, '
+                f'ap_replenish_active={ap_replenish_active}'
             )
             if action == 'wait':
                 self.config.task_delay(server_update=True)
