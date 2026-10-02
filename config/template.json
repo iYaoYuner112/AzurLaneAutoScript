@@ -1905,7 +1905,8 @@
       "OperationCoinsReturnThreshold": 60000,
       "EnableMeowfficerFarming": true,
       "EnableHazard1Leveling": true,
-      "ExecuteFixedPatrolScan": false
+      "ExecuteFixedPatrolScan": false,
+      "MeowfficerExecuteFixedPatrolScan": false
     },
     "Storage": {
       "Storage": {}

@@ -462,6 +462,7 @@ class GeneratedConfig:
     OpsiScheduling_EnableMeowfficerFarming = True
     OpsiScheduling_EnableHazard1Leveling = True
     OpsiScheduling_ExecuteFixedPatrolScan = False
+    OpsiScheduling_MeowfficerExecuteFixedPatrolScan = False
 
     # Group `IslandProduction`
     IslandProduction_HardFloorItems = '{}'

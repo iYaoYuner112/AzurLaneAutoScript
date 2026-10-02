@@ -782,6 +782,7 @@ OpsiScheduling:
   EnableMeowfficerFarming: true
   EnableHazard1Leveling: true
   ExecuteFixedPatrolScan: false
+  MeowfficerExecuteFixedPatrolScan: false
 
 # =================== Island ====================
 

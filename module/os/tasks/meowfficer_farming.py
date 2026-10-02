@@ -2,10 +2,27 @@ from module.config.utils import get_os_reset_remain
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
-from module.os.map import OSMap
+from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 
 
 class OpsiMeowfficerFarming(OSMap):
+    def _meow_fixed_patrol_scan(self):
+        """
+        Meowfficer's post-combat forced move (efficiency mode).
+
+        Switch fleets to read each radar and clear question marks, moving none of
+        them. This is equivalent to the CL1 fixed patrol L0/L1, and does not have
+        the L2 fixed landing move (C1/D1/E1/F1 are defined for the hazard level 1
+        map, not for the meowfficer zones).
+        """
+        if not self.config.OpsiScheduling_MeowfficerExecuteFixedPatrolScan:
+            return
+        if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
+            return
+        logger.info('Meowfficer: trigger fixed patrol scan (switch fleets only)')
+        # clear_question_any_fleet restores the primary fleet itself.
+        self.clear_question_any_fleet()
+
     def os_meowfficer_farming(self):
         """
         Recommend 3 or 5 for higher meowfficer searching point per action points ratio.
@@ -82,6 +99,7 @@ class OpsiMeowfficerFarming(OSMap):
                         recon_scan=False,
                         submarine_call=self.config.OpsiFleet_Submarine)
                     self.run_auto_search()
+                    self._meow_fixed_patrol_scan()
                     self.handle_after_auto_search()
                     self.config.check_task_switch()
 
@@ -98,6 +116,7 @@ class OpsiMeowfficerFarming(OSMap):
                     recon_scan=False,
                     submarine_call=self.config.OpsiFleet_Submarine)
                 self.run_auto_search()
+                self._meow_fixed_patrol_scan()
                 self.handle_after_auto_search()
                 self.config.check_task_switch()
 

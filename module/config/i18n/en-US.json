@@ -2714,6 +2714,10 @@
     "ExecuteFixedPatrolScan": {
       "name": "Forced Movement (CL1)",
       "help": "After a CL1 battle, scan each fleet's radar. If a question mark is seen but unreachable, attempt movement regardless of AP; otherwise move fleets through the C1-F1 patrol points and rescan only when current AP is above 7. Meowfficer farming does not use these fixed destinations."
+    },
+    "MeowfficerExecuteFixedPatrolScan": {
+      "name": "Meowfficer forced move (efficiency)",
+      "help": "When enabled, after each meowfficer combat round, if question marks remain on the radar, switch through fleets 1-4 to read each radar and clear questions (switching fleets only, no moving). Default off; when off, only the current meowfficer fleet radar is checked."
     }
   },
   "IslandProduction": {
