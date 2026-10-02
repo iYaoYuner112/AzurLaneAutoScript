@@ -606,17 +606,31 @@ class AlasGUI(Frame):
         self.alas_config.get_next_task()
         self._update_overview_resources()
 
-        if len(self.alas_config.pending_task) >= 1:
-            if self.alas.alive:
+        # The running task is recorded in cross-storage by the scheduler loop, so
+        # a task whose next_run was already advanced to the future still shows in
+        # the "running" queue instead of being miscategorized as "waiting".
+        running_command = deep_get(
+            self.alas_config.data,
+            keys="Alas.Storage.Storage.RunningTask",
+            default=None,
+        )
+        if self.alas.alive and running_command:
+            running = [
+                t
+                for t in self.alas_config.pending_task + self.alas_config.waiting_task
+                if t.command == running_command
+            ]
+            pending = [t for t in self.alas_config.pending_task if t.command != running_command]
+            waiting = [t for t in self.alas_config.waiting_task if t.command != running_command]
+        else:
+            # Fallback: RunningTask not written yet (brief startup window).
+            if self.alas.alive and len(self.alas_config.pending_task) >= 1:
                 running = self.alas_config.pending_task[:1]
                 pending = self.alas_config.pending_task[1:]
             else:
                 running = []
-                pending = self.alas_config.pending_task[:]
-        else:
-            running = []
-            pending = []
-        waiting = self.alas_config.waiting_task
+                pending = self.alas_config.pending_task
+            waiting = self.alas_config.waiting_task
 
         def put_task(func: Function):
             with use_scope(f"overview-task_{func.command}"):

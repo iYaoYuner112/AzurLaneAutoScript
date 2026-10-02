@@ -557,6 +557,8 @@ class AzurLaneAutoScript:
             if task.next_run > datetime.now():
                 logger.info(f'Wait until {task.next_run} for task `{task.command}`')
                 self.is_first_task = False
+                # No task is running during the wait, clear the running marker.
+                self.config.cross_set('Alas.Storage.Storage.RunningTask', None)
                 method = self.config.Optimization_WhenTaskQueueEmpty
                 if method == 'close_game':
                     logger.info('Close game during wait')
@@ -633,6 +635,9 @@ class AzurLaneAutoScript:
                 continue
 
             # Run
+            # Record the running task so the web UI can show it in the "running"
+            # queue even when its next_run has already been advanced to the future.
+            self.config.cross_set('Alas.Storage.Storage.RunningTask', task)
             logger.info(f'Scheduler: Start task `{task}`')
             self.device.stuck_record_clear()
             self.device.click_record_clear()
