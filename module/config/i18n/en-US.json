@@ -2711,6 +2711,22 @@
       "name": "Allow CL1 Leveling",
       "help": "Allow CL1 leveling after yellow coins reach the return target."
     },
+    "EnableObscure": {
+      "name": "Allow Obscure to replenish coins",
+      "help": "Allow the scheduler to proxy Obscure to replenish coins when coins are low."
+    },
+    "EnableAbyssal": {
+      "name": "Allow Abyssal to replenish coins",
+      "help": "Allow the scheduler to proxy Abyssal to replenish coins when coins are low."
+    },
+    "EnableStronghold": {
+      "name": "Allow Stronghold to replenish coins",
+      "help": "Allow the scheduler to proxy Stronghold to replenish coins when coins are low."
+    },
+    "TaskPriority": {
+      "name": "Coin task priority",
+      "help": "Order in which coin replenish tasks are tried when coins are low, separated by >. The first candidate with content is proxied for exactly one round, then the scheduler re-evaluates."
+    },
     "ExecuteFixedPatrolScan": {
       "name": "Forced Movement (CL1)",
       "help": "After a CL1 battle, scan each fleet's radar. If a question mark is seen but unreachable, attempt movement regardless of AP; otherwise move fleets through the C1-F1 patrol points and rescan only when current AP is above 7. Meowfficer farming does not use these fixed destinations."

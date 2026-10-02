@@ -1,6 +1,7 @@
 from module.logger import logger
 from module.os.fleet import BossFleet
 from module.os.map import OSMap
+from module.os.tasks.task_context import opsi_no_content, should_hand_over_to_scheduling
 
 
 class OpsiStronghold(OSMap):
@@ -22,9 +23,10 @@ class OpsiStronghold(OSMap):
         self.globe_update()
         zone = self.find_siren_stronghold()
         if zone is None:
-            # No siren stronghold, delay next run to tomorrow.
-            self.config.task_delay(server_update=True)
-            self.config.task_stop()
+            # No siren stronghold. Proxied runs report NO_CONTENT so the
+            # scheduler tries the next candidate; standalone runs keep the
+            # legacy "delay until tomorrow" behaviour.
+            opsi_no_content(self.config, 'OpsiStronghold', 'No siren stronghold')
 
         self.globe_enter(zone)
         self.zone_init()
@@ -35,6 +37,12 @@ class OpsiStronghold(OSMap):
         self.handle_fleet_resolve(revert=False)
 
     def os_stronghold(self):
+        if should_hand_over_to_scheduling(
+                self.config, 'OpsiStronghold', self.is_smart_scheduling_enabled):
+            logger.info('[大世界-调度] OpsiStronghold 交由智能调度统一代理，交接给 OpsiScheduling')
+            self.config.task_call('OpsiScheduling')
+            self.config.task_stop()
+
         while True:
             self.clear_stronghold()
             self.config.check_task_switch()

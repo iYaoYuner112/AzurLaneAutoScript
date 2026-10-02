@@ -781,6 +781,11 @@ OpsiScheduling:
   OperationCoinsReturnThreshold: 60000
   EnableMeowfficerFarming: true
   EnableHazard1Leveling: true
+  EnableObscure: true
+  EnableAbyssal: true
+  EnableStronghold: true
+  TaskPriority:
+    value: 'OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming'
   ExecuteFixedPatrolScan: false
   MeowfficerExecuteFixedPatrolScan: false
 

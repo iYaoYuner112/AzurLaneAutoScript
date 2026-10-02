@@ -86,6 +86,23 @@ def test_switch_away_from_other_opsi_does_not_mark_resume_recovery():
     assert all(key != OS_RESUME_RECOVERY_KEY for key, _ in cfg.cross_set_calls)
 
 
+def test_task_switched_uses_owner_when_a_child_is_proxied():
+    """代理子任务期间必须以拥有者（调度器）做切换判断。
+
+    `config.task` 此刻是子任务，直接拿它比较会把每一轮都误判成任务切换。
+    """
+    cfg = FakeConfig('OpsiHazard1Leveling', 'OpsiScheduling')
+    cfg._task_switch_owner = make_function('OpsiScheduling')
+    assert AzurLaneConfig.task_switched(cfg) is False
+    assert cfg.cross_set_calls == []
+
+
+def test_task_switched_without_owner_would_mistake_the_child_for_a_switch():
+    """没有拥有者信息时，子任务身份确实会被当作切换——这正是要守护的契约。"""
+    cfg = FakeConfig('OpsiHazard1Leveling', 'OpsiScheduling')
+    assert AzurLaneConfig.task_switched(cfg) is True
+
+
 # ---- resume barrier ----
 
 class StatefulConfig:

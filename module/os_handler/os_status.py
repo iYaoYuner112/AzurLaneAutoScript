@@ -9,6 +9,7 @@ from module.config.utils import get_server_next_update
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.ocr.ocr import Digit
+from module.os.tasks.task_context import is_running_opsi_proxy
 from module.os_shop.assets import OS_SHOP_CHECK, OS_SHOP_PURPLE_COINS, SHOP_PURPLE_COINS, SHOP_YELLOW_COINS
 from module.statistics.resource_monitor import record_dashboard_resource
 from module.ui.ui import UI
@@ -31,6 +32,12 @@ class OSStatus(UI):
 
     @property
     def is_in_task_cl1_leveling(self) -> bool:
+        # Standalone CL1 only. When smart scheduling proxies the CL1 work, it
+        # runs as a sub-task, and `map_rescan` must NOT be skipped there (see
+        # OSMap.map_rescan); keeping the proxy out of this identity preserves
+        # that behaviour while `config.task` now carries the sub-task name.
+        if is_running_opsi_proxy(self.config):
+            return False
         return self.config.task.command == 'OpsiHazard1Leveling'
 
     @property

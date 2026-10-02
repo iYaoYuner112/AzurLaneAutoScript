@@ -1,5 +1,6 @@
 from module.logger import logger
 from module.os.map import OSMap
+from module.os.tasks.task_context import is_running_opsi_proxy
 
 
 class OpsiHazard1Leveling(OSMap):
@@ -33,7 +34,7 @@ class OpsiHazard1Leveling(OSMap):
             if self.get_yellow_coins() < coin_preserve:
                 logger.info(f'Reach the limit of yellow coins, preserve={coin_preserve}')
                 if self.is_smart_scheduling_enabled:
-                    if self.config.task.command == 'OpsiScheduling':
+                    if is_running_opsi_proxy(self.config):
                         return
                     self.config.task_call('OpsiScheduling')
                     self.config.task_stop()
@@ -87,7 +88,7 @@ class OpsiHazard1Leveling(OSMap):
             self.handle_after_auto_search()
             self.config.check_task_switch()
             if self.is_smart_scheduling_enabled:
-                if self.config.task.command == 'OpsiScheduling':
+                if is_running_opsi_proxy(self.config):
                     return
                 self.config.task_call('OpsiScheduling')
                 self.config.task_stop()

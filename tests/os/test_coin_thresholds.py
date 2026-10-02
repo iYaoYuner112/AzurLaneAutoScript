@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 
 from module.os.map import OSMap, should_move_fleet_for_fixed_patrol
@@ -86,34 +87,65 @@ def test_resource_monitor_records_value_and_action_point_total():
     }
 
 
-def test_child_task_settings_are_bound_and_scheduler_binding_is_restored():
+def test_child_task_keeps_identity_and_owner_is_restored():
+    """代理子任务时：子任务看到自己的身份，拥有者仍是调度器，异常后全部还原。"""
+    from module.config.config import Function
+    from module.os.tasks.task_context import is_running_opsi_proxy, opsi_task_context
+
+    def make_function(command):
+        return Function({
+            'Scheduler': {
+                'Command': command,
+                'Enable': True,
+                'NextRun': datetime(2026, 1, 1),
+            }
+        })
+
     class FakeConfig:
         def __init__(self):
-            self.task = SimpleNamespace(command='OpsiScheduling')
+            self.task = make_function('OpsiScheduling')
+            self.data = {'OpsiHazard1Leveling': {
+                'Scheduler': {
+                    'Command': 'OpsiHazard1Leveling',
+                    'Enable': True,
+                    'NextRun': datetime(2026, 1, 1),
+                }
+            }}
             self.bindings = []
+            self.child_identity = None
+            self.owner_identity = None
+            self.proxy_running = None
 
         def bind(self, task, func_list=None):
             self.bindings.append((task, tuple(func_list or ())))
 
-    scheduler = SimpleNamespace(config=FakeConfig())
+    config = FakeConfig()
+    owner = config.task
 
     def run_child():
-        assert scheduler.config.bindings[-1] == (
-            'OpsiScheduling', ('OpsiHazard1Leveling',)
-        )
-        assert scheduler.config.task.command == 'OpsiScheduling'
+        config.child_identity = config.task.command
+        config.owner_identity = getattr(config._task_switch_owner, 'command', None)
+        config.proxy_running = is_running_opsi_proxy(config)
         raise RuntimeError('child task failed')
 
     try:
-        OpsiScheduling._run_with_child_config(
-            scheduler, 'OpsiHazard1Leveling', run_child
-        )
+        with opsi_task_context(config, 'OpsiHazard1Leveling'):
+            run_child()
     except RuntimeError:
         pass
     else:
         raise AssertionError('expected child task failure')
 
-    assert scheduler.config.bindings[-1] == ('OpsiScheduling', ())
+    # The child keeps its own identity; the scheduler stays the owner.
+    assert config.child_identity == 'OpsiHazard1Leveling'
+    assert config.owner_identity == 'OpsiScheduling'
+    assert config.proxy_running is True
+    # Binding and temporary attributes are restored after the failure.
+    assert config.bindings[-1] == ('OpsiScheduling', ())
+    assert config.task is owner
+    assert not hasattr(config, '_opsi_context')
+    assert not hasattr(config, '_task_switch_owner')
+    assert not hasattr(config, '_disable_task_switch')
 
 
 def test_fixed_patrol_uses_threshold_above_seven_ap():

@@ -444,7 +444,10 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
                 allow_none=False,
             )
             if task is None:
-                task = self.task.command
+                # A proxied Opsi sub-task must never move its own schedule: the
+                # delay belongs to the task that really owns the run.
+                owner = getattr(self, '_task_switch_owner', None)
+                task = str(getattr(owner, 'command', '') or '') or self.task.command
             logger.info(f"Delay task `{task}` to {run} ({kv})")
             self.modified[f'{task}.Scheduler.NextRun'] = run
             self.update()
@@ -622,7 +625,11 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         if self.stop_event is not None:
             if self.stop_event.is_set():
                 return True
-        prev = self.task
+        # When an Opsi sub-task is proxied, `self.task` is the sub-task while it
+        # runs. The switch decision must be taken on the task that owns the run,
+        # otherwise the proxy would look like a switch on every round.
+        owner = getattr(self, '_task_switch_owner', None)
+        prev = owner if owner is not None else self.task
         self.load()
         new = self.get_next()
         if prev == new:
@@ -646,9 +653,15 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         """
         Stop current task when task switched.
 
+        Proxied one-round Opsi sub-tasks may disable the switch: they run inside
+        a single scheduler round, and a switch in the middle of that round only
+        makes the delay bookkeeping harder to reason about.
+
         Raises:
             TaskEnd:
         """
+        if getattr(self, '_disable_task_switch', False):
+            return
         if self.task_switched():
             self.task_stop(message=message)
 

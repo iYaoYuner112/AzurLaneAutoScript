@@ -9288,6 +9288,22 @@
         "type": "checkbox",
         "value": true
       },
+      "EnableObscure": {
+        "type": "checkbox",
+        "value": true
+      },
+      "EnableAbyssal": {
+        "type": "checkbox",
+        "value": true
+      },
+      "EnableStronghold": {
+        "type": "checkbox",
+        "value": true
+      },
+      "TaskPriority": {
+        "type": "input",
+        "value": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming"
+      },
       "ExecuteFixedPatrolScan": {
         "type": "checkbox",
         "value": false

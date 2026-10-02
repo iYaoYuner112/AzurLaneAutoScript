@@ -3,6 +3,7 @@ from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
+from module.os.tasks.task_context import is_running_opsi_proxy
 
 
 class OpsiMeowfficerFarming(OSMap):
@@ -121,7 +122,7 @@ class OpsiMeowfficerFarming(OSMap):
                 self.config.check_task_switch()
 
             if self.is_smart_scheduling_enabled:
-                if self.config.task.command == 'OpsiScheduling':
+                if is_running_opsi_proxy(self.config):
                     return
                 self.config.task_call('OpsiScheduling')
                 self.config.task_stop()
