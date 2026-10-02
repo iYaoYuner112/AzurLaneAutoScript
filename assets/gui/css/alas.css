@@ -403,8 +403,8 @@ pre.rich-traceback-code {
 }
 
 *[style*="--overview-resource-row--"] {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: .35rem;
 }
 
