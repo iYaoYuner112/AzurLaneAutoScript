@@ -4,7 +4,7 @@ from module.base.base import ModuleBase
 from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import *
-from module.exception import GameNotRunningError
+from module.exception import GameNotRunningError, GameTooManyClickError
 from module.handler.assets import *
 from module.logger import logger
 from module.os_handler.assets import CLICK_SAFE_AREA as OS_CLICK_SAFE_AREA
@@ -317,6 +317,12 @@ class InfoHandler(ModuleBase):
     _story_option_timer = Timer(2)
     _story_option_record = 0
     _story_option_confirm = Timer(0.3, count=0)
+    # 剧情选项按钮名按「第几个/共几个」生成（如 STORY_OPTION_2_OF_3），不同剧情段
+    # 共用同一个名字，装置/柱子较多的海域会被设备层防连点机制误判成卡死。
+    # 因此剧情选项与确认弹窗点击后清空设备点击记录，卡死改由这个连续计数兜底：
+    # 剧情一直停在选项画面不动才会报 GameTooManyClickError。
+    _story_option_click = 0
+    _story_option_click_limit = 12
 
     def _story_option_buttons(self):
         """
@@ -414,22 +420,43 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def story_skip(self, drop=None):
+    def story_skip(self, drop=None, *, click_interval=2, prefer_skip=False):
         """
         2023.09.14 Story options changed with big white options in the middle,
             Check STORY_SKIP_3 but click the original STORY_SKIP.
+
+        Args:
+            drop (DropImage | None): 掉落记录对象。
+            click_interval (float): 剧情操作之间的最小重试间隔，默认 2 秒。
+                传小于 2 秒的值会启用快速推进路径（大世界刷图使用 0.5 秒），
+                该路径逐帧检测选项、不点空白区，并在点击后重置画面确认计时器。
+                大于等于 2 秒时行为与旧版完全一致。
+            prefer_skip (bool): 无选项对话优先点击右上角 STORY_SKIP，
+                且不依赖也不修改全局 STORY_ALLOW_SKIP 配置。
+
+        Raises:
+            GameTooManyClickError: 连续点击剧情选项达到 `_story_option_click_limit`
+                次仍未推进时抛出（剧情真的卡在选项画面）。
         """
+        fast = click_interval < 2
+        reset_interval = click_interval if fast else 3
         if self.story_popup_timeout.started() and not self.story_popup_timeout.reached():
-            if self.handle_popup_confirm('STORY_SKIP'):
+            if self.handle_popup_confirm('STORY_SKIP', interval=click_interval):
+                # 提交确认弹窗的按钮名（POPUP_CONFIRM_STORY_SKIP）同样在不同剧情段
+                # 复用，与选项一起清掉点击记录，避免被防连点机制误判为卡死。
+                self.device.click_record_clear()
+                self._story_option_click = 0
                 self.story_popup_timeout = Timer(10)
-                self.interval_reset(STORY_SKIP_3)
-                self.interval_reset(STORY_LETTERS_ONLY)
+                self.interval_reset(STORY_SKIP_3, interval=reset_interval)
+                self.interval_reset(STORY_LETTERS_ONLY, interval=reset_interval)
                 return True
         if self._is_story_black():
-            if self.appear_then_click(STORY_LETTERS_ONLY, offset=(20, 20), interval=2):
+            if self.appear_then_click(STORY_LETTERS_ONLY, offset=(20, 20), interval=click_interval):
+                self._story_option_click = 0
                 self.story_popup_timeout.reset()
                 return True
-        if self._story_option_timer.reached() and self.appear(STORY_SKIP_3, offset=(20, 20), interval=0):
+        if (fast or self._story_option_timer.reached()) \
+                and self.appear(STORY_SKIP_3, offset=(20, 20), interval=0):
             options = self._story_option_buttons_2()
             options_count = len(options)
             logger.attr('Story_options', options_count)
@@ -437,31 +464,48 @@ class InfoHandler(ModuleBase):
                 self._story_option_record = 0
                 self._story_option_confirm.reset()
             elif options_count == self._story_option_record:
-                if self._story_option_confirm.reached():
+                if self._story_option_confirm.reached() and self._story_option_timer.reached():
                     try:
                         select = options[self.config.STORY_OPTION]
                     except IndexError:
                         select = options[0]
                     self.device.click(select)
+                    # 选项按钮名按「第几个/共几个」生成，不同剧情段共用同一个名字，
+                    # 装置/柱子较多的海域会被设备层防连点机制误判成「两个按钮交替
+                    # 点击」。因此点击后清空点击记录，卡死检测改由连续点击数兜底。
+                    self.device.click_record_clear()
+                    self._story_option_click += 1
+                    if self._story_option_click >= self._story_option_click_limit:
+                        self._story_option_click = 0
+                        raise GameTooManyClickError(
+                            f'[处理器-剧情] 连续点击剧情选项 {self._story_option_click_limit} 次仍未推进，剧情可能卡住')
                     self._story_option_timer.reset()
                     self.story_popup_timeout.reset()
-                    self.interval_reset(STORY_SKIP_3)
-                    self.interval_reset(STORY_LETTERS_ONLY)
+                    self.interval_reset(STORY_SKIP_3, interval=reset_interval)
+                    self.interval_reset(STORY_LETTERS_ONLY, interval=reset_interval)
+                    if fast:
+                        self._story_confirm.reset()
                     self._story_option_record = 0
                     self._story_option_confirm.reset()
                     return True
             else:
                 self._story_option_record = options_count
                 self._story_option_confirm.reset()
-        if self.appear(STORY_SKIP_3, offset=(20, 20), interval=2):
+                if fast:
+                    # 选项仍在确认稳定时不点空白区，下一张截图继续选择。
+                    return False
+        # 快速路径下点击冷却不代表剧情消失，允许在画面确认计时器到点后立即跳过。
+        story_confirmed = fast \
+            and self.appear(STORY_SKIP_3, offset=(20, 20)) and self._story_confirm.reached()
+        if self.appear(STORY_SKIP_3, offset=(20, 20), interval=click_interval):
             # Confirm it's story
             # When story play speed is Very Fast, Alas clicked story skip but story disappeared
             # This click will interrupt auto search
             self.interval_reset([STORY_SKIP_3])
-            if self._story_confirm.reached():
+            if story_confirmed or (not fast and self._story_confirm.reached()):
                 if drop:
                     drop.handle_add(self, before=2)
-                if self.config.STORY_ALLOW_SKIP:
+                if prefer_skip or self.config.STORY_ALLOW_SKIP:
                     logger.info(f'{STORY_SKIP_3} -> {STORY_SKIP}')
                     self.device.click(STORY_SKIP)
                 else:
@@ -473,8 +517,12 @@ class InfoHandler(ModuleBase):
             else:
                 self.interval_clear(STORY_SKIP_3)
         else:
-            self._story_confirm.reset()
-        if self.appear_then_click(STORY_CLOSE, offset=(10, 10), interval=2):
+            # 快速推进时，点击冷却不代表剧情消失，不能把画面确认也重置。
+            if not fast or not self.appear(STORY_SKIP_3, offset=(20, 20)):
+                self._story_option_click = 0
+                self._story_confirm.reset()
+        if self.appear_then_click(STORY_CLOSE, offset=(10, 10), interval=click_interval):
+            self._story_option_click = 0
             self.story_popup_timeout.reset()
             return True
 
