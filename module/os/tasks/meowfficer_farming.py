@@ -16,7 +16,11 @@ class OpsiMeowfficerFarming(OSMap):
         the L2 fixed landing move (C1/D1/E1/F1 are defined for the hazard level 1
         map, not for the meowfficer zones).
         """
-        if not self.config.OpsiScheduling_MeowfficerExecuteFixedPatrolScan:
+        enabled = getattr(self.config, 'OpsiMeowfficerFarming_ExecuteFixedPatrolScan', None)
+        if enabled is None:
+            enabled = self.config.cross_get(
+                'OpsiMeowfficerFarming.OpsiMeowfficerFarming.ExecuteFixedPatrolScan', default=False)
+        if not enabled:
             return
         if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
             return
@@ -85,44 +89,98 @@ class OpsiMeowfficerFarming(OSMap):
                 self.action_point_set(cost=0, keep_current_ap=keep_current_ap, check_rest_ap=check_rest_ap)
                 ap_checked = True
 
-            # (1252, 1012) is the coordinate of zone 134 (the center zone) in os_globe_map.png
-            if self.config.OpsiMeowfficerFarming_TargetZone != 0:
-                try:
-                    zone = self.name_to_zone(self.config.OpsiMeowfficerFarming_TargetZone)
-                except ScriptError:
-                    logger.warning(f'wrong zone_id input:{self.config.OpsiMeowfficerFarming_TargetZone}')
-                    raise RequestHumanTakeover('wrong input, task stopped')
-                else:
-                    logger.hr(f'OS meowfficer farming, zone_id={zone.zone_id}', level=1)
-                    self.globe_goto(zone, refresh=True)
-                    self.fleet_set(self.config.OpsiFleet_Fleet)
-                    self.os_order_execute(
-                        recon_scan=False,
-                        submarine_call=self.config.OpsiFleet_Submarine)
-                    self.run_auto_search()
-                    self._meow_fixed_patrol_scan()
-                    self.handle_after_auto_search()
-                    self.config.check_task_switch()
-
-            else:
-                zones = self.zone_select(hazard_level=self.config.OpsiMeowfficerFarming_HazardLevel) \
-                    .delete(SelectedGrids([self.zone])) \
-                    .delete(SelectedGrids(self.zones.select(is_port=True))) \
-                    .sort_by_clock_degree(center=(1252, 1012), start=self.zone.location)
-
-                logger.hr(f'OS meowfficer farming, zone_id={zones[0].zone_id}', level=1)
-                self.globe_goto(zones[0])
-                self.fleet_set(self.config.OpsiFleet_Fleet)
-                self.os_order_execute(
-                    recon_scan=False,
-                    submarine_call=self.config.OpsiFleet_Submarine)
-                self.run_auto_search()
-                self._meow_fixed_patrol_scan()
-                self.handle_after_auto_search()
-                self.config.check_task_switch()
+            # ===== mode dispatch, same order as AzurPilot =====
+            self._meow_dispatch()
 
             if self.is_smart_scheduling_enabled:
                 if is_running_opsi_proxy(self.config):
                     return
                 self.config.task_call('OpsiScheduling')
                 self.config.task_stop()
+
+    def _meow_dispatch(self):
+        """
+        Pick and run the meowfficer mode handler, in AzurPilot's order:
+
+        1. traditional single target zone (TargetZone given, StayInZone off);
+        2. StayInZone: keep searching the configured target zone;
+        3. random zone search.
+        """
+        target_zone = self.config.OpsiMeowfficerFarming_TargetZone
+        stay_in_zone = self.config.OpsiMeowfficerFarming_StayInZone
+        if target_zone != 0:
+            try:
+                zone = self.name_to_zone(target_zone)
+            except ScriptError:
+                logger.warning(f'wrong zone_id input:{target_zone}')
+                raise RequestHumanTakeover('wrong input, task stopped')
+            if stay_in_zone:
+                self._meow_handle_stay_in_zone(zone)
+            else:
+                self._meow_handle_traditional_zone(zone)
+        else:
+            if stay_in_zone:
+                logger.warning('StayInZone is enabled but TargetZone is 0, '
+                               'fallback to the random zone search')
+            self._meow_handle_normal_search()
+
+    def _meow_handle_traditional_zone(self, zone):
+        """
+        Traditional single target zone (AzurPilot's `_meow_handle_traditional_zone`).
+
+        One strategic search round; the whole map gets rescanned inside
+        `run_strategic_search`, then the radar-only patrol runs.
+        """
+        logger.hr(f'OS meowfficer farming, zone_id={zone.zone_id}', level=1)
+        self.globe_goto(zone, refresh=True)
+        self.fleet_set(self.config.OpsiFleet_Fleet)
+        self.os_order_execute(
+            recon_scan=False,
+            submarine_call=self.config.OpsiFleet_Submarine)
+        self.run_strategic_search()
+        self._meow_fixed_patrol_scan()
+        self.handle_after_auto_search()
+        self.config.check_task_switch()
+
+    def _meow_handle_stay_in_zone(self, zone):
+        """
+        Stay in one target zone and keep searching (AzurPilot's `_meow_handle_stay_in_zone`).
+
+        Get into the zone, prepare 120 action points, then run one strategic search
+        round with the radar-only patrol, and repeat next round.
+        """
+        logger.hr(f'OS meowfficer farming (stay in zone), zone_id={zone.zone_id}', level=1)
+        self.get_current_zone()
+        if self.zone.zone_id != zone.zone_id or not self.is_zone_name_hidden:
+            self.globe_goto(zone, types='SAFE', refresh=True)
+        self.action_point_set(cost=120, keep_current_ap=True, check_rest_ap=True)
+        self.fleet_set(self.config.OpsiFleet_Fleet)
+        self.os_order_execute(
+            recon_scan=False,
+            submarine_call=self.config.OpsiFleet_Submarine)
+        self.run_strategic_search()
+        self._meow_fixed_patrol_scan()
+        self.handle_after_auto_search()
+        self.config.check_task_switch()
+
+    def _meow_handle_normal_search(self):
+        """
+        Random zone search: pick the nearest usable zone of the configured hazard
+        level (AzurPilot's `_meow_handle_normal_search`).
+        """
+        # (1252, 1012) is the coordinate of zone 134 (the center zone) in os_globe_map.png
+        zones = self.zone_select(hazard_level=self.config.OpsiMeowfficerFarming_HazardLevel) \
+            .delete(SelectedGrids([self.zone])) \
+            .delete(SelectedGrids(self.zones.select(is_port=True))) \
+            .sort_by_clock_degree(center=(1252, 1012), start=self.zone.location)
+
+        logger.hr(f'OS meowfficer farming, zone_id={zones[0].zone_id}', level=1)
+        self.globe_goto(zones[0])
+        self.fleet_set(self.config.OpsiFleet_Fleet)
+        self.os_order_execute(
+            recon_scan=False,
+            submarine_call=self.config.OpsiFleet_Submarine)
+        self.run_auto_search()
+        self._meow_fixed_patrol_scan()
+        self.handle_after_auto_search()
+        self.config.check_task_switch()

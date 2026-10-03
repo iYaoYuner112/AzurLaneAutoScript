@@ -449,9 +449,12 @@ class GeneratedConfig:
     OpsiMeowfficerFarming_ActionPointPreserve = 1000
     OpsiMeowfficerFarming_HazardLevel = 5  # 3, 4, 5, 6, 10
     OpsiMeowfficerFarming_TargetZone = 0
+    OpsiMeowfficerFarming_StayInZone = False
+    OpsiMeowfficerFarming_ExecuteFixedPatrolScan = False
 
     # Group `OpsiHazard1Leveling`
     OpsiHazard1Leveling_TargetZone = 0  # 0, 44, 22
+    OpsiHazard1Leveling_ExecuteFixedPatrolScan = False
 
     # Group `OpsiScheduling`
     OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
@@ -465,8 +468,6 @@ class GeneratedConfig:
     OpsiScheduling_EnableAbyssal = True
     OpsiScheduling_EnableStronghold = True
     OpsiScheduling_TaskPriority = 'OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming'
-    OpsiScheduling_ExecuteFixedPatrolScan = False
-    OpsiScheduling_MeowfficerExecuteFixedPatrolScan = False
 
     # Group `IslandProduction`
     IslandProduction_HardFloorItems = '{}'

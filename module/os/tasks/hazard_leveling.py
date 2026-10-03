@@ -80,10 +80,11 @@ class OpsiHazard1Leveling(OSMap):
             self.run_strategic_search()
             # Fixed patrol: read the radars of all fleets without moving any of
             # them first, then move fleets away and rescan the whole map when
-            # needed. Skipped when an event is already solved.
-            if self.is_smart_scheduling_enabled and self._forced_move_enabled() \
-                    and not self._solved_map_event:
-                self.execute_fixed_patrol_scan()
+            # needed. Skipped when an event is already solved (AzurPilot puts the
+            # check here, not inside the patrol entry).
+            if self._forced_move_enabled():
+                if not self._solved_map_event:
+                    self.execute_fixed_patrol_scan()
 
             self.handle_after_auto_search()
             self.config.check_task_switch()

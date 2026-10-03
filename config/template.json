@@ -1908,9 +1908,7 @@
       "EnableObscure": true,
       "EnableAbyssal": true,
       "EnableStronghold": true,
-      "TaskPriority": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming",
-      "ExecuteFixedPatrolScan": false,
-      "MeowfficerExecuteFixedPatrolScan": false
+      "TaskPriority": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming"
     },
     "Storage": {
       "Storage": {}
@@ -1928,7 +1926,9 @@
     "OpsiMeowfficerFarming": {
       "ActionPointPreserve": 1000,
       "HazardLevel": 5,
-      "TargetZone": 0
+      "TargetZone": 0,
+      "StayInZone": false,
+      "ExecuteFixedPatrolScan": false
     },
     "OpsiFleet": {
       "Fleet": 1,
@@ -1948,7 +1948,8 @@
       "ServerUpdate": "00:00, 12:00"
     },
     "OpsiHazard1Leveling": {
-      "TargetZone": 0
+      "TargetZone": 0,
+      "ExecuteFixedPatrolScan": false
     },
     "OpsiFleet": {
       "Fleet": 1,

@@ -5,6 +5,7 @@ import inflection
 
 from module.base.timer import Timer
 from module.config.config import OS_MAP_STALE_KEY, OS_RESUME_RECOVERY_KEY
+from module.os.tasks.task_context import current_opsi_context
 from module.config.utils import get_os_reset_remain
 from module.exception import CampaignEnd, GameStuckError, GameTooManyClickError, MapDetectionError, \
     MapWalkError, RequestHumanTakeover, ScriptEnd, ScriptError
@@ -972,6 +973,20 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return False
 
     def clear_question_any_fleet(self):
+        """
+        L0/L1 of fixed patrol: read fleet 1-4 radars, clearing question marks
+        without moving any fleet to a patrol landing point.
+
+        AzurPilot order per fleet: predict the radar first -- only run the
+        clear-question flow when this fleet really sees a question mark -- then,
+        after clearing a plain question, immediately rescan the whole map to
+        pick up events that were hidden by the question / blocking fleet. A
+        target event found that way stops the patrol here, so the (much more
+        expensive) L2 fleet movement is never reached.
+
+        Returns:
+            bool: True if a target event was found and solved.
+        """
         primary = self.config.OpsiFleet_Fleet
         solved_events = set()
         question_unreachable = False
@@ -980,6 +995,14 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.info(f'[FIXED PATROL][L0] Check Fleet {fleet}')
                 if not self._set_fixed_patrol_fleet(fleet):
                     continue
+
+                self.device.screenshot()
+                question = self.radar.predict_question(
+                    self.device.image, in_port=self.zone.is_port)
+                if question is None:
+                    logger.info(f'[FIXED PATROL][L0] Fleet {fleet}: radar has no question')
+                    continue
+
                 self._solved_map_event = set()
                 self._solved_fleet_mechanism = False
                 self.clear_question()
@@ -990,7 +1013,29 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                         f'[FIXED PATROL][L0] Fleet {fleet} solved an event, stop'
                     )
                     return True
-                logger.info(f'[FIXED PATROL][L0] Fleet {fleet}: no actionable question')
+
+                # Clearing a plain question can reveal an event somewhere else on
+                # the map (the question or the blocking fleet was hiding it). Do a
+                # full map scan before switching to the next fleet, so L0 can still
+                # stop without moving any fleet (AzurPilot).
+                self._solved_map_event = set()
+                self._solved_fleet_mechanism = False
+                try:
+                    self.map_rescan_once(rescan_mode='full')
+                except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
+                        RequestHumanTakeover):
+                    raise
+                except Exception as e:
+                    logger.debug(
+                        f'Fixed patrol L0: rescan after clearing a question failed, '
+                        f'continue: {e}', exc_info=True)
+                solved_events.update(self._solved_map_event)
+                if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
+                    logger.info(
+                        f'[FIXED PATROL][L0] Event revealed after clearing a question, stop'
+                    )
+                    return True
+                logger.info(f'[FIXED PATROL][L0] Fleet {fleet}: no actionable event')
         finally:
             self._solved_map_event = solved_events
             self._question_unreachable = question_unreachable
@@ -1390,6 +1435,193 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         logger.info('[FIXED PATROL] L2 finished: result=NO_EVENT')
         return False
 
+    def _is_meowfficer_task(self) -> bool:
+        """
+        Whether the current run is 短猫相接.
+
+        Also true while OpsiScheduling proxies it: the proxied sub-task carries its
+        own identity in the task context, so the check must not read
+        `config.task.command` alone (see task_context).
+        """
+        context = current_opsi_context(self.config)
+        current = getattr(context, 'current_task', '') if context is not None else ''
+        task = getattr(self.config, 'task', None)
+        return (current or str(getattr(task, 'command', ''))) == 'OpsiMeowfficerFarming'
+
+    # Event grids that were already judged unreachable in the current rescan round.
+    _unreachable_event_nodes = set()
+
+    def _mark_event_unreachable(self, node):
+        """
+        Remember an event grid that cannot be reached in this rescan round.
+
+        Rebind instead of in-place `add`: a class-level default set is shared by
+        every instance, and an in-place add would leak the marker into others.
+
+        Args:
+            node (str): Event grid, e.g. 'B7'.
+        """
+        self._unreachable_event_nodes = set(self._unreachable_event_nodes) | {node}
+
+    def _radar_question_to_local(self):
+        """
+        Locate the white question mark on the current fleet's radar as a local grid.
+
+        Akashi / logging tower / scanning device icons are often hidden behind the
+        fleet model, so the view detection flickers. The radar question mark is the
+        same detection `clear_question` uses and is steadier.
+
+        Returns:
+            Grid or None: Local grid to click, None if the radar shows no question.
+        """
+        question = self.radar.predict_question(self.device.image, in_port=self.zone.is_port)
+        if question is None:
+            return None
+        try:
+            return self.convert_radar_to_local(question)
+        except KeyError:
+            return None
+
+    def _goto_akashi_with_other_fleets(self, drop=None):
+        """
+        Akashi is visible but the current fleet cannot reach it: try the other fleets.
+
+        Walking into Akashi usually fails because an idle fleet blocks the path or the
+        area movement count is used up. Any fleet can buy from the shop, so switch
+        through the rest: buy directly when one is adjacent, otherwise click Akashi and
+        let it walk. The first success wins; when all fail the original fleet is
+        restored and the caller falls back to the fixed patrol.
+
+        Args:
+            drop: Drop record.
+
+        Returns:
+            bool: True if a fleet managed to buy from Akashi.
+        """
+        current = self.fleet_selector.get()
+        logger.info(f'Current fleet {current} cannot reach Akashi, try other fleets')
+        try:
+            for fleet in [f for f in [1, 2, 3, 4] if f != current]:
+                self.fleet_set(fleet)
+                self.device.screenshot()
+                self.update_os()
+                self.view.predict()
+                grids = self.view.select(is_akashi=True)
+                if grids and grids[0].is_akashi:
+                    grid = grids[0]
+                else:
+                    grid = self._radar_question_to_local()
+                    if grid is None:
+                        logger.info(f'Fleet {fleet} has no Akashi in sight, next')
+                        continue
+                    logger.info(f'Fleet {fleet} did not identify Akashi, fallback to the radar question')
+                fleet_loc = self.convert_radar_to_local((0, 0))
+                # "Adjacent, buy directly" only when the view really says it is Akashi:
+                # a radar question can also be a logging tower / device, which has to be
+                # clicked and walked to instead of being opened as a shop.
+                if grid.is_akashi and fleet_loc.distance_to(grid) <= 1:
+                    logger.info(f'Akashi ({grid}) is near fleet {fleet} ({fleet_loc}), buy directly')
+                    self.handle_akashi_supply_buy(grid)
+                    self._solved_map_event.add('is_akashi')
+                    return True
+                logger.info(f'Fleet {fleet} clicks Akashi ({grid}) and tries to walk there')
+                self.device.click(grid)
+                with self.config.temporary(STORY_ALLOW_SKIP=False):
+                    walk_time = 1.5 + 0.6 * grid.distance_to(fleet_loc)
+                    result = self.wait_until_walk_stable(
+                        confirm_timer=Timer(walk_time, count=4),
+                        drop=drop,
+                        walk_out_of_step=False,
+                    )
+                if 'akashi' in result:
+                    self._solved_map_event.add('is_akashi')
+                    return True
+                logger.info(f'Fleet {fleet} cannot reach Akashi either, next')
+            return False
+        finally:
+            # Restore the original fleet on every path, so later steps do not act on
+            # a wrong fleet.
+            self.fleet_set(current)
+
+    def _goto_scanning_device_with_other_fleets(self, drop=None):
+        """
+        The current fleet cannot reach the siren device: try the other fleets.
+
+        Walking into the device usually fails because an idle fleet blocks the path.
+        Any fleet can click the device and open the dialog, so switch through the rest
+        and click; the first fleet that reaches it wins. When all fail the original
+        fleet is restored and the caller falls back to the fixed patrol.
+
+        Args:
+            drop: Drop record.
+
+        Returns:
+            bool: True if a fleet reached the device and opened its dialog.
+        """
+        current = self.fleet_selector.get()
+        logger.info(f'Current fleet {current} cannot reach the siren device, try other fleets')
+        try:
+            for fleet in [f for f in [1, 2, 3, 4] if f != current]:
+                self.fleet_set(fleet)
+                self.device.screenshot()
+                self.update_os()
+                self.view.predict()
+                grids = self.view.select(is_scanning_device=True)
+                if grids and grids[0].is_scanning_device:
+                    grid = grids[0]
+                else:
+                    grid = self._radar_question_to_local()
+                    if grid is None:
+                        logger.info(f'Fleet {fleet} has no device in sight, next')
+                        continue
+                    logger.info(f'Fleet {fleet} did not identify the device, fallback to the radar question')
+                logger.info(f'Fleet {fleet} clicks the device ({grid}) and tries to walk there')
+                self.device.click(grid)
+                with self.config.temporary(STORY_ALLOW_SKIP=False):
+                    result = self.wait_until_walk_stable(
+                        drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
+                if 'event' in result:
+                    logger.info(f'Fleet {fleet} reached the siren device')
+                    self._set_device_state(DEVICE_DIALOG_OPEN)
+                    return True
+                logger.info(f'Fleet {fleet} cannot reach the device either, next')
+            return False
+        finally:
+            # Restore the original fleet on every path, so later steps do not act on
+            # a wrong fleet.
+            self.fleet_set(current)
+
+    def _recover_unreachable_akashi(self, drop, node):
+        """
+        Unified fallback when Akashi cannot be reached: other fleets first, then the
+        fixed patrol.
+
+        Akashi's icon is hidden by the fleet model and the view detection flickers, so
+        both failing paths (bought nothing, or no longer identified) share this.
+
+        Args:
+            drop: Drop record.
+            node (str): Akashi grid, e.g. 'B7'. A full rescan sees the same grid from
+                several camera views; this keeps the slow path to once per round.
+
+        Returns:
+            bool: True if some fleet bought from Akashi.
+        """
+        if self._is_meowfficer_task():
+            # 短猫相接不走这套共享兜底（换队点明石 + 挪舰队），它只有换队扫雷达。
+            logger.info('Meowfficer farming does not use the shared Akashi fallback, '
+                        'its own radar patrol handles it')
+            return False
+        if node in self._unreachable_event_nodes:
+            logger.info(f'Akashi on {node} was already judged unreachable this round, skip')
+            return False
+        if self._goto_akashi_with_other_fleets(drop=drop):
+            return True
+        logger.info('No fleet can reach Akashi, run the fixed patrol')
+        self._mark_event_unreachable(node)
+        self.execute_fixed_patrol_scan()
+        return False
+
     def _forced_move_enabled(self):
         """
         Read the fixed patrol switch, tolerating the legacy level numbers.
@@ -1397,7 +1629,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         Returns:
             bool: True if fixed patrol is enabled.
         """
-        value = self.config.OpsiScheduling_ExecuteFixedPatrolScan
+        value = getattr(self.config, 'OpsiHazard1Leveling_ExecuteFixedPatrolScan', None)
+        if value is None:
+            # The fallbacks run from the shared rescan code too, where 侵蚀1 may not
+            # be bound; read the task's config directly in that case.
+            value = self.config.cross_get(
+                'OpsiHazard1Leveling.OpsiHazard1Leveling.ExecuteFixedPatrolScan', default=False)
         if isinstance(value, str):
             value = value.strip().lower()
             if value in ('true', '1', '2', '3'):
@@ -1446,10 +1683,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if not self._forced_move_enabled():
             logger.info('Fixed patrol: switch is off, skipped')
             return False
-        if not self.zone or self.zone.is_port or self.zone.hazard_level != 1:
-            # The landing grids are defined for the hazard level 1 map.
-            return False
-        if self._solved_map_event:
+        if self._is_meowfficer_task():
+            # 短猫相接不走这套共享强制移动（与 AP master 一致）：L2 把舰队挪到的
+            # C1/D1/E1/F1 是照侵蚀1 那张图定的，短猫跑的海域各不相同，挪了没意义
+            # 还可能把舰队挪到不该去的地方。短猫的强制移动只有换队扫雷达。
+            logger.info('Fixed patrol: meowfficer farming uses its own radar-only patrol, '
+                        'skip the shared L2')
             return False
         # Guard against recursive re-entry: if the event handler already triggered
         # fixed patrol (e.g. Akashi unreachable), don't nest another full patrol.
@@ -1641,12 +1880,26 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             if 'akashi' in result:
                 self._solved_map_event.add('is_akashi')
                 return True
+            # Cannot reach Akashi: try the other fleets first, and fall back to the
+            # fixed patrol (move the blocking fleet away) when none works.
+            grids = self.view.select(is_akashi=True)
+            if 'is_akashi' not in self._solved_map_event and grids and grids[0].is_akashi:
+                grid = grids[0]
+                logger.info('Unable to reach Akashi, try other fleets first')
             else:
-                return False
+                # Akashi "disappeared" from the view: it was clicked but no shop was
+                # opened, which means the current fleet cannot reach it. Its icon is
+                # hidden by the fleet model and the detection flickers, so a missing
+                # re-identification must not be treated as "nothing happened".
+                logger.info('Akashi was not identified again, try other fleets first')
+            return self._recover_unreachable_akashi(drop, location2node(grid.location))
 
         grids = self.view.select(is_scanning_device=True)
         if 'is_scanning_device' not in self._solved_map_event and grids and grids[0].is_scanning_device:
             grid = grids[0]
+            if location2node(grid.location) in self._unreachable_event_nodes:
+                logger.info(f'Siren device on {grid} was already judged unreachable this round, skip')
+                return False
             logger.info(f'Found siren probe (scanning device) on {grid}, stop battle plan to handle it')
             # The probe is a special map event, not a normal battle target: click it,
             # wait for the operation popup, confirm it, then rescan. Never skip it to
@@ -1657,13 +1910,25 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 result = self.wait_until_walk_stable(
                     drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+            reached = 'event' in result
+            if not reached:
+                # The walk can be blocked by an idle fleet, in which case the device
+                # dialog never opens: try the other fleets before giving up.
+                reached = self._goto_scanning_device_with_other_fleets(drop=drop)
             self.os_auto_search_run(drop=drop)
-            if 'event' in result:
+            if reached:
                 self._solved_map_event.add('is_scanning_device')
                 self._set_device_state(DEVICE_COMPLETED)
                 return True
             else:
+                # No fleet could reach the device: remember this grid and fall back to
+                # the fixed patrol to move the blocking fleet away. Must return False —
+                # returning True would make map_rescan believe the event was handled and
+                # spin on the same device.
+                logger.info('Unable to reach the siren device, run the fixed patrol')
+                self._mark_event_unreachable(location2node(grid.location))
                 self._set_device_state(DEVICE_NONE)
+                self.execute_fixed_patrol_scan()
                 return False
 
         grids = self.view.select(is_logging_tower=True)
@@ -1718,6 +1983,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             bool: If solved a map random event
         """
         result = False
+        # A new rescan round gives every event another chance: clear last round's
+        # "cannot reach" markers (AzurPilot does the same here).
+        self._unreachable_event_nodes = set()
 
         # Try current camera first
         logger.hr('Map rescan current', level=2)

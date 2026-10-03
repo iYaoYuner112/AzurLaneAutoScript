@@ -769,10 +769,13 @@ OpsiMeowfficerFarming:
     option: [ 3, 4, 5, 6, 10 ]
   TargetZone:
     value: 0
+  StayInZone: false
+  ExecuteFixedPatrolScan: false
 OpsiHazard1Leveling:
   TargetZone:
     value: 0
     option: [ 0, 44, 22 ]
+  ExecuteFixedPatrolScan: false
 OpsiScheduling:
   UseSmartSchedulingOperationCoinsPreserve: true
   OperationCoinsPreserve: 20000
@@ -786,8 +789,6 @@ OpsiScheduling:
   EnableStronghold: true
   TaskPriority:
     value: 'OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming'
-  ExecuteFixedPatrolScan: false
-  MeowfficerExecuteFixedPatrolScan: false
 
 # =================== Island ====================
 

@@ -17,7 +17,9 @@ class SwitchStub:
     """只提供 `_forced_move_enabled` 需要的属性。"""
 
     def __init__(self, value):
-        self.config = SimpleNamespace(OpsiScheduling_ExecuteFixedPatrolScan=value)
+        self.config = SimpleNamespace(
+            OpsiHazard1Leveling_ExecuteFixedPatrolScan=value,
+            cross_get=lambda keys, default=None: default)
 
 
 def enabled(value):
@@ -80,6 +82,9 @@ class ScanStub:
     def _forced_move_enabled(self):
         return self.enabled
 
+    def _is_meowfficer_task(self):
+        return OSMap._is_meowfficer_task(self)
+
     def clear_question_any_fleet(self):
         # 真实实现会在清不掉时置位 `_question_unreachable`，这里直接给定
         self.scan_calls += 1
@@ -136,15 +141,16 @@ def test_skips_when_no_map_grids():
     assert stub.fleet_sets == []
 
 
-def test_skips_on_non_hazard_one_map():
-    """落点是照侵蚀1 那张图定的，别的海域不跑这套。"""
+def test_no_zone_guard_matches_ap_master():
+    """AP master 的入口没有海域守卫：别的海域照样按 AP 判断进入 L2（落点不存在时
+    `_move_fleet_to_patrol` 会自行跳过，不会乱挪）。"""
     for hazard_level in (2, 5):
-        stub, result = run_scan(hazard_level=hazard_level)
+        stub, result = run_scan(hazard_level=hazard_level, current_ap=50)
         assert result is False
-        assert stub.scan_calls == 0
-        assert stub.move_calls == 0
-    stub, result = run_scan(is_port=True)
-    assert result is False and stub.move_calls == 0
+        assert stub.scan_calls == 1
+        assert stub.move_calls == 1
+    stub, result = run_scan(is_port=True, current_ap=50)
+    assert result is False and stub.move_calls == 1
 
 
 def test_moves_fleets_when_action_point_enough():
@@ -275,3 +281,240 @@ def test_candidates_fall_back_to_far_rows_when_nothing_else():
 def test_solved_events_constant_is_used():
     """编排里判定“事件已解决”用的是共享常量，别写死字符串。"""
     assert 'is_akashi' in ALREADY_SOLVED_MAP_EVENTS
+
+
+# ---- L0（换队读雷达）对齐 AP：有问号才清、清完立刻重扫捞事件 ----
+
+class L0Stub:
+    """只提供 `clear_question_any_fleet`（L0）需要的属性。"""
+
+    def __init__(self, questions, reveal_on=None):
+        self.config = SimpleNamespace(OpsiFleet_Fleet=1)
+        self.zone = SimpleNamespace(is_port=False)
+        self.questions = questions            # {fleet: 问号格子 or None}
+        self.reveal_on = reveal_on            # 清问号后重扫命中的事件；None 表示没命中
+        self.events = []
+        self.current = None
+        self._solved_map_event = set()
+        self._solved_fleet_mechanism = False
+        self._question_unreachable = False
+        self.device = SimpleNamespace(
+            image=None, screenshot=lambda: self.events.append('screenshot'))
+        self.radar = SimpleNamespace(
+            predict_question=lambda image, in_port: self.questions.get(self.current))
+
+    def _set_fixed_patrol_fleet(self, fleet):
+        self.current = fleet
+        self.events.append(f'check{fleet}')
+        return True
+
+    def fleet_set(self, fleet):
+        self.current = fleet
+        self.events.append(f'set{fleet}')
+
+    def clear_question(self):
+        self.events.append(f'clear{self.current}')
+
+    def map_rescan_once(self, rescan_mode='full'):
+        self.events.append('rescan')
+        if self.reveal_on:
+            self._solved_map_event = set(self.reveal_on)
+
+
+def test_l0_does_not_run_clear_question_without_a_question():
+    """雷达上没有问号就不走清除流程，也不重扫（对齐 AP 的先看雷达）。"""
+    stub = L0Stub({})
+    assert OSMap.clear_question_any_fleet(stub) is False
+    assert not any(e.startswith('clear') for e in stub.events)
+    assert 'rescan' not in stub.events
+    # 4 支舰队都检查过，最后复位主队
+    assert stub.events.count('screenshot') == 4
+    assert stub.events[-1] == 'set1'
+
+
+def test_l0_rescans_after_clearing_a_plain_question():
+    """清掉普通问号后立刻整图重扫一次，把被遮挡的事件捞出来。"""
+    stub = L0Stub({1: (4, 0), 2: None, 3: None, 4: None})
+    assert OSMap.clear_question_any_fleet(stub) is False
+    assert stub.events.count('clear1') == 1
+    assert stub.events.count('rescan') == 1
+    # 重扫只发生在清过问号之后
+    assert stub.events.index('clear1') < stub.events.index('rescan')
+
+
+def test_l0_rescan_hit_stops_before_moving_any_fleet():
+    """重扫才显现的事件命中就停止，不再检查后续舰队（也就不会进 L2 挪舰队）。"""
+    stub = L0Stub({1: (4, 0)}, reveal_on={'is_akashi'})
+    assert OSMap.clear_question_any_fleet(stub) is True
+    assert 'is_akashi' in stub._solved_map_event
+    assert 'check2' not in stub.events
+    assert 'check3' not in stub.events
+
+
+# ---- 短猫绝不走共享 L2（对齐 AP master）----
+
+def test_shared_fixed_patrol_skips_meowfficer():
+    stub = ScanStub(enabled=True)
+    stub.config.task = SimpleNamespace(command='OpsiMeowfficerFarming')
+    result = OSMap.execute_fixed_patrol_scan(stub)
+    assert result is False
+    assert stub.move_calls == 0
+    assert stub.scan_calls == 0
+    assert stub.ap_reads == 0
+
+
+def test_meowfficer_detected_directly_and_when_proxied():
+    from module.os.tasks.task_context import OpsiTaskContext
+    stub = ScanStub(enabled=True)
+    stub.config.task = SimpleNamespace(command='OpsiMeowfficerFarming')
+    assert OSMap._is_meowfficer_task(stub) is True
+
+    stub.config.task = SimpleNamespace(command='OpsiScheduling')
+    assert OSMap._is_meowfficer_task(stub) is False
+
+    # 智能调度代理短猫时，身份在 task context 里，config.task 是子任务自己
+    stub.config._opsi_context = OpsiTaskContext(
+        parent_task='OpsiScheduling', current_task='OpsiMeowfficerFarming')
+    assert OSMap._is_meowfficer_task(stub) is True
+
+
+def test_meowfficer_guard_missing_config_does_not_crash():
+    """老配置/替身没有 task 属性时也不能炸（保持向后兼容）。"""
+    stub = ScanStub(enabled=True)
+    assert OSMap._is_meowfficer_task(stub) is False
+
+
+# ---- 事件不可达兜底（对齐 AP master：换其他舰队 → 仍不行则强制移动）----
+
+class RecoveryStub:
+    def __init__(self, rotation_succeeds=False, meow=False):
+        self.config = SimpleNamespace(
+            temporary=lambda **kwargs: SimpleNamespace(recover=lambda: None))
+        self._unreachable_event_nodes = set()
+        self._rotation_succeeds = rotation_succeeds
+        self._meow = meow
+        self.patrol_calls = 0
+
+    def _is_meowfficer_task(self):
+        return self._meow
+
+    def _goto_akashi_with_other_fleets(self, drop=None):
+        return self._rotation_succeeds
+
+    def execute_fixed_patrol_scan(self):
+        self.patrol_calls += 1
+
+    _mark_event_unreachable = OSMap._mark_event_unreachable
+    _recover_unreachable_akashi = OSMap._recover_unreachable_akashi
+
+
+def test_unreachable_akashi_rotation_succeeds_without_patrol():
+    stub = RecoveryStub(rotation_succeeds=True)
+    assert OSMap._recover_unreachable_akashi(stub, None, 'B7') is True
+    assert stub.patrol_calls == 0
+
+
+def test_unreachable_akashi_falls_back_to_patrol_once_per_round():
+    stub = RecoveryStub(rotation_succeeds=False)
+    assert OSMap._recover_unreachable_akashi(stub, None, 'B7') is False
+    assert stub.patrol_calls == 1
+    assert 'B7' in stub._unreachable_event_nodes
+    # 同一格在本轮重扫里不再重复触发大规模挪舰队
+    assert OSMap._recover_unreachable_akashi(stub, None, 'B7') is False
+    assert stub.patrol_calls == 1
+
+
+def test_unreachable_akashi_fallback_skipped_for_meowfficer():
+    stub = RecoveryStub(rotation_succeeds=False, meow=True)
+    assert OSMap._recover_unreachable_akashi(stub, None, 'B7') is False
+    assert stub.patrol_calls == 0
+
+
+def test_mark_event_unreachable_rebinds_instead_of_leaking():
+    a = RecoveryStub()
+    b = RecoveryStub()
+    a._mark_event_unreachable('B7')
+    assert a._unreachable_event_nodes == {'B7'}
+    assert b._unreachable_event_nodes == set()
+
+
+def test_radar_question_to_local_returns_none_without_a_question():
+    stub = SimpleNamespace(
+        device=SimpleNamespace(image=None), zone=SimpleNamespace(is_port=False),
+        radar=SimpleNamespace(predict_question=lambda image, in_port: None))
+    assert OSMap._radar_question_to_local(stub) is None
+
+
+def test_fallback_patrol_not_blocked_by_other_solved_events():
+    """_solved_map_event 的门槛在调用方，入口本身不再拦（AP master 同款）。"""
+    stub = ScanStub(enabled=True, current_ap=50)
+    stub._solved_map_event = {'is_logging_tower'}
+    assert OSMap.execute_fixed_patrol_scan(stub) is False
+    assert stub.move_calls == 1
+
+
+# ---- 装置不可达：换其他舰队点（对齐 AP master 的效果）----
+
+class _TempContext:
+    """`config.temporary()` 的最小替身：既能 with，也能 recover。"""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def recover(self):
+        pass
+
+
+class DeviceRotationStub:
+    def __init__(self, reachable_fleet=None):
+        self.config = SimpleNamespace(temporary=lambda **kwargs: _TempContext())
+        self._reachable = reachable_fleet
+        self._current = 1
+        self.fleet_events = []
+        self.device_states = []
+        self.walk_calls = 0
+        self.device = SimpleNamespace(image=None, screenshot=lambda: None,
+                                      click=lambda grid: None)
+        self.view = SimpleNamespace(
+            predict=lambda: None,
+            select=lambda **kwargs: [SimpleNamespace(is_scanning_device=True)])
+
+    @property
+    def fleet_selector(self):
+        outer = self
+        return SimpleNamespace(get=lambda: outer._current)
+
+    def fleet_set(self, fleet):
+        self._current = fleet
+        self.fleet_events.append(fleet)
+        return True
+
+    def update_os(self):
+        pass
+
+    def wait_until_walk_stable(self, **kwargs):
+        self.walk_calls += 1
+        return 'event' if self._current == self._reachable else 'timeout'
+
+    def _set_device_state(self, state):
+        self.device_states.append(state)
+
+    _goto_scanning_device_with_other_fleets = OSMap._goto_scanning_device_with_other_fleets
+
+
+def test_device_rotation_reaches_with_another_fleet():
+    stub = DeviceRotationStub(reachable_fleet=3)
+    assert OSMap._goto_scanning_device_with_other_fleets(stub, None) is True
+    assert stub.device_states == ['DEVICE_DIALOG_OPEN']
+    # 结束时恢复原舰队
+    assert stub.fleet_events[-1] == 1
+
+
+def test_device_rotation_fails_and_restores_original_fleet():
+    stub = DeviceRotationStub(reachable_fleet=None)
+    assert OSMap._goto_scanning_device_with_other_fleets(stub, None) is False
+    assert stub.fleet_events[-1] == 1
+    assert stub.walk_calls == 3      # 除了原舰队，另外三队都试过

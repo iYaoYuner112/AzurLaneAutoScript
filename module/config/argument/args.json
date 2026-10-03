@@ -9303,14 +9303,6 @@
       "TaskPriority": {
         "type": "input",
         "value": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming"
-      },
-      "ExecuteFixedPatrolScan": {
-        "type": "checkbox",
-        "value": false
-      },
-      "MeowfficerExecuteFixedPatrolScan": {
-        "type": "checkbox",
-        "value": false
       }
     },
     "Storage": {
@@ -9377,6 +9369,14 @@
       "TargetZone": {
         "type": "input",
         "value": 0
+      },
+      "StayInZone": {
+        "type": "checkbox",
+        "value": false
+      },
+      "ExecuteFixedPatrolScan": {
+        "type": "checkbox",
+        "value": false
       }
     },
     "OpsiFleet": {
@@ -9449,6 +9449,10 @@
           44,
           22
         ]
+      },
+      "ExecuteFixedPatrolScan": {
+        "type": "checkbox",
+        "value": false
       }
     },
     "OpsiFleet": {
