@@ -877,8 +877,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         Clear nearly (and 3 grids from above) question marks on radar.
         Try 3 times at max to avoid loop tries on 2 adjacent fleet mechanism.
 
-        Args:
-            drop:
+        `_question_unreachable` semantics follow AzurPilot: it is set ONLY when every
+        attempt saw a question but none could be cleared. Any other outcome -- e.g. a
+        question that turned out to be a plain story event and got consumed -- must
+        NOT mark it, otherwise the caller moves fleets to hunt a question that no
+        longer exists.
 
         Returns:
             bool: If cleared
@@ -890,7 +893,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             grid = self.radar.predict_question(self.device.image, in_port=self.zone.is_port)
             if grid is None:
                 logger.info('No question mark above current fleet on this radar')
-                self._question_unreachable = question_seen
                 return False
 
             question_seen = True
@@ -901,16 +903,24 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.view.predict()
             self.view.show()
 
+            # Camera drift (no current fleet in the local view, e.g. after a full
+            # rescan left the camera at a scan position): a fallback conversion would
+            # use the camera center as the fleet position and click a wrong grid.
+            if self.view.select(is_current_fleet=True).count == 0:
+                self._os_camera_recover_to_fleet()
+
             try:
                 grid = self.convert_radar_to_local(grid)
             except KeyError:
-                # The question mark sits outside the current local view (e.g. the
-                # fleet is at the map edge and the question is one grid beyond it).
-                # It can not be clicked now; mark it unreachable so the fixed patrol
-                # L2 moves a fleet to bring it into view.
-                logger.warning('Question mark is outside the local view, mark unreachable')
-                self._question_unreachable = True
-                return False
+                # The question sits outside the local view (e.g. the fleet is at the
+                # map edge and the question is one grid beyond it). Recover the
+                # camera when the fleet is not visible either, then retry -- do NOT
+                # mark it unreachable here (AzurPilot retries instead).
+                if self.view.select(is_current_fleet=True).count == 0:
+                    self._os_camera_recover_to_fleet()
+                else:
+                    logger.warning('Question mark is outside the local view, skip this grid')
+                continue
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 result = self.wait_until_walk_stable(
@@ -926,13 +936,17 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.os_auto_search_run(drop=drop)
                 return True
             else:
-                logger.warning(f'Arrive question with unexpected result: {result}, expected: {grid.str}')
-                self._question_unreachable = True
+                # A plain story event (options + rewards) also lands here: the
+                # question has been consumed, so just re-predict the radar. The log
+                # stays for diagnosability, but it must never mark the question
+                # unreachable (AzurPilot has no such branch at all).
+                logger.info(f'Question turned into {result}, expected: {grid.str}, re-predict radar')
                 continue
 
-        logger.warning('Failed to goto question mark after 5 trail, '
+        logger.warning('Failed to goto question mark after 3 trail, '
                        'this might be 2 adjacent fleet mechanism, stopped')
         self._question_unreachable = question_seen
+        return False
         return False
 
     def clear_question_any_fleet(self):
@@ -1413,6 +1427,36 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     # Event grids that were already judged unreachable in the current rescan round.
     _unreachable_event_nodes = set()
+
+    def _os_camera_recover_to_fleet(self, fleet=None):
+        """
+        Re-focus the camera on the current fleet by switching fleets and back.
+
+        The game sometimes leaves the camera elsewhere (after auto search / event
+        handling); the local view then has no current fleet, radar coordinates can not
+        be converted into clickable grids, and visible events are wrongly treated as
+        out of reach. `fleet_set` already waits for the camera to settle.
+
+        Args:
+            fleet (int | None): Fleet to focus, defaults to the current one.
+
+        Returns:
+            bool: True if the current fleet is visible again.
+        """
+        if fleet is None:
+            fleet = self.fleet_selector.get()
+        logger.warning(f'Camera is not following fleet {fleet}, switch fleets to re-focus')
+        other = 1 if fleet != 1 else 2
+        self.fleet_set(other)
+        self.fleet_set(fleet)
+        self.device.screenshot()
+        self.update_os()
+        self.view.predict()
+        if self.view.select(is_current_fleet=True).count == 1:
+            logger.info('Camera re-focused on the current fleet')
+            return True
+        logger.warning('Camera still not following after the re-focus, view detection may be broken')
+        return False
 
     def _mark_event_unreachable(self, node):
         """

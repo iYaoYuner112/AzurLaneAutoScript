@@ -518,3 +518,92 @@ def test_device_rotation_fails_and_restores_original_fleet():
     assert OSMap._goto_scanning_device_with_other_fleets(stub, None) is False
     assert stub.fleet_events[-1] == 1
     assert stub.walk_calls == 3      # 除了原舰队，另外三队都试过
+
+
+# ---- clear_question 的 _question_unreachable 语义（对齐 AP master）----
+#
+# 用户实测场景：问号点过去开的是普通剧情事件（3 选项 + 奖励），wait 返回 'event'。
+# 旧实现把它标成 question_unreachable → L2 无视行动力去挪舰队追一个已经消失的问号。
+# master 的语义：只有 3 次尝试都看到问号却没清掉才置位。
+
+class _FakeGrid:
+    def __init__(self):
+        self.str = 'B4'
+        self.is_logging_tower = False
+        self.is_scanning_device = False
+
+
+class ClearQuestionStub:
+    def __init__(self, predictions, walk_results=None, convert_error=False, fleet_visible=True):
+        self.config = SimpleNamespace(temporary=lambda **kwargs: _TempContext())
+        self.zone = SimpleNamespace(is_port=False)
+        self._solved_map_event = set()
+        self._question_unreachable = False
+        self.events = []
+        self._predictions = list(predictions or [])
+        self._walk_results = list(walk_results or [])
+        self._convert_error = convert_error
+        self._fleet_visible = fleet_visible
+        self.device = SimpleNamespace(image=None, screenshot=lambda: None,
+                                      click=lambda grid: self.events.append('click'))
+        self.radar = SimpleNamespace(
+            predict_question=lambda image, in_port: (
+                self._predictions.pop(0) if self._predictions else None))
+        self.view = SimpleNamespace(
+            predict=lambda: None,
+            show=lambda: None,
+            select=lambda **kwargs: SimpleNamespace(
+                count=1 if self._fleet_visible else 0))
+        self.fleet_selector = SimpleNamespace(get=lambda: 2)
+
+    def handle_info_bar(self):
+        pass
+
+    def update_os(self):
+        pass
+
+    def convert_radar_to_local(self, grid):
+        if self._convert_error:
+            raise KeyError('out of view')
+        return _FakeGrid()
+
+    def wait_until_walk_stable(self, **kwargs):
+        return self._walk_results.pop(0) if self._walk_results else 'timeout'
+
+    def _os_camera_recover_to_fleet(self, fleet=None):
+        self.events.append('recover')
+        return True
+
+    clear_question = OSMap.clear_question
+
+
+def test_story_event_from_question_is_not_marked_unreachable():
+    """问号开成普通剧情并消费掉：不能标 unreachable，否则 L2 会去追已消失的问号。"""
+    stub = ClearQuestionStub(predictions=[(0, -1), None], walk_results=['event'])
+    assert OSMap.clear_question(stub) is False
+    assert stub._question_unreachable is False
+    assert stub.events == ['click']
+
+
+def test_all_attempts_failed_marks_unreachable():
+    """3 次都看到问号却没清掉（相邻双舰队机关）：置位，交给 L2。"""
+    stub = ClearQuestionStub(
+        predictions=[(0, -1), (0, -1), (0, -1), (0, -1)],
+        walk_results=['timeout', 'timeout', 'timeout'])
+    assert OSMap.clear_question(stub) is False
+    assert stub._question_unreachable is True
+
+
+def test_out_of_view_question_recovers_camera_without_unreachable():
+    stub = ClearQuestionStub(predictions=[(0, -1), None], convert_error=True,
+                             fleet_visible=False)
+    assert OSMap.clear_question(stub) is False
+    assert stub._question_unreachable is False
+    assert 'recover' in stub.events
+
+
+def test_no_question_on_radar_returns_false_cleanly():
+    stub = ClearQuestionStub(predictions=[None])
+    assert OSMap.clear_question(stub) is False
+    assert stub._question_unreachable is False
+    assert stub.events == []
