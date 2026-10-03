@@ -79,18 +79,25 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         Resume barrier: if the map state is stale, re-establish it before any
         Opsi operation. Runs once per invalidation, not on every loop.
 
-        The re-sync does: invalidate stale scan caches -> FULL MAP RESCAN ->
-        rebuild targets (done later by the target selector). Fleet positions are
-        re-read by the fixed patrol / radar check when they are actually needed.
+        The regular re-sync does: invalidate stale scan caches -> FULL MAP RESCAN
+        -> rebuild targets (done later by the target selector). Fleet positions
+        are re-read by the fixed patrol / radar check when they are needed.
+        Smart scheduling resume takes a different path, see below.
 
         Smart scheduling resume: when OpsiScheduling itself was preempted by
         another task (OS_RESUME_RECOVERY_KEY set), the barrier does NOT rescan
-        unconditionally. It defers to the one-shot Auto Search probe in
-        `os_init()`: if the auto search starts normally the map state is
-        considered still valid; only when the probe has no effect does it fall
-        back to one full map rescan (see `_os_resume_recovery_auto_search()`).
-        This applies to every zone, including 22/44/154 which normally skip the
-        first auto search -- those get an extra probe call site in `os_init()`.
+        and does NOT run a first auto search either. AzurPilot does the same:
+        the smart scheduling sub-tasks rebuild the map on their own
+        (侵蚀1练级 runs its own battle plan followed by clear_question() and
+        map_rescan(); coin tasks navigate to their own zones), so the barrier
+        only invalidates the cached scan state and lets the sub-task flow do
+        the rebuild.
+
+        Running a first auto search here used to be the resume probe. It had to
+        be dropped: that auto search cleared the zone before the sub-task's own
+        battle plan, so the battle plan had nothing to fight and the map events
+        were never picked up by `map_rescan()`, i.e. events were silently
+        missed right after a resume (see `handle_first_auto_search()`).
         """
         if not self._os_map_was_interrupted():
             logger.info('[OS RESUME] Continue without interruption')
@@ -99,8 +106,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         logger.info(f'[OS RESUME] Current zone: {self.zone}')
 
         # If a Siren device interaction was in progress when the task was
-        # interrupted, do NOT replay any stale click. Re-observe the UI: the full
-        # rescan below re-detects the device and re-decides from the real state.
+        # interrupted, do NOT replay any stale click. Re-observe the UI instead:
+        # either the rescan below or the smart scheduling sub-task flow
+        # re-detects the device and re-decides from the real state.
         if self._device_state in DEVICE_INTERRUPTIBLE_STATES:
             logger.info(f'[OS][DEVICE] interruption detected during state={self._device_state}')
             logger.info('[OS][DEVICE] recovery: re-observing current UI (no stale click)')
@@ -110,15 +118,19 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         self._solved_fleet_mechanism = False
 
         # Smart scheduling resume: OpsiScheduling was preempted by another task.
-        # One-shot: consume the recovery flag immediately, no matter which path
-        # is taken below, so a later resume can never probe twice.
+        # One-shot: consume the recovery flag immediately so a later resume can
+        # never repeat this barrier.
         if self._os_resume_recovery_available():
             self.config.cross_set(OS_RESUME_RECOVERY_KEY, False)
             logger.info('[OS][RESUME] OpsiScheduling resumed after external task interruption')
             logger.info('[OS][RESUME] Map state marked stale')
-            logger.info('[OS][RESUME] Deferring resync to the one-shot Auto Search recovery probe')
-            self._os_resume_probe_pending = True
-            # Stale flag stays set; it is cleared by the probe result.
+            logger.info('[OS][RESUME] Handing the map rebuild over to the smart scheduling sub-tasks')
+            # No auto search / rescan here (AzurPilot aligns): the sub-task flow
+            # rebuilds the map itself and its own battle plan + map_rescan() is
+            # the only chance for map events to be resolved. Clearing the stale
+            # flag keeps this barrier one-shot.
+            self.config.cross_set(OS_MAP_STALE_KEY, False)
+            logger.info('[OS][MAP] Map state resynced')
             return
 
         logger.info('[OS RESUME] Running FULL MAP RESCAN after interruption')
@@ -145,80 +157,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             and bool(self.config.cross_get(OS_RESUME_RECOVERY_KEY, default=False))
         )
 
-    # One-shot probe flag: set by ensure_map_state_current() when OpsiScheduling
-    # resumes after external preemption, consumed by the first auto search in
-    # os_init() (see `_os_resume_recovery_auto_search()`).
-    _os_resume_probe_pending = False
-
-    def _os_resume_recovery_auto_search(self):
-        """
-        First auto search probe after OpsiScheduling is resumed from an external
-        preemption (smart scheduling resume barrier).
-
-        Try ONE auto search with the existing functions:
-        - If auto search really runs (it starts and the daemon loop completes
-          normally, with combat activity detected by the existing battle-count
-          detector), the map state is still valid: resume scheduling directly
-          and skip the full map rescan.
-        - If it has no effect (auto search can not even start / unexpected
-          failure, never by repeated clicking), fall back to ONE FULL MAP RESCAN
-          to re-sync fleets and targets, then resume scheduling.
-
-        "Real" activity is judged with the existing in-project signals only:
-        the daemon's own unlock check (which raises RequestHumanTakeover when the
-        auto search option stays invisible), and `_auto_search_battle_count`,
-        incremented by `on_auto_search_battle_count_add()` whenever
-        `combat_appear()` sees a battle actually start.
-
-        One-shot: the probe flag is consumed at entry, so this runs at most
-        once per preemption-resume cycle and can never loop.
-        """
-        self._os_resume_probe_pending = False
-        logger.hr('OS resume recovery: first auto search probe', level=2)
-        logger.info('[OS][RESUME] Trying one Auto Search recovery')
-        self.on_auto_search_battle_count_reset()
-        started = False
-        combat = 0
-        try:
-            combat = self.run_auto_search(
-                question=False, rescan=False, after_auto_search=False)
-            started = True
-        except RequestHumanTakeover:
-            # The daemon's unlock check could not see the auto search option.
-            # Auto search can not even start: treat as no effect, do not click
-            # again, fall back to a full map rescan.
-            logger.warning('[OS][RESUME] Auto search option unavailable, treat as no effect')
-        battle_count = self._auto_search_battle_count
-        if started:
-            logger.info(
-                f'[OS][RESUME] Auto Search started successfully '
-                f'(combat={combat}, battle_count={battle_count})')
-            self.config.cross_set(OS_MAP_STALE_KEY, False)
-            self._os_resume_recovery_finished()
-            return
-
-        logger.warning('[OS][RESUME] Auto Search attempt had no effect')
-        logger.info('[OS][RESUME] Falling back to FULL MAP RESCAN')
-        logger.info('[OS][RESUME] FULL MAP RESCAN after scheduling interruption')
-        # Same cache invalidation as the regular resume barrier: events solved
-        # during the probe belong to the pre-resumption map data.
-        self._solved_map_event = set()
-        self._solved_fleet_mechanism = False
-        try:
-            self.map_rescan(rescan_mode='full')
-        except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
-                RequestHumanTakeover):
-            raise
-        except Exception as e:
-            logger.warning(f'[OS RESUME] full rescan failed, continue: {e}')
-        self.config.cross_set(OS_MAP_STALE_KEY, False)
-        self._os_resume_recovery_finished()
-
-    def _os_resume_recovery_finished(self):
-        """Log the resume barrier completion and hand back to the scheduler."""
-        logger.info('[OS][RESUME] Map state synchronized')
-        logger.info('[OS][RESUME] Rebuilding scheduling targets')
-
     @property
     def _device_state(self):
         return self.config.cross_get(DEVICE_STATE_KEY, default=DEVICE_NONE) or DEVICE_NONE
@@ -226,6 +164,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def _set_device_state(self, state):
         self.config.cross_set(DEVICE_STATE_KEY, state)
         logger.info(f'[OS][DEVICE] state={state}')
+
+    # One-shot flag: set by os_init() when the running task is OpsiScheduling,
+    # consumed by the smart scheduling decision (`handle_first_auto_search()`),
+    # so that the scheduling layer decides whether the skipped first auto search
+    # has to be made up.
+    _smart_scheduling_first_auto_search_pending = False
 
     def os_init(self):
         """
@@ -284,25 +228,44 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             logger.warning('OS is in a special zone type, while SAFE and DANGEROUS are acceptable')
             self.map_exit()
 
-        # Clear current zone
+        # Clear current zone.
+        #
+        # Smart scheduling (OpsiScheduling) must NOT run a first auto search
+        # here. Its sub-tasks rebuild the map on their own -- 侵蚀1练级 runs its
+        # battle plan followed by clear_question() + map_rescan(), coin tasks
+        # navigate to their own zones -- and an auto search would first clear
+        # the zone, so the sub-task's battle plan would have nothing to fight
+        # and the map events would never be resolved by `map_rescan()`.
+        # AzurPilot does the same: OpsiScheduling defers the decision to
+        # `handle_first_auto_search()` (see module/os/tasks/scheduling.py).
+        self._smart_scheduling_first_auto_search_pending = (
+                self.config.task.command == 'OpsiScheduling'
+                and self.is_smart_scheduling_enabled
+        )
+
         if self.zone.zone_id in [22, 44, 154]:
             logger.info('In zone 22, 44, 154, skip running first auto search')
-            if self._os_resume_probe_pending:
-                # These zones do not run a first auto search of their own, so
-                # the resume probe gets its own call site here. Without it a
-                # resume in these zones could only ever do a full map rescan.
-                self._os_resume_recovery_auto_search()
-                self.handle_after_auto_search()
             self.handle_ash_beacon_attack()
+        elif self._smart_scheduling_first_auto_search_pending:
+            logger.info('Smart scheduling will decide whether to run the first auto search')
         else:
-            if self._os_resume_probe_pending:
-                # Smart scheduling resumed after external preemption: this
-                # first auto search doubles as the resume probe. It falls back
-                # to a full map rescan by itself when it has no effect.
-                self._os_resume_recovery_auto_search()
-            else:
-                self.run_auto_search(rescan=False)
-            self.handle_after_auto_search()
+            self.run_first_auto_search()
+
+    def run_first_auto_search(self):
+        """
+        Run the auto search that opens an Opsi task on the current zone.
+
+        Not called by OpsiScheduling: that task defers the decision to
+        `handle_first_auto_search()`, because its sub-tasks do their own
+        clearing and an extra auto search would make them miss map events.
+        """
+        if self.zone.zone_id == 154:
+            logger.info('In zone 154, skip first auto search')
+            self.handle_ash_beacon_attack()
+            return
+        logger.info('Run first auto search')
+        self.run_auto_search(rescan=False)
+        self.handle_after_auto_search()
 
     def get_current_zone_from_globe(self):
         """

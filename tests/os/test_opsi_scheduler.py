@@ -275,3 +275,38 @@ def test_hand_over_requires_enabled_coin_task_and_not_proxying():
     disabled = SimpleNamespace(
         cross_get=lambda keys, default=None: False if 'EnableObscure' in keys else default)
     assert should_hand_over_to_scheduling(disabled, 'OpsiObscure', True) is False
+
+
+# ---- 首次自律寻敌的交接（对齐 AzurPilot 的 handle_first_auto_search）----
+
+def make_first_auto_search_stub(pending):
+    stub = SimpleNamespace()
+    stub._smart_scheduling_first_auto_search_pending = pending
+    stub.calls = []
+    stub.run_first_auto_search = lambda: stub.calls.append('first_auto_search')
+    return bind(stub, 'handle_first_auto_search')
+
+
+def test_handle_first_auto_search_ignores_when_nothing_pending():
+    stub = make_first_auto_search_stub(False)
+    OpsiScheduling.handle_first_auto_search(stub, False)
+    assert stub.calls == []
+
+
+def test_handle_first_auto_search_skips_and_consumes_flag():
+    """侵蚀1练级路径：跳过 os_init 的首次自律寻敌，并消费一次性标志。
+
+    练级自带计划作战 + clear_question + map_rescan，先跑自律会把海域打空，
+    计划作战无目标可打，地图事件也就不会在 map_rescan 里被处理。
+    """
+    stub = make_first_auto_search_stub(True)
+    OpsiScheduling.handle_first_auto_search(stub, False)
+    assert stub.calls == []
+    assert stub._smart_scheduling_first_auto_search_pending is False
+
+
+def test_handle_first_auto_search_runs_when_requested():
+    stub = make_first_auto_search_stub(True)
+    OpsiScheduling.handle_first_auto_search(stub, True)
+    assert stub.calls == ['first_auto_search']
+    assert stub._smart_scheduling_first_auto_search_pending is False

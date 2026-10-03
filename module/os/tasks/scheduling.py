@@ -304,10 +304,33 @@ class OpsiScheduling(OSMap):
         logger.info(f'[大世界-调度] 黄币补充任务均无可执行内容: {"、".join(skipped)}')
         return OpsiTaskResult(OpsiStatus.NO_CONTENT, reason='no coin task has content')
 
+    def handle_first_auto_search(self, run):
+        """由智能调度决定是否补跑 os_init 阶段跳过的首次自律寻敌。
+
+        Args:
+            run (bool): True 补跑一次首次自律寻敌；False 跳过。
+        """
+        if not getattr(self, '_smart_scheduling_first_auto_search_pending', False):
+            return
+        self._smart_scheduling_first_auto_search_pending = False
+
+        if not run:
+            logger.info('[大世界-调度] 跳过 os_init 的首次自律寻敌（子任务自带清场流程）')
+            return
+
+        logger.info('[大世界-调度] 补跑 os_init 的首次自律寻敌')
+        self.run_first_auto_search()
+
     def _execute_hazard1_leveling_once(self, yellow_coins, total_ap, current_ap) -> OpsiTaskResult:
         """Proxy one round of侵蚀 1 练级, which is the default NORMAL action."""
         logger.info(f'[大世界-调度] 选择任务: {TASK_NAME_HAZARD1_LEVELING}（原因: 黄币充足）')
         logger.info(f'[大世界-调度] TASK_START {TASK_NAME_HAZARD1_LEVELING}')
+        # 侵蚀 1 练级自带完整的清场流程（计划作战 + clear_question + map_rescan），
+        # 所以 os_init 挂起的首次自律寻敌在这里必须跳过：一旦先跑了自律，
+        # 当前海域会被打空，随后的计划作战无目标可打，地图事件也就失去了
+        # 被 map_rescan 处理的机会（这正是「自律完直接进计划作战、事件被漏」的原因）。
+        # AzurPilot 同样在代理侵蚀 1 前 handle_first_auto_search(run=False)。
+        self.handle_first_auto_search(run=False)
         try:
             with opsi_task_context(self.config, TASK_NAME_HAZARD1_LEVELING, disable_task_switch=False):
                 self.os_hazard1_leveling()
