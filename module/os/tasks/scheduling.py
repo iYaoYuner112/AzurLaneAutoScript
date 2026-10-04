@@ -17,7 +17,12 @@ AzurPilot's state-driven scheduling, mapped onto the Alas scheduler:
 
 from datetime import datetime, timedelta
 
-from module.config.utils import get_os_reset_remain, get_server_next_update
+from module.config.utils import (
+    get_nearest_weekday_date,
+    get_os_next_reset,
+    get_os_reset_remain,
+    get_server_next_update,
+)
 from module.logger import logger
 from module.os_handler.action_point import ActionPointLimit
 from module.os.map import OSMap
@@ -138,6 +143,10 @@ RESET_NEAR_DELAY_MINUTES = 150
 
 
 class OpsiScheduling(OSMap):
+    # 塞壬要塞清空后的检查缓冲：要塞刷新时间（周一 0 点 / 每月 1 日）再加 2 小时，
+    # 避免卡着刷新时刻反复检查（对齐 AP master 的 RESET_CHECK_GRACE）。
+    RESET_CHECK_GRACE = timedelta(hours=2)
+
     # ------------------------------------------------------------------ state
 
     def _get_smart_state(self) -> dict:
@@ -203,12 +212,29 @@ class OpsiScheduling(OSMap):
 
     # ------------------------------------------------------------- postpone
 
+    def _get_next_stronghold_check_time(self):
+        """下次塞壬要塞可能刷新的时间。
+
+        要塞数量有限：每周（服务器周一 0 点）刷新 1 个，每月 1 日随大世界重置
+        再刷新 1 个。清除干净后要等这两个时间点才会有新的，取其中较早的一个。
+
+        Returns:
+            datetime.datetime: 下次要塞刷新时间（本地时间，含 2 小时缓冲）。
+        """
+        next_weekly = get_nearest_weekday_date(0)
+        next_monthly = get_os_next_reset()
+        return min(next_weekly, next_monthly) + self.RESET_CHECK_GRACE
+
     def _postpone_coin_task_check(self, task_name, reason=''):
         """Remember that this candidate was cleared, so it is skipped for a while."""
         state_key = COIN_TASK_POSTPONE_KEYS.get(task_name)
         if state_key is None:
             return
-        if get_os_reset_remain() <= 0:
+        if task_name == TASK_NAME_STRONGHOLD:
+            # 塞壬要塞打完就没了，继续搜索只是反复遍历全球地图：
+            # 推迟到下次要塞刷新（每周一 / 每月 1 日取较早），对齐 AP master。
+            next_check = self._get_next_stronghold_check_time()
+        elif get_os_reset_remain() <= 0:
             next_check = datetime.now() + timedelta(minutes=RESET_NEAR_DELAY_MINUTES)
         else:
             next_check = get_server_next_update('00:00')

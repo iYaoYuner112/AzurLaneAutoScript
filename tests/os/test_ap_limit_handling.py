@@ -7,11 +7,13 @@
 """
 
 from types import SimpleNamespace
+from datetime import datetime as dt
 from contextlib import contextmanager
 
 import module.os.tasks.scheduling as sched_mod
 from module.os.tasks.scheduling import OpsiScheduling
 from module.os.tasks.meowfficer_farming import OpsiMeowfficerFarming
+from module.config.utils import get_server_next_update
 from module.os_handler.action_point import ActionPointLimit
 
 
@@ -195,3 +197,91 @@ def test_scheduler_proxy_success_path_unaffected():
 
     assert result.status == sched_mod.OpsiStatus.SUCCESS
     assert stub.delayed == []
+
+
+# ---- 塞壬要塞清空后的检查推迟（对齐 AP master：推迟到下次要塞刷新）----
+
+def _make_stronghold_stub(weekly, monthly):
+    import module.os.tasks.scheduling as sched_mod
+
+    state = {}
+
+    class StrongholdStub:
+        RESET_CHECK_GRACE = sched_mod.OpsiScheduling.RESET_CHECK_GRACE
+
+        def _get_smart_state(self):
+            return dict(state)
+
+        def _save_smart_state(self, s):
+            state.clear()
+            state.update(s)
+
+        _postpone_coin_task_check = OpsiScheduling._postpone_coin_task_check
+        _get_coin_task_postpone = OpsiScheduling._get_coin_task_postpone
+        _get_next_stronghold_check_time = OpsiScheduling._get_next_stronghold_check_time
+
+    stub = StrongholdStub()
+    patches = (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
+               sched_mod.get_os_reset_remain)
+    return stub, state, patches
+
+
+def test_stronghold_postpone_until_next_refresh():
+    import module.os.tasks.scheduling as sched_mod
+
+    weekly = dt(2026, 10, 5, 0, 0, 0)       # 下个周一
+    monthly = dt(2026, 11, 1, 0, 0, 0)      # 下次月度重置（更晚）
+    stub, state, patches = _make_stronghold_stub(weekly, monthly)
+    p_w, p_m, p_r = patches
+    saved = (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
+             sched_mod.get_os_reset_remain)
+    sched_mod.get_nearest_weekday_date = lambda target: weekly
+    sched_mod.get_os_next_reset = lambda: monthly
+    sched_mod.get_os_reset_remain = lambda: 10
+    try:
+        stub._postpone_coin_task_check('OpsiStronghold', 'cleared')
+        stored = stub._get_coin_task_postpone('OpsiStronghold')
+        grace = OpsiScheduling.RESET_CHECK_GRACE
+        assert stored == weekly + grace          # 周一早于月度重置 → 取周一
+        assert stored != get_server_next_update('00:00') or weekly.day == \
+            get_server_next_update('00:00').day
+    finally:
+        (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
+         sched_mod.get_os_reset_remain) = saved
+
+
+def test_stronghold_postpone_takes_earlier_of_weekly_and_monthly():
+    import module.os.tasks.scheduling as sched_mod
+
+    weekly = dt(2026, 10, 12, 0, 0, 0)      # 下个周一（更晚）
+    monthly = dt(2026, 10, 5, 0, 0, 0)      # 月度重置（更早）
+    stub, state, patches = _make_stronghold_stub(weekly, monthly)
+    p_w, p_m, p_r = patches
+    saved = (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
+             sched_mod.get_os_reset_remain)
+    sched_mod.get_nearest_weekday_date = lambda target: weekly
+    sched_mod.get_os_next_reset = lambda: monthly
+    sched_mod.get_os_reset_remain = lambda: 10
+    try:
+        stub._postpone_coin_task_check('OpsiStronghold', 'cleared')
+        stored = stub._get_coin_task_postpone('OpsiStronghold')
+        assert stored == monthly + OpsiScheduling.RESET_CHECK_GRACE
+    finally:
+        (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
+         sched_mod.get_os_reset_remain) = saved
+
+
+def test_non_stronghold_tasks_keep_daily_postpone():
+    """隐秘/深渊的清空推迟不受要塞刷新逻辑影响。"""
+    import module.os.tasks.scheduling as sched_mod
+
+    stub, state, patches = _make_stronghold_stub({}, {})
+    p_w, p_m, p_r = patches
+    saved = (sched_mod.get_os_reset_remain,)
+    sched_mod.get_os_reset_remain = lambda: 10
+    try:
+        stub._postpone_coin_task_check('OpsiObscure', 'cleared')
+        stored = stub._get_coin_task_postpone('OpsiObscure')
+        assert stored == get_server_next_update('00:00')
+    finally:
+        sched_mod.get_os_reset_remain = saved[0]
