@@ -349,9 +349,13 @@ class InfoHandler(ModuleBase):
             if task not in ('OpsiHazard1Leveling', 'OpsiMeowfficerFarming'):
                 task = 'OpsiHazard1Leveling'
 
+            # `default` only matters when the key is missing from the user's config,
+            # e.g. an alas.json migrated before the OpsiSirenBug group existed. It has
+            # to match the generated default (True), otherwise the fleet walks to the
+            # device and then picks "leave" because the feature looks switched off.
             siren_research_enabled = self.config.cross_get(
                 keys=f'{task}.OpsiSirenBug.SirenResearch_Enable',
-                default=False
+                default=True
             )
 
             if not siren_research_enabled:

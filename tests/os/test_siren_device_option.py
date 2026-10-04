@@ -24,13 +24,14 @@ class IdentifyStub:
     """只提供 `_identify_siren_device_option` 需要的属性。"""
 
     def __init__(self, task='OpsiHazard1Leveling', story_option=-2,
-                 research_enable=False, siren_mode='resource'):
+                 research_enable=False, siren_mode='resource', has_research_key=True):
         self.config = SimpleNamespace(
             task=SimpleNamespace(command=task),
             STORY_OPTION=story_option,
             cross_get=lambda keys, default=None: (
                 siren_mode if keys.endswith('Siren_Mode') else (
-                    research_enable if keys.endswith('SirenResearch_Enable') else default)),
+                    research_enable if has_research_key and keys.endswith('SirenResearch_Enable')
+                    else default)),
         )
         self.siren_device_mode = 'unset'
 
@@ -46,6 +47,15 @@ def test_five_options_research_disabled_picks_leave():
     select = stub._identify_siren_device_option(options(5))
     assert select.name == 'STORY_OPTION_5_OF_5'
     assert stub.siren_device_mode is None
+
+
+def test_config_without_the_siren_group_still_researches():
+    """老配置里根本没有 OpsiSirenBug 这一组（cross_get 取不到键）时，兜底值必须等于
+    生成的默认值 True：舰队已经走到装置前，不该因为"读不到开关"就选离开白跑一趟。"""
+    stub = IdentifyStub(has_research_key=False, siren_mode='resource')
+    select = stub._identify_siren_device_option(options(5))
+    assert select.name == 'STORY_OPTION_4_OF_5'
+    assert stub.siren_device_mode == 'resource'
 
 
 def test_five_options_resource_mode_picks_fourth():
