@@ -108,7 +108,8 @@ class TestPrepareSchedulingActionPoint(unittest.TestCase):
         stub = PrepareStub(panel_open=True, reusable=False)
         result = OpsiScheduling._prepare_scheduling_action_point(stub, (1417, 30), cost=70)
         self.assertEqual(result, (1417, 420))
-        self.assertEqual(stub.quit_calls, 0)
+        # 补充完成后由调度层统一关窗，返回新读数给子任务
+        self.assertEqual(stub.quit_calls, 1)
         self.assertEqual(len(stub.handle_calls), 1)
         # 含箱口径一致时可以跳过重复首读
         self.assertTrue(stub.handle_calls[0]['skip_first_read'])
@@ -119,7 +120,7 @@ class TestPrepareSchedulingActionPoint(unittest.TestCase):
         stub.config.OS_ACTION_POINT_BOX_USE = 8
         result = OpsiScheduling._prepare_scheduling_action_point(stub, (1417, 420), cost=70)
         # 口径不一致 → 走补充路径，并且不跳过首读
-        self.assertEqual(stub.quit_calls, 0)
+        self.assertEqual(stub.quit_calls, 1)
         self.assertEqual(len(stub.handle_calls), 1)
         self.assertFalse(stub.handle_calls[0]['skip_first_read'])
         self.assertEqual(result, (1417, 420))

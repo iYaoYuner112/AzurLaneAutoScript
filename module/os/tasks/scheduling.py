@@ -481,6 +481,9 @@ class OpsiScheduling(OSMap):
         ):
             self.action_point_quit()
             return None
+        # 统一在调度层把面板收尾：补充后的读数交给子任务，面板不再保留，
+        # 否则它会挡住子任务接下来的地图操作（黄币 OCR、海域识别都会读到错值）。
+        self.action_point_quit()
         return (int(self._action_point_total), int(self._action_point_current))
 
     # ------------------------------------------------------------ main entry

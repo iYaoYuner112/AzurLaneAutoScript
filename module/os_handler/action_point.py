@@ -380,6 +380,12 @@ class ActionPointHandler(UI, MapEventHandler):
             if self.handle_map_event():
                 continue
 
+        # 「打开弹窗读行动力 → 取消关闭」是设计内的成对操作，一轮里会被连续调用多次
+        # （智能调度决策、短猫前置检查、统计快照），点击记录（最近 15 次）会攒出
+        # 两个按钮各 ≥6 次，被「两个按钮交替点击次数过多」规则误判成卡死。
+        # 只在弹窗确实关闭之后清理：真卡死时上面的循环不会跳出，仍由单按钮 ≥12 次兜底。
+        self.device.click_record_remove(ACTION_POINT_REMAIN_OS)
+        self.device.click_record_remove(ACTION_POINT_CANCEL)
         # 已正向确认弹窗关闭：下一次有意打开不必再等上一次留下的 3 秒重试冷却。
         self.interval_clear(OS_CHECK)
 

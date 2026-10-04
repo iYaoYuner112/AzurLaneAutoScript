@@ -33,6 +33,13 @@ class OpsiHazard1Leveling(OSMap):
                 self.config.OS_ACTION_POINT_PRESERVE = 0
             logger.attr('OS_ACTION_POINT_PRESERVE', self.config.OS_ACTION_POINT_PRESERVE)
 
+            # 智能调度代跑时，决策会暂留行动力面板：必须在任何地图操作（读黄币、读海域）
+            # 之前处理掉。否则面板挡住地图，黄币 OCR 读到 0，会被误判成「黄币达到上限」
+            # 而直接空转；空转又会加速调度循环，一轮一次开窗关窗，攒够 12 次交替点击
+            # 就触发防连点、重启游戏。
+            if is_running_opsi_proxy(self.config):
+                fresh_ap = self._prepare_scheduling_action_point(fresh_ap, cost=70)
+
             coin_preserve = (
                 self.config.OpsiScheduling_OperationCoinsPreserve
                 if self.is_smart_scheduling_enabled
@@ -57,11 +64,6 @@ class OpsiHazard1Leveling(OSMap):
                 self.config.task_stop()
 
             self.get_current_zone()
-
-            # 智能调度代跑时，决策刚读过行动力：能在同一个面板里确认开工的就跳过弹窗。
-            # 面板没被保留（独立运行 / 途中被打断）时这里原样返回，走下面的弹窗路径。
-            if is_running_opsi_proxy(self.config):
-                fresh_ap = self._prepare_scheduling_action_point(fresh_ap, cost=70)
 
             # Preset action point to 70
             # When running CL1 oil is for running CL1, not meowfficer farming
