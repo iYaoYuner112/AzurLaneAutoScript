@@ -131,6 +131,7 @@ class ProxyStub:
         self.delayed = []
         self.stop_counter = _StopCounter()
         self.postpones = []
+        self.handler_calls = []
         self.config = SimpleNamespace(
             task_delay=lambda **kwargs: self.delayed.append(kwargs),
             task_stop=lambda: setattr(self.stop_counter, 'n', self.stop_counter.n + 1),
@@ -138,7 +139,8 @@ class ProxyStub:
         self._raise_limit = raise_limit
 
     def _get_coin_task_handler(self, task_name):
-        def handler():
+        def handler(fresh_ap=None, ap_checked=False):
+            self.handler_calls.append({'fresh_ap': fresh_ap, 'ap_checked': ap_checked})
             if self._raise_limit:
                 raise ActionPointLimit(current=1000, total=1000, preserve=1000)
         return handler
@@ -173,6 +175,8 @@ def test_scheduler_proxy_catches_action_point_limit():
     assert result.reason == 'action point limit'
     assert stub.delayed == [{'server_update': True}]
     assert stub.stop_counter.n == 1
+    # 代跑短猫必须带 ap_checked=True：调度决策刚查过行动力，短猫不该再查一遍。
+    assert stub.handler_calls == [{'fresh_ap': None, 'ap_checked': True}]
 
 
 def test_scheduler_proxy_success_path_unaffected():
@@ -197,6 +201,7 @@ def test_scheduler_proxy_success_path_unaffected():
 
     assert result.status == sched_mod.OpsiStatus.SUCCESS
     assert stub.delayed == []
+    assert stub.handler_calls == [{'fresh_ap': None, 'ap_checked': True}]
 
 
 # ---- 塞壬要塞清空后的检查推迟（对齐 AP master：推迟到下次要塞刷新）----

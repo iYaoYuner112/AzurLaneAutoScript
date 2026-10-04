@@ -291,8 +291,10 @@ class OpsiScheduling(OSMap):
                 disable_task_switch=COIN_TASK_DISABLE_TASK_SWITCH.get(task_name, True),
             ):
                 if task_name == TASK_NAME_MEOWFFICER_FARMING:
-                    # 耄耋相接与决策共用同一个行动力面板
-                    handler(fresh_ap=fresh_ap)
+                    # 耄耋相接与决策共用同一个行动力面板：本轮决策刚用新鲜读数
+                    # 验证过总行动力高于短猫保留线，ap_checked=True 让短猫跳过
+                    # 那次重复的前置检查（否则一轮里多一组 REMAIN_OS + CANCEL）。
+                    handler(fresh_ap=fresh_ap, ap_checked=True)
                 else:
                     handler()
         except OpsiNoContent as e:

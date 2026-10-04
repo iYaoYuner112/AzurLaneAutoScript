@@ -29,18 +29,37 @@ class OpsiMeowfficerFarming(OSMap):
         # clear_question_any_fleet restores the primary fleet itself.
         self.clear_question_any_fleet()
 
-    def os_meowfficer_farming(self, fresh_ap=None):
+    def os_meowfficer_farming(self, fresh_ap=None, ap_checked=False):
         """耄耋相接入口。
 
         Args:
-            fresh_ap (tuple[int, int] | None): 智能调度代跑时传入的决策首读。
-                短猫的行动力前置检查（`_meow_ap_check`）自带完整的弹窗流程，
-                这一步会把决策暂留的面板消耗掉，所以该读数在这里不复用——
-                只负责把面板收尾，避免它残留到后续的截图识别。
+            fresh_ap (tuple[int, int] | None): 智能调度代跑时传入的决策首读
+                (总行动力, 当前行动力)。决策暂留的面板还开着时，本轮的开工补充
+                会在同一个面板里完成并更新这个读数；同海域续跑时再用它跳过
+                进海域的行动点弹窗。
+            ap_checked (bool): 智能调度代跑时为 True —— 本轮调度决策刚用新鲜
+                读数验证过总行动力高于短猫保留线，短猫不必再开一次弹窗重复
+                检查，否则一轮里会多出一组「REMAIN_OS + CANCEL」点击。
         """
         logger.hr(f'OS meowfficer farming, hazard_level={self.config.OpsiMeowfficerFarming_HazardLevel}', level=1)
-        # 收尾决策暂留的行动力面板（短猫的开工检查会自己重开弹窗）
-        self._close_scheduling_action_point()
+        if not ap_checked:
+            # 独立运行：没有决策暂留的面板，也没有可复用的读数。
+            self._close_scheduling_action_point()
+            fresh_ap = None
+        try:
+            self._run_meowfficer_farming(fresh_ap=fresh_ap, ap_checked=ap_checked)
+        finally:
+            # 面板暂留期间任何出口都必须收尾（含 task_delay + task_stop 与异常），
+            # 否则它会挡住后续的截图识别——黄币 OCR、海域名识别都会读到错值。
+            self._close_scheduling_action_point()
+
+    def _run_meowfficer_farming(self, fresh_ap=None, ap_checked=False):
+        """耄耋相接主流程：准备配置，然后按轮派发。行动力面板由调用方收尾。
+
+        Args:
+            fresh_ap (tuple[int, int] | None): 决策首读的 (总行动力, 当前行动力)。
+            ap_checked (bool): 本轮是否已完成行动力检查。
+        """
         if self.is_cl1_mode_enabled and not self.is_smart_scheduling_enabled \
             and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
             logger.info('With CL1 leveling enabled, set action point preserve to 1000')
@@ -74,7 +93,6 @@ class OpsiMeowfficerFarming(OSMap):
             self.config.task_delay(server_update=True)
             self.config.task_stop()
 
-        ap_checked = False
         while True:
             self.config.OS_ACTION_POINT_PRESERVE = preserve
             if self.config.is_task_enabled('OpsiAshBeacon') \
@@ -84,10 +102,17 @@ class OpsiMeowfficerFarming(OSMap):
                 self.config.OS_ACTION_POINT_PRESERVE = 0
             logger.attr('OS_ACTION_POINT_PRESERVE', self.config.OS_ACTION_POINT_PRESERVE)
             if not ap_checked:
+                # 独立运行时短猫自己查一次行动力下限；智能调度代跑时调度层已查过。
                 ap_checked = self._meow_ap_check(ap_checked)
 
+            # 决策暂留了行动力面板时，在这里把本轮开工补充并进同一个面板，
+            # 并拿到可以复用的读数（对齐 AzurPilot 的 _prepare_scheduling_action_point）。
+            fresh_ap = self._meow_prepare_action_point(fresh_ap)
+
             # ===== mode dispatch, same order as AzurPilot =====
-            self._meow_dispatch()
+            self._meow_dispatch(fresh_ap=fresh_ap)
+            # 读数只能复用一次，下一轮必须重新读取。
+            fresh_ap = None
 
             if self.is_smart_scheduling_enabled:
                 if is_running_opsi_proxy(self.config):
@@ -103,6 +128,9 @@ class OpsiMeowfficerFarming(OSMap):
         首轮用 `action_point_set(cost=0, keep_current_ap=True)` 检查总行动力是否已
         跌破保留线。独立跑短猫（智能调度关闭）且黄币足够时，行动力不足会优雅推迟
         到服务器刷新，而不是以任务报错收场；被智能调度代理时异常交回调度层处理。
+
+        智能调度代跑时这一步整个跳过（`ap_checked=True`）：调度决策刚用新鲜读数
+        验证过总行动力高于保留线，再开一次弹窗只会多一组「REMAIN_OS + CANCEL」。
 
         Args:
             ap_checked (bool): 是否已完成本轮的行动力检查。
@@ -139,13 +167,47 @@ class OpsiMeowfficerFarming(OSMap):
             ap_checked = True
         return ap_checked
 
-    def _meow_dispatch(self):
+    def _meow_prepare_action_point(self, fresh_ap):
+        """把智能调度决策首读的行动力面板用于本轮开工。
+
+        已在目标安全海域续跑时，直接在决策暂留的同一个面板里完成开工补充
+        （对齐 AzurPilot）：开工线 120 的弹窗逻辑与「复用读数」结果一致，
+        可以省掉一次「关窗 → 重进海域 → 重开弹窗」。
+
+        换海域、还没进海域或传统单一海域模式则先关窗，由各自的进海域流程
+        重新补充——那时读数会作废，强行复用会漏掉开箱与石油购买。
+
+        Args:
+            fresh_ap (tuple[int, int] | None): 决策首读的 (总行动力, 当前行动力)。
+
+        Returns:
+            tuple[int, int] | None: 开工补充后的读数；没能保留面板或已关窗时返回 None。
+        """
+        if not getattr(self, '_scheduling_ap_panel_open', False):
+            # 面板没被保留：读数没有对应的新鲜来源，不能复用。
+            return None
+        stay_in_zone = self.config.OpsiMeowfficerFarming_StayInZone
+        target_zone = self.config.OpsiMeowfficerFarming_TargetZone
+        if stay_in_zone and target_zone != 0 \
+                and getattr(getattr(self, 'zone', None), 'zone_id', None) == target_zone \
+                and self.is_zone_name_hidden:
+            # 已在单个指定安全海域：首读面板可直接完成本轮开工补充。
+            return self._prepare_scheduling_action_point(fresh_ap, cost=120)
+        # 需要换海域或走传统模式：先关窗，沿各自的进入海域流程补充。
+        self._close_scheduling_action_point()
+        return None
+
+    def _meow_dispatch(self, fresh_ap=None):
         """
         Pick and run the meowfficer mode handler, in AzurPilot's order:
 
         1. traditional single target zone (TargetZone given, StayInZone off);
         2. StayInZone: keep searching the configured target zone;
         3. random zone search.
+
+        Args:
+            fresh_ap (tuple[int, int] | None): 本轮开工可复用的行动力首读，
+                只在「指定海域 + StayInZone」模式下消费。
         """
         target_zone = self.config.OpsiMeowfficerFarming_TargetZone
         stay_in_zone = self.config.OpsiMeowfficerFarming_StayInZone
@@ -156,7 +218,7 @@ class OpsiMeowfficerFarming(OSMap):
                 logger.warning(f'wrong zone_id input:{target_zone}')
                 raise RequestHumanTakeover('wrong input, task stopped')
             if stay_in_zone:
-                self._meow_handle_stay_in_zone(zone)
+                self._meow_handle_stay_in_zone(zone, fresh_ap=fresh_ap)
             else:
                 self._meow_handle_traditional_zone(zone)
         else:
@@ -183,18 +245,32 @@ class OpsiMeowfficerFarming(OSMap):
         self.handle_after_auto_search()
         self.config.check_task_switch()
 
-    def _meow_handle_stay_in_zone(self, zone):
+    def _meow_handle_stay_in_zone(self, zone, fresh_ap=None):
         """
         Stay in one target zone and keep searching (AzurPilot's `_meow_handle_stay_in_zone`).
 
         Get into the zone, prepare 120 action points, then run one strategic search
         round with the radar-only patrol, and repeat next round.
+
+        Args:
+            zone (Zone): 目标海域。
+            fresh_ap (tuple[int, int] | None): 智能调度决策首读、或上个面板里
+                补充完成的 (总行动力, 当前行动力)。与本次调用之间没有行动力消耗，
+                达到 120 开工线时直接复用，跳过行动点弹窗。
         """
         logger.hr(f'OS meowfficer farming (stay in zone), zone_id={zone.zone_id}', level=1)
         self.get_current_zone()
         if self.zone.zone_id != zone.zone_id or not self.is_zone_name_hidden:
             self.globe_goto(zone, types='SAFE', refresh=True)
-        self.action_point_set(cost=120, keep_current_ap=True, check_rest_ap=True)
+            # 换海域会消耗行动力，开工检查必须重新读取。
+            fresh_ap = None
+        if self.action_point_reusable(fresh_ap, cost=120):
+            fresh_total, fresh_current = fresh_ap
+            logger.info(
+                f'[大世界-耄耋相接] 复用刚读到的行动力'
+                f'(当前={fresh_current}, 总={fresh_total})，跳过行动点弹窗')
+        else:
+            self.action_point_set(cost=120, keep_current_ap=True, check_rest_ap=True)
         self.fleet_set(self.config.OpsiFleet_Fleet)
         self.os_order_execute(
             recon_scan=False,

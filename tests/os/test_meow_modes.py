@@ -25,8 +25,8 @@ class DispatchStub:
     def _meow_handle_traditional_zone(self, zone):
         self.calls.append(('traditional', zone.zone_id))
 
-    def _meow_handle_stay_in_zone(self, zone):
-        self.calls.append(('stay', zone.zone_id))
+    def _meow_handle_stay_in_zone(self, zone, fresh_ap=None):
+        self.calls.append(('stay', zone.zone_id, fresh_ap))
 
     def _meow_handle_normal_search(self):
         self.calls.append(('normal', None))
@@ -43,7 +43,21 @@ def test_target_zone_without_stay_uses_traditional():
 def test_target_zone_with_stay_keeps_searching_the_zone():
     stub = DispatchStub(target_zone=44, stay=True)
     stub._meow_dispatch()
-    assert stub.calls == [('stay', 44)]
+    assert stub.calls == [('stay', 44, None)]
+
+
+def test_stay_in_zone_receives_reusable_reading():
+    """决策首读要透传给 StayInZone 分支，否则复用无从谈起。"""
+    stub = DispatchStub(target_zone=44, stay=True)
+    stub._meow_dispatch(fresh_ap=(1695, 142))
+    assert stub.calls == [('stay', 44, (1695, 142))]
+
+
+def test_traditional_mode_ignores_reusable_reading():
+    """传统单一海域模式每轮都要重新进海域，读数没有复用价值。"""
+    stub = DispatchStub(target_zone=44, stay=False)
+    stub._meow_dispatch(fresh_ap=(1695, 142))
+    assert stub.calls == [('traditional', 44)]
 
 
 def test_no_target_zone_uses_random_zone_search():
