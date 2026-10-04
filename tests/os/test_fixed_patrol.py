@@ -534,12 +534,21 @@ class _FakeGrid:
 
 
 class ClearQuestionStub:
-    def __init__(self, predictions, walk_results=None, convert_error=False, fleet_visible=True):
-        self.config = SimpleNamespace(temporary=lambda **kwargs: _TempContext())
+    def __init__(self, predictions, walk_results=None, convert_error=False, fleet_visible=True,
+                 confirmed_on_walk=False, siren_device_mode=None):
+        self.config = SimpleNamespace(
+            temporary=lambda **kwargs: _TempContext(),
+            task=SimpleNamespace(command='OpsiHazard1Leveling'),
+            cross_get=lambda keys, default=None: default)
         self.zone = SimpleNamespace(is_port=False)
         self._solved_map_event = set()
         self._question_unreachable = False
         self.events = []
+        self.is_siren_device_confirmed = False
+        self.siren_device_mode = siren_device_mode
+        self.auto_search_calls = 0
+        self.fleet_sets = []
+        self._confirmed_on_walk = confirmed_on_walk
         self._predictions = list(predictions or [])
         self._walk_results = list(walk_results or [])
         self._convert_error = convert_error
@@ -568,7 +577,17 @@ class ClearQuestionStub:
         return _FakeGrid()
 
     def wait_until_walk_stable(self, **kwargs):
+        # 模拟真实 story_skip：识别到装置剧情会置位 is_siren_device_confirmed
+        if self._confirmed_on_walk:
+            self.is_siren_device_confirmed = True
         return self._walk_results.pop(0) if self._walk_results else 'timeout'
+
+    def os_auto_search_run(self, drop=None):
+        self.auto_search_calls += 1
+
+    def fleet_set(self, fleet):
+        self.fleet_sets.append(fleet)
+        return True
 
     def _os_camera_recover_to_fleet(self, fleet=None):
         self.events.append('recover')
@@ -607,3 +626,23 @@ def test_no_question_on_radar_returns_false_cleanly():
     assert OSMap.clear_question(stub) is False
     assert stub._question_unreachable is False
     assert stub.events == []
+
+
+def test_story_device_confirmed_solves_and_stops_patrol():
+    """问号点过去开出信息收集装置（剧情已点完）：视为已解决，巡逻停止且不自律。"""
+    stub = ClearQuestionStub(
+        predictions=[(0, -1), None], walk_results=['event'],
+        confirmed_on_walk=True, siren_device_mode='collected')
+    assert OSMap.clear_question(stub) is True
+    assert 'is_scanning_device' in stub._solved_map_event
+    assert stub.auto_search_calls == 0      # collected 模式无需自律寻敌
+    assert stub._question_unreachable is False
+
+
+def test_story_device_unknown_mode_runs_auto_search_once():
+    stub = ClearQuestionStub(
+        predictions=[(0, -1), None], walk_results=['event'],
+        confirmed_on_walk=True, siren_device_mode=None)
+    assert OSMap.clear_question(stub) is True
+    assert stub.auto_search_calls == 1
+    assert 'is_scanning_device' in stub._solved_map_event

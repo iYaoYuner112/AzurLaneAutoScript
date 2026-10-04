@@ -324,6 +324,73 @@ class InfoHandler(ModuleBase):
     _story_option_click = 0
     _story_option_click_limit = 12
 
+    # 塞壬装置剧情识别状态（对齐 AP master info_handler）：
+    # is_siren_device_confirmed 在剧情选项被识别为装置剧情时置位，供
+    # clear_question 判定「问号点过去开出的是装置/事件」并停止强制移动巡逻。
+    is_siren_device_confirmed = False
+    siren_device_mode = None
+
+    def _identify_siren_device_option(self, options):
+        """根据选项序列识别塞壬装置剧情（对齐 AP master `_identify_siren_device_option`）。
+
+        侵蚀一地图的装置剧情：
+        - 塞壬探测装置：5 个选项（探测敌人/探测资源/离开），按 Siren_Mode 选择；
+        - 塞壬信息收集装置 / 探测装置产物柱子：3 个选项，点中间选项即完成。
+
+        3 选项剧情并不都是塞壬装置：深渊 / 隐秘 / 要塞 / 跨月 用 STORY_OPTION=0
+        指定点第一项（解除封锁的强制确认，中间项是「查阅作战说明」），
+        因此显式指定了 STORY_OPTION 时按配置选择，只有自动选择（-2）才按柱子处理。
+
+        Returns:
+            Button | None: 需要点击的按钮，若识别为非塞壬装置剧情则返回 None。
+        """
+        if len(options) == 5:
+            task = self.config.task.command
+            if task not in ('OpsiHazard1Leveling', 'OpsiMeowfficerFarming'):
+                task = 'OpsiHazard1Leveling'
+
+            siren_research_enabled = self.config.cross_get(
+                keys=f'{task}.OpsiSirenBug.SirenResearch_Enable',
+                default=False
+            )
+
+            if not siren_research_enabled:
+                logger.info('[Handler] [Story] 塞壬研究装置未启用，选择离开')
+                self.siren_device_mode = None
+                return options[-1]
+
+            siren_mode = self.config.cross_get(
+                keys=f'{task}.OpsiSirenBug.Siren_Mode',
+                default='resource'
+            )
+
+            if siren_mode == 'enemy':
+                logger.info('[Handler] [Story] 选择反复尝试探测隐藏的敌人')
+                self.siren_device_mode = 'enemy'
+                return options[2]
+            else:
+                logger.info('[Handler] [Story] 选择反复尝试探测隐藏的资源')
+                self.siren_device_mode = 'resource'
+                return options[3]
+
+        elif len(options) == 3:
+            # 3 选项剧情的正确选项随海域而变，不能一律点中间项：
+            # - 深渊 / 隐秘 / 要塞 / 跨月 用 STORY_OPTION=0 指定点第一项，
+            #   例如深渊解除封锁的强制确认，中间项是「查阅作战说明」；
+            # - 大世界其余任务为 STORY_OPTION=-2（自动选择），3 选项时
+            #   即塞壬信息收集装置 / 探测装置产物柱子的「提交物品」。
+            story_option = self.config.STORY_OPTION
+            if 0 <= story_option < len(options):
+                logger.info(f'[Handler] [Story] 3 选项剧情，按 STORY_OPTION 选择第 {story_option + 1} 项')
+                return options[story_option]
+            # 未显式指定选项，按塞壬信息收集装置 / 柱子处理
+            logger.info('[Handler] [Story] 塞壬信息收集装置/柱子，点中间选项完成')
+            self.siren_device_mode = 'collected'
+            return options[1]
+
+        return None
+
+
     def _story_option_buttons(self):
         """
         Returns:
@@ -465,10 +532,16 @@ class InfoHandler(ModuleBase):
                 self._story_option_confirm.reset()
             elif options_count == self._story_option_record:
                 if self._story_option_confirm.reached() and self._story_option_timer.reached():
-                    try:
-                        select = options[self.config.STORY_OPTION]
-                    except IndexError:
-                        select = options[0]
+                    select = self._identify_siren_device_option(options)
+                    is_siren_device = select is not None
+                    if is_siren_device:
+                        # 识别到塞壬装置剧情则锁定确认，避免后续非装置剧情段把状态覆盖回 False
+                        self.is_siren_device_confirmed = True
+                    if not is_siren_device:
+                        try:
+                            select = options[self.config.STORY_OPTION]
+                        except IndexError:
+                            select = options[0]
                     self.device.click(select)
                     # 选项按钮名按「第几个/共几个」生成，不同剧情段共用同一个名字，
                     # 装置/柱子较多的海域会被设备层防连点机制误判成「两个按钮交替

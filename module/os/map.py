@@ -921,6 +921,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 else:
                     logger.warning('Question mark is outside the local view, skip this grid')
                 continue
+            self.is_siren_device_confirmed = False
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 result = self.wait_until_walk_stable(
@@ -931,22 +932,42 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             elif 'event' in result and grid.is_logging_tower:
                 self._solved_map_event.add('is_logging_tower')
                 return True
-            elif 'event' in result and grid.is_scanning_device:
+            elif 'event' in result and (grid.is_scanning_device or self.is_siren_device_confirmed):
+                # 问号点过去开出的是塞壬装置：剧情选项已由 story_skip 的
+                # `_identify_siren_device_option` 处理完成（信息收集装置/柱子
+                # 点中间项即完成并给奖励）。标记为已解决并停止巡逻——对齐
+                # AP master（map.py:1322-1406）：collected 无需自律寻敌。
+                logger.hr('Siren device solved via question', level=2)
+                siren_mode = getattr(self, 'siren_device_mode', None)
+                logger.attr('Siren device mode', siren_mode)
+                if siren_mode == 'enemy':
+                    task = self.config.task.command
+                    if task not in ('OpsiHazard1Leveling', 'OpsiMeowfficerFarming'):
+                        task = 'OpsiHazard1Leveling'
+                    siren_fleet = self.config.cross_get(
+                        keys=f'{task}.OpsiSirenBug.Siren_Fleet', default=0)
+                    current_fleet = self.fleet_selector.get()
+                    if siren_fleet > 0:
+                        self.fleet_set(siren_fleet)
+                    for _ in range(3):
+                        self.os_auto_search_run(drop=drop)
+                    if siren_fleet > 0:
+                        self.fleet_set(current_fleet)
+                elif siren_mode == 'collected':
+                    logger.info('Siren info collection device: dialog already completed, '
+                                'no auto search needed')
+                else:
+                    logger.info('Siren device standard handling, run auto search')
+                    self.os_auto_search_run(drop=drop)
                 self._solved_map_event.add('is_scanning_device')
-                self.os_auto_search_run(drop=drop)
                 return True
             else:
-                # A plain story event (options + rewards) also lands here: the
-                # question has been consumed, so just re-predict the radar. The log
-                # stays for diagnosability, but it must never mark the question
-                # unreachable (AzurPilot has no such branch at all).
                 logger.info(f'Question turned into {result}, expected: {grid.str}, re-predict radar')
                 continue
 
         logger.warning('Failed to goto question mark after 3 trail, '
                        'this might be 2 adjacent fleet mechanism, stopped')
         self._question_unreachable = question_seen
-        return False
         return False
 
     def clear_question_any_fleet(self):
