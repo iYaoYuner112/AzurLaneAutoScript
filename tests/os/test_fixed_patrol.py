@@ -9,6 +9,7 @@
 
 from types import SimpleNamespace
 
+from module.exception import GameStuckError, GameTooManyClickError, MapWalkError
 from module.os.fixed_patrol import AntiLoopGuard
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 
@@ -646,3 +647,147 @@ def test_story_device_unknown_mode_runs_auto_search_once():
     assert OSMap.clear_question(stub) is True
     assert stub.auto_search_calls == 1
     assert 'is_scanning_device' in stub._solved_map_event
+
+
+# ---- 挪队失败恢复后必须重新对焦（对齐 AzurPilot 的救场能力）----
+
+class PatrolMoveStub:
+    """只提供 `_try_fixed_patrol_move` 需要的属性；第一次点击后「走到一半卡住」。"""
+
+    def __init__(self, click_fail_times=1, convert_fail_after_recover=False):
+        self.events = []
+        self.config = SimpleNamespace()
+        self.device = SimpleNamespace(
+            stuck_record_clear=lambda: None,
+            click=lambda grid: self.events.append('click'),
+        )
+        self._click_fail = click_fail_times
+        self._convert_fail_after_recover = convert_fail_after_recover
+        self._clicks = 0
+        self._recovered = False
+
+    def focus_to(self, location):
+        self.events.append('focus')
+
+    def update(self):
+        self.events.append('update')
+
+    def convert_global_to_local(self, location):
+        if self._recovered and self._convert_fail_after_recover:
+            raise KeyError('out of sight')
+        self.events.append('convert')
+        return SimpleNamespace(location=location)
+
+    def fleet_set(self, fleet):
+        self.events.append('fleet')
+
+    def wait_until_walk_stable(self, confirm_timer=None):
+        self._clicks += 1
+        if self._clicks <= self._click_fail:
+            # 不是「超出移动范围」，而是走到一半卡住：值得恢复后重试
+            raise MapWalkError('stuck')
+
+    def _fixed_patrol_soft_recover(self):
+        self.events.append('soft_recover')
+        self._recovered = True
+        return True
+
+    def _fixed_patrol_app_restart(self):
+        self.events.append('app_restart')
+        return True
+
+
+def try_patrol_move(**kwargs):
+    stub = PatrolMoveStub(**kwargs)
+    target = (2, 0)
+    result = OSMap._try_fixed_patrol_move(stub, 1, SimpleNamespace(location=target), target)
+    return stub, result
+
+
+def test_move_recovers_by_refocusing_on_the_target():
+    """恢复会把镜头丢在别处：必须重新 focus_to 再换算坐标，否则目标明明可达却被放弃。"""
+    stub, result = try_patrol_move()
+    assert result is True
+    assert stub.events == [
+        'focus', 'update', 'convert', 'click',
+        'soft_recover', 'fleet', 'focus', 'update', 'convert', 'click',
+    ]
+
+
+def test_move_gives_up_when_target_lost_after_recovery():
+    """重新对焦后仍然换算不到目标格 -> 放弃这个候选点，交给下一个备用落点。"""
+    stub, result = try_patrol_move(convert_fail_after_recover=True)
+    assert result is False
+    assert stub.events.count('soft_recover') == 1
+    assert stub.events.count('click') == 1
+
+
+def test_out_of_range_candidate_is_dropped_without_recovery():
+    """「超出移动范围」是落点本身的问题，恢复也救不回来：直接换下一个候选点。"""
+    stub = PatrolMoveStub(click_fail_times=0)
+
+    def out_of_range(confirm_timer=None):
+        raise MapWalkError('walk_out_of_step')
+
+    stub.wait_until_walk_stable = out_of_range
+    result = OSMap._try_fixed_patrol_move(stub, 1, SimpleNamespace(location=(2, 0)), (2, 0))
+    assert result is False
+    assert stub.events == ['focus', 'update', 'convert', 'click']
+
+
+# ---- 计划作战出意外也要继续重扫（否则这一轮的强制移动根本不会跑）----
+
+class StrategicSearchStub:
+    def __init__(self, error=None):
+        self.error = error
+        self.events = []
+
+    def handle_ash_beacon_attack(self):
+        self.events.append('ash')
+
+    def os_auto_search_run(self, strategic=False):
+        self.events.append('strategic_search')
+        if self.error is not None:
+            raise self.error
+
+    def hp_reset(self):
+        self.events.append('hp_reset')
+
+    def hp_get(self):
+        self.events.append('hp_get')
+
+    def clear_question(self):
+        self.events.append('clear_question')
+
+    def map_rescan(self):
+        self.events.append('map_rescan')
+
+
+def test_strategic_search_success_scans_the_map():
+    stub = StrategicSearchStub()
+    assert OSMap.run_strategic_search(stub) is True
+    assert stub.events == [
+        'ash', 'strategic_search', 'hp_reset', 'hp_get', 'clear_question', 'map_rescan',
+    ]
+
+
+def test_strategic_search_unexpected_error_still_scans_the_map():
+    """意外异常吞掉并返回 False：事件检索和强制移动照跑，不让一整轮白跑。"""
+    stub = StrategicSearchStub(error=RuntimeError('map detection glitch'))
+    assert OSMap.run_strategic_search(stub) is False
+    assert 'map_rescan' in stub.events
+    assert 'clear_question' in stub.events
+
+
+def test_strategic_search_rethrows_task_and_recovery_errors():
+    """任务切换与恢复型异常必须上抛，不能被当成「本轮搜索失败」继续点图。"""
+    from module.exception import ScriptEnd
+    for error in (ScriptEnd('switch'), GameStuckError('stuck'), GameTooManyClickError('clicks')):
+        stub = StrategicSearchStub(error=error)
+        try:
+            OSMap.run_strategic_search(stub)
+        except type(error):
+            pass
+        else:
+            raise AssertionError(f'{type(error).__name__} was swallowed')
+        assert 'map_rescan' not in stub.events

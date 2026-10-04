@@ -1261,9 +1261,14 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 return False
             # The recovery may have changed the current fleet, ensure it again.
             self.fleet_set(fleet)
+            # Recovery leaves the camera wherever the game parked it. Converting the
+            # target without re-focusing raises KeyError whenever the target is out of
+            # sight, which throws away a candidate that is actually reachable.
             try:
+                self.focus_to(target_grid.location)
+                self.update()
                 clickable_grid = self.convert_global_to_local(target_grid.location)
-            except KeyError:
+            except (KeyError, MapDetectionError):
                 logger.warning(
                     f'Fixed patrol: fleet {fleet} lost '
                     f'{location2node(target_grid.location)} after recovery'
@@ -1848,17 +1853,34 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     _solved_fleet_mechanism = 0
 
     def run_strategic_search(self):
+        """Run strategic search, then scan the map for events.
+
+        Returns:
+            bool: True if the search ran to the end, False if an unexpected error
+                interrupted it. Task switching and recovery errors still propagate.
+                The event scan runs either way, so a flaky search does not skip the
+                rescan and the fixed patrol of this round.
+        """
         self.handle_ash_beacon_attack()
 
         logger.hr('Run strategy search', level=2)
-        self.os_auto_search_run(strategic=True)
+        interrupted = False
+        try:
+            self.os_auto_search_run(strategic=True)
+            self.hp_reset()
+            self.hp_get()
+        except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
+                RequestHumanTakeover):
+            raise
+        except Exception as e:
+            logger.warning(f'Strategic search interrupted: {e}', exc_info=True)
+            interrupted = True
 
-        self.hp_reset()
-        self.hp_get()
         self._solved_map_event = set()
         self._solved_fleet_mechanism = False
         self.clear_question()
         self.map_rescan()
+        return not interrupted
 
     def map_rescan_current(self, drop=None):
         """
