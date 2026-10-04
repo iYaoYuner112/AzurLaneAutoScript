@@ -1930,6 +1930,11 @@
       "StayInZone": false,
       "ExecuteFixedPatrolScan": false
     },
+    "OpsiSirenBug": {
+      "SirenResearch_Enable": true,
+      "Siren_Mode": "resource",
+      "Siren_Fleet": 0
+    },
     "OpsiFleet": {
       "Fleet": 1,
       "Submarine": false
@@ -1950,6 +1955,11 @@
     "OpsiHazard1Leveling": {
       "TargetZone": 0,
       "ExecuteFixedPatrolScan": false
+    },
+    "OpsiSirenBug": {
+      "SirenResearch_Enable": true,
+      "Siren_Mode": "resource",
+      "Siren_Fleet": 0
     },
     "OpsiFleet": {
       "Fleet": 1,

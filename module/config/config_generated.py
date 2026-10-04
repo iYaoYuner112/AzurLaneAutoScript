@@ -456,6 +456,11 @@ class GeneratedConfig:
     OpsiHazard1Leveling_TargetZone = 0  # 0, 44, 22
     OpsiHazard1Leveling_ExecuteFixedPatrolScan = False
 
+    # Group `OpsiSirenBug`
+    OpsiSirenBug_SirenResearch_Enable = True
+    OpsiSirenBug_Siren_Mode = 'resource'  # resource, enemy
+    OpsiSirenBug_Siren_Fleet = 0  # 0, 1, 2, 3, 4
+
     # Group `OpsiScheduling`
     OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
     OpsiScheduling_OperationCoinsPreserve = 20000

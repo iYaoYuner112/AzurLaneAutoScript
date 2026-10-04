@@ -324,10 +324,12 @@ Opsi:
     OpsiMeowfficerFarming:
       - Scheduler
       - OpsiMeowfficerFarming
+      - OpsiSirenBug
       - OpsiFleet
     OpsiHazard1Leveling:
       - Scheduler
       - OpsiHazard1Leveling
+      - OpsiSirenBug
       - OpsiFleet
     OpsiCrossMonth:
       - Scheduler
