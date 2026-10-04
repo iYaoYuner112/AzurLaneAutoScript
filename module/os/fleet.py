@@ -281,6 +281,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         result = set()
         # Record story history to clear click record
         clicked_story = False
+        # 侵蚀 1 / 短猫是连续刷图：明石退出商店、首次提交探测资源选项、剧情领奖之后，
+        # 地图状态其实已经确定，用固定的 0.8 秒（至少 3 帧）确认稳定即可，
+        # 不必再按原先的路径距离推算等待。
+        fast_farming = getattr(getattr(self.config, 'task', None), 'command', None) in (
+            'OpsiHazard1Leveling', 'OpsiMeowfficerFarming',
+        )
+        siren_confirmed = bool(getattr(self, 'is_siren_device_confirmed', False))
         stuck_timer = Timer(20, count=5).start()
         confirm_timer.reset()
 
@@ -299,12 +306,23 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 result.add('event')
                 if event == 'story_skip':
                     clicked_story = True
+                    confirmed = bool(getattr(self, 'is_siren_device_confirmed', False))
+                    if fast_farming and confirmed and not siren_confirmed \
+                            and getattr(self, 'siren_device_mode', None) == 'resource':
+                        # 探测资源选项已经提交，返回地图后只确认镜头稳定，随即交给自律拾取。
+                        confirm_timer = Timer(0.8, count=2).start()
+                        record = None
+                    siren_confirmed = confirmed
                 elif event == 'map_get_items':
                     # story_skip -> map_get_items means abyssal progress reward is received
                     if clicked_story:
                         logger.info('Got items from story')
                         self.device.click_record_clear()
                         clicked_story = False
+                        if fast_farming:
+                            # 信息装置先等后续选项和奖励出现，领奖后才缩短收尾确认。
+                            confirm_timer = Timer(0.8, count=2).start()
+                            record = None
                 else:
                     # Handled other events, clear history
                     clicked_story = False
@@ -364,7 +382,12 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
                 self.interval_clear(PORT_SUPPLY_CHECK)
                 self.handle_akashi_supply_buy(CLICK_SAFE_AREA)
-                confirm_timer.reset()
+                if fast_farming:
+                    # 商店退出已确认返回地图，原先按路程计算的到达时间不再适用。
+                    confirm_timer = Timer(0.8, count=2).start()
+                    record = None
+                else:
+                    confirm_timer.reset()
                 stuck_timer.reset()
                 result.add('akashi')
                 continue

@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from module.base.button import Button
 from module.base.timer import Timer
-from module.exception import GameTooManyClickError
+from module.exception import CampaignEnd, GameTooManyClickError
 from module.handler.assets import STORY_CLOSE, STORY_SKIP_3
 from module.handler.info_handler import InfoHandler
 from module.os_handler.assets import (
@@ -276,6 +276,48 @@ class TestAutoSearchEnableRetry(SpeedTestBase):
             self.assertFalse(handler.handle_os_auto_search_map_option())
         self.assertNotIn('_os_auto_search_enable_timer', handler.__dict__)
         self.assertEqual(handler.device.count_of(OPTION_OFF_NAME), 0)
+
+
+# ---- 第二批：奖励确认后直接收尾，不再空跑一次自律 ----
+
+class TestAutoSearchRewardFinish(SpeedTestBase):
+    def _reward_appears(self, handler):
+        """让 AUTO_SEARCH_REWARD 出现，并让 os_auto_search_quit 报告「海域未清空」。"""
+        handler.os_auto_search_quit = lambda drop=None: False
+        return patch.object(AUTO_SEARCH_REWARD, 'match', return_value=True)
+
+    def test_confirmed_start_finishes_search(self):
+        """本轮已确认开启过自律 → 奖励出现即结束本次搜索。"""
+        handler = MapEventStub(command='OpsiHazard1Leveling')
+        handler._os_auto_search_started = True
+        with self._reward_appears(handler), \
+                patch.object(STORY_SKIP_3, 'match', return_value=False):
+            with self.assertRaises(CampaignEnd):
+                handler.handle_os_auto_search_map_option()
+
+    def test_unconfirmed_reward_keeps_the_old_recovery(self):
+        """没确认开启过（可能是上个海域延迟弹的奖励）→ 保留原来的恢复路径。"""
+        handler = MapEventStub(command='OpsiHazard1Leveling')
+        handler._os_auto_search_started = False
+        with self._reward_appears(handler), \
+                patch.object(STORY_SKIP_3, 'match', return_value=False):
+            self.assertTrue(handler.handle_os_auto_search_map_option())
+
+    def test_other_task_never_finishes_on_reward(self):
+        """非刷图任务（如大世界每日）不吃这个优化。"""
+        handler = MapEventStub(command='OpsiDaily')
+        handler._os_auto_search_started = True
+        with self._reward_appears(handler), \
+                patch.object(STORY_SKIP_3, 'match', return_value=False):
+            self.assertTrue(handler.handle_os_auto_search_map_option())
+
+    def test_meowfficer_farming_also_finishes(self):
+        handler = MapEventStub(command='OpsiMeowfficerFarming')
+        handler._os_auto_search_started = True
+        with self._reward_appears(handler), \
+                patch.object(STORY_SKIP_3, 'match', return_value=False):
+            with self.assertRaises(CampaignEnd):
+                handler.handle_os_auto_search_map_option()
 
 
 if __name__ == '__main__':

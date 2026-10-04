@@ -671,6 +671,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         unlock_checked = False
         unlock_check_timer = Timer(5, count=10).start()
         self.ash_popup_canceled = False
+        # 侵蚀 1 / 短猫在「奖励出现」时会直接收尾（见 handle_os_auto_search_map_option），
+        # 但只有「本次守护循环里确实把自律寻敌打开过」才能这么判：否则奖励可能是上一个
+        # 海域延迟弹出来的，仍然需要走原来的重启恢复路径。
+        self._os_auto_search_started = False
+        confirm_search_start = self.config.task.command in (
+            'OpsiHazard1Leveling', 'OpsiMeowfficerFarming')
 
         def false_func(*args, **kwargs):
             return False
@@ -716,6 +722,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     unlock_checked = True
                 elif self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120)):
                     unlock_checked = True
+
+            if confirm_search_start and not self._os_auto_search_started \
+                    and self.match_template_color(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120)):
+                # 只把「本次守护循环已确认开启」之后的奖励当作正常收尾
+                self._os_auto_search_started = True
 
             if self.handle_os_auto_search_map_option(
                     drop=drop,
