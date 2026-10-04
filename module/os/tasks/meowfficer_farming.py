@@ -1,6 +1,7 @@
 from module.config.utils import get_os_reset_remain
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
+from module.os_handler.action_point import ActionPointLimit
 from module.map.map_grids import SelectedGrids
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 from module.os.tasks.task_context import is_running_opsi_proxy
@@ -76,18 +77,7 @@ class OpsiMeowfficerFarming(OSMap):
                 self.config.OS_ACTION_POINT_PRESERVE = 0
             logger.attr('OS_ACTION_POINT_PRESERVE', self.config.OS_ACTION_POINT_PRESERVE)
             if not ap_checked:
-                # Check action points first to avoid using remaining AP when it not enough for tomorrow's daily
-                # When not running CL1 and use oil
-                keep_current_ap = True
-                check_rest_ap = True
-                if self.is_smart_scheduling_enabled:
-                    check_rest_ap = False
-                if self.is_cl1_mode_enabled and self.get_yellow_coins() >= self.yellow_coins_preserve:
-                    check_rest_ap = False
-                if not self.is_cl1_mode_enabled and self.config.OpsiGeneral_BuyActionPointLimit > 0:
-                    keep_current_ap = False
-                self.action_point_set(cost=0, keep_current_ap=keep_current_ap, check_rest_ap=check_rest_ap)
-                ap_checked = True
+                ap_checked = self._meow_ap_check(ap_checked)
 
             # ===== mode dispatch, same order as AzurPilot =====
             self._meow_dispatch()
@@ -97,6 +87,50 @@ class OpsiMeowfficerFarming(OSMap):
                     return
                 self.config.task_call('OpsiScheduling')
                 self.config.task_stop()
+
+    def _meow_ap_check(self, ap_checked):
+        """
+        行动力检查（对齐 AP master `_meow_ap_check`）。
+
+        每轮先把 `OS_ACTION_POINT_PRESERVE` 设为本轮保留值（余烬信标未收满时置 0），
+        首轮用 `action_point_set(cost=0, keep_current_ap=True)` 检查总行动力是否已
+        跌破保留线。独立跑短猫（智能调度关闭）且黄币足够时，行动力不足会优雅推迟
+        到服务器刷新，而不是以任务报错收场；被智能调度代理时异常交回调度层处理。
+
+        Args:
+            ap_checked (bool): 是否已完成本轮的行动力检查。
+
+        Returns:
+            bool: 最新的行动力检查状态标志。
+        """
+        if not ap_checked:
+            keep_current_ap = True
+            check_rest_ap = True
+            smart_scheduled = is_running_opsi_proxy(self.config)
+            cl1_yellow_enough = False
+            if self.is_smart_scheduling_enabled:
+                check_rest_ap = False
+            if self.is_cl1_mode_enabled and not smart_scheduled:
+                cl1_yellow_enough = self.get_yellow_coins() >= self.yellow_coins_preserve
+                if cl1_yellow_enough:
+                    check_rest_ap = False
+            if not self.is_cl1_mode_enabled and self.config.OpsiGeneral_BuyActionPointLimit > 0:
+                keep_current_ap = False
+            if not smart_scheduled and self.is_cl1_mode_enabled and cl1_yellow_enough:
+                try:
+                    self.action_point_set(
+                        cost=0, keep_current_ap=keep_current_ap, check_rest_ap=check_rest_ap)
+                except ActionPointLimit as e:
+                    logger.warning(
+                        f'[短猫相接] 行动力达到保留线 '
+                        f'(total={e.total} <= preserve={e.preserve})，推迟到服务器刷新')
+                    self.config.task_delay(server_update=True)
+                    self.config.task_stop()
+            else:
+                self.action_point_set(
+                    cost=0, keep_current_ap=keep_current_ap, check_rest_ap=check_rest_ap)
+            ap_checked = True
+        return ap_checked
 
     def _meow_dispatch(self):
         """

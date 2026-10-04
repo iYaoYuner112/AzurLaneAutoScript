@@ -115,7 +115,33 @@ def get_action_point_box_priority(boxes, current_ap, max_current_ap=200):
 
 
 class ActionPointLimit(Exception):
-    pass
+    """行动力不足异常（对齐 AP master：异常携带现场数据，供调度层优雅推迟）。
+
+    Attributes:
+        current (int | None): 当前行动力。
+        total (int | None): 总行动力（含药剂）。
+        cost (int | None): 目标海域消耗。
+        preserve (int | None): 保留行动力设定值。
+    """
+
+    def __init__(self, current=None, total=None, cost=None, preserve=None):
+        super().__init__()
+        self.current = current
+        self.total = total
+        self.cost = cost
+        self.preserve = preserve
+
+    @property
+    def delay_minutes(self):
+        """需要延迟的分钟数（行动力每 10 分钟恢复 1 点）；无法计算时返回 None。"""
+        if self.cost is None or self.current is None:
+            return None
+
+        missing = self.cost - self.current
+        if missing <= 0:
+            return None
+
+        return missing * 10
 
 
 class ActionPointHandler(UI, MapEventHandler):
@@ -398,7 +424,10 @@ class ActionPointHandler(UI, MapEventHandler):
             if self._action_point_total <= self.config.OS_ACTION_POINT_PRESERVE:
                 logger.info(f'Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}')
                 self.action_point_quit()
-                raise ActionPointLimit
+                raise ActionPointLimit(
+                    current=self._action_point_current,
+                    total=self._action_point_total,
+                    preserve=self.config.OS_ACTION_POINT_PRESERVE)
 
         for _ in range(12):
             # Having enough action points
@@ -425,7 +454,10 @@ class ActionPointHandler(UI, MapEventHandler):
             if self._action_point_total < cost:
                 logger.info('Not having enough action points')
                 self.action_point_quit()
-                raise ActionPointLimit
+                raise ActionPointLimit(
+                    current=self._action_point_current,
+                    total=self._action_point_total,
+                    cost=cost)
 
             box = get_action_point_box_priority(
                 self._action_point_box, self._action_point_current
@@ -440,11 +472,17 @@ class ActionPointHandler(UI, MapEventHandler):
                 else:
                     logger.info(f'Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}')
                     self.action_point_quit()
-                    raise ActionPointLimit
+                    raise ActionPointLimit(
+                        current=self._action_point_current,
+                        total=self._action_point_total,
+                        preserve=self.config.OS_ACTION_POINT_PRESERVE)
             else:
                 logger.info('No more action point boxes')
                 self.action_point_quit()
-                raise ActionPointLimit
+                raise ActionPointLimit(
+                    current=self._action_point_current,
+                    total=self._action_point_total,
+                    cost=cost)
 
         logger.warning('Failed to get action points after 12 trial')
         return False

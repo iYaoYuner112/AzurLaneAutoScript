@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 
 from module.config.utils import get_os_reset_remain, get_server_next_update
 from module.logger import logger
+from module.os_handler.action_point import ActionPointLimit
 from module.os.map import OSMap
 from module.os.tasks.task_context import (
     OpsiNoContent,
@@ -263,6 +264,15 @@ class OpsiScheduling(OSMap):
         except OpsiNoContent as e:
             self._postpone_coin_task_check(task_name, str(e))
             return OpsiTaskResult(OpsiStatus.NO_CONTENT, task=task_name, reason=str(e))
+        except ActionPointLimit as e:
+            # 行动力打到保留线：优雅推迟到服务器刷新，而不是以任务报错收场
+            # （对齐 AP master 的调度器兜底）。
+            logger.warning(
+                f'[大世界-调度] {task_name} 行动力不足（达到保留线），推迟到服务器刷新: '
+                f'total={e.total} preserve={e.preserve}')
+            self.config.task_delay(server_update=True)
+            self.config.task_stop()
+            return OpsiTaskResult(OpsiStatus.FAILED, task=task_name, reason='action point limit')
 
         no_content_task = pop_opsi_no_content(self.config)
         if no_content_task == task_name:
