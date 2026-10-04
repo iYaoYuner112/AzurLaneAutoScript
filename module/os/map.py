@@ -1859,7 +1859,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             bool: True if the search ran to the end, False if an unexpected error
                 interrupted it. Task switching and recovery errors still propagate.
                 The event scan runs either way, so a flaky search does not skip the
-                rescan and the fixed patrol of this round.
+                rescan of this round. Callers that do more work on top of the scan
+                gate it on this return value, e.g. meowfficer farming skips the
+                radar patrol when the search was interrupted.
         """
         self.handle_ash_beacon_attack()
 

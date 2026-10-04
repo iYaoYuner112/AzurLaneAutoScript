@@ -232,7 +232,9 @@ class OpsiMeowfficerFarming(OSMap):
         Traditional single target zone (AzurPilot's `_meow_handle_traditional_zone`).
 
         One strategic search round; the whole map gets rescanned inside
-        `run_strategic_search`, then the radar-only patrol runs.
+        `run_strategic_search`, then the radar-only patrol runs. When the search was
+        interrupted the map state is not trustworthy, so the radar patrol is skipped
+        and the next round picks it up (AzurPilot's `if search_completed:` gate).
         """
         logger.hr(f'OS meowfficer farming, zone_id={zone.zone_id}', level=1)
         self.globe_goto(zone, refresh=True)
@@ -240,8 +242,10 @@ class OpsiMeowfficerFarming(OSMap):
         self.os_order_execute(
             recon_scan=False,
             submarine_call=self.config.OpsiFleet_Submarine)
-        self.run_strategic_search()
-        self._meow_fixed_patrol_scan()
+        if self.run_strategic_search():
+            self._meow_fixed_patrol_scan()
+        else:
+            logger.warning('Strategic search interrupted, skip the radar patrol this round')
         self.handle_after_auto_search()
         self.config.check_task_switch()
 
@@ -275,8 +279,10 @@ class OpsiMeowfficerFarming(OSMap):
         self.os_order_execute(
             recon_scan=False,
             submarine_call=self.config.OpsiFleet_Submarine)
-        self.run_strategic_search()
-        self._meow_fixed_patrol_scan()
+        if self.run_strategic_search():
+            self._meow_fixed_patrol_scan()
+        else:
+            logger.warning('Strategic search interrupted, skip the radar patrol this round')
         self.handle_after_auto_search()
         self.config.check_task_switch()
 

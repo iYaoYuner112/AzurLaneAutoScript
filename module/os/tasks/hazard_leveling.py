@@ -40,28 +40,10 @@ class OpsiHazard1Leveling(OSMap):
             if is_running_opsi_proxy(self.config):
                 fresh_ap = self._prepare_scheduling_action_point(fresh_ap, cost=70)
 
-            coin_preserve = (
-                self.config.OpsiScheduling_OperationCoinsPreserve
-                if self.is_smart_scheduling_enabled
-                else self.yellow_coins_preserve
-            )
-            if self.get_yellow_coins() < coin_preserve:
-                logger.info(f'Reach the limit of yellow coins, preserve={coin_preserve}')
-                if self.is_smart_scheduling_enabled:
-                    if is_running_opsi_proxy(self.config):
-                        return
-                    self.config.task_call('OpsiScheduling')
-                    self.config.task_stop()
-                with self.config.multi_set():
-                    self.config.task_delay(server_update=True)
-                    if not self.is_in_opsi_explore():
-                        cd = self.nearest_task_cooling_down
-                        if cd is None:
-                            for task in ['OpsiAbyssal', 'OpsiStronghold', 'OpsiObscure']:
-                                if self.config.is_task_enabled(task):
-                                    self.config.task_call(task)
-                        self.config.task_call('OpsiMeowfficerFarming')
-                self.config.task_stop()
+            # 决策代跑时刚读过黄币、也已经按保留线分派过任务，这里不再进情报页
+            # 重读一遍（对齐 AzurPilot：智能调度上下文跳过侵蚀1 的开工黄币检查）。
+            if not is_running_opsi_proxy(self.config):
+                self._cl1_resource_check()
 
             self.get_current_zone()
 
@@ -99,7 +81,8 @@ class OpsiHazard1Leveling(OSMap):
             if self.zone.zone_id != zone or not self.is_zone_name_hidden:
                 self.globe_goto(self.name_to_zone(zone), types='SAFE', refresh=True)
             self.fleet_set(self.config.OpsiFleet_Fleet)
-            self.run_strategic_search()
+            if not self.run_strategic_search():
+                logger.warning('Strategic search was interrupted, scan the map anyway')
             # Fixed patrol: read the radars of all fleets without moving any of
             # them first, then move fleets away and rescan the whole map when
             # needed. Skipped when an event is already solved (AzurPilot puts the
@@ -115,3 +98,36 @@ class OpsiHazard1Leveling(OSMap):
                     return
                 self.config.task_call('OpsiScheduling')
                 self.config.task_stop()
+
+    def _cl1_resource_check(self):
+        """
+        开工黄币检查，只给非代理运行（独立侵蚀1、或被 task_call 直接拉起）用。
+
+        智能调度代跑时不再调用：决策每轮开头已经读过黄币并按保留线分派过任务，
+        再读一次只是多一趟情报页往返。
+
+        Raises:
+            ScriptEnd: 黄币不足时交棒给智能调度或其它任务。
+        """
+        coin_preserve = (
+            self.config.OpsiScheduling_OperationCoinsPreserve
+            if self.is_smart_scheduling_enabled
+            else self.yellow_coins_preserve
+        )
+        if self.get_yellow_coins() >= coin_preserve:
+            return
+
+        logger.info(f'Reach the limit of yellow coins, preserve={coin_preserve}')
+        if self.is_smart_scheduling_enabled:
+            self.config.task_call('OpsiScheduling')
+            self.config.task_stop()
+        with self.config.multi_set():
+            self.config.task_delay(server_update=True)
+            if not self.is_in_opsi_explore():
+                cd = self.nearest_task_cooling_down
+                if cd is None:
+                    for task in ['OpsiAbyssal', 'OpsiStronghold', 'OpsiObscure']:
+                        if self.config.is_task_enabled(task):
+                            self.config.task_call(task)
+                self.config.task_call('OpsiMeowfficerFarming')
+        self.config.task_stop()
