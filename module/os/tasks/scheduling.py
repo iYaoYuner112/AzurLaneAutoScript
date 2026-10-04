@@ -23,6 +23,7 @@ from module.config.utils import (
     get_os_reset_remain,
     get_server_next_update,
 )
+from module.exception import GameStuckError, GameTooManyClickError, RequestHumanTakeover
 from module.logger import logger
 from module.os_handler.action_point import ActionPointLimit
 from module.os.map import OSMap
@@ -280,13 +281,20 @@ class OpsiScheduling(OSMap):
 
         logger.info(f'[大世界-调度] TASK_START {task_name}')
         pop_opsi_no_content(self.config)
+        if task_name != TASK_NAME_MEOWFFICER_FARMING:
+            # 其它补币任务要自行导航地图，先把决策暂留的行动力面板关掉
+            self._close_scheduling_action_point()
         try:
             with opsi_task_context(
                 self.config,
                 task_name,
                 disable_task_switch=COIN_TASK_DISABLE_TASK_SWITCH.get(task_name, True),
             ):
-                handler()
+                if task_name == TASK_NAME_MEOWFFICER_FARMING:
+                    # 耄耋相接与决策共用同一个行动力面板
+                    handler(fresh_ap=fresh_ap)
+                else:
+                    handler()
         except OpsiNoContent as e:
             self._postpone_coin_task_check(task_name, str(e))
             return OpsiTaskResult(OpsiStatus.NO_CONTENT, task=task_name, reason=str(e))
@@ -369,7 +377,8 @@ class OpsiScheduling(OSMap):
         self.handle_first_auto_search(run=False)
         try:
             with opsi_task_context(self.config, TASK_NAME_HAZARD1_LEVELING, disable_task_switch=False):
-                self.os_hazard1_leveling()
+                # 把决策刚读到的行动力交给子任务，它在同一个面板里完成开工检查
+                self.os_hazard1_leveling(fresh_ap=(total_ap, current_ap))
         except OpsiNoContent as e:
             return OpsiTaskResult(OpsiStatus.NO_CONTENT, task=TASK_NAME_HAZARD1_LEVELING, reason=str(e))
         return OpsiTaskResult(OpsiStatus.SUCCESS, task=TASK_NAME_HAZARD1_LEVELING, map_changed=True)
@@ -397,6 +406,83 @@ class OpsiScheduling(OSMap):
         self.config.task_stop()
         return True
 
+    # ------------------------------------------------- 行动点面板的生命周期管理
+    #
+    # 决策要读一次行动力，子任务开工还要再读一次。为了省掉「关窗 → 重开 → 重读」
+    # 这一趟往返，决策读完先**不关**面板，等确定子任务之后在同一面板里关掉或直接
+    # 完成开工补充（对齐 AzurPilot 的 _get_scheduling_action_point / _prepare_...）。
+    # 面板暂留期间任何出口都必须保证关窗，因此调用方用 try/finally 兜住。
+
+    # 决策暂留的行动力面板是否还开着，以及当时读取用的含箱口径。
+    _scheduling_ap_panel_open = False
+    _scheduling_ap_box_use = None
+
+    def _close_scheduling_action_point(self):
+        """关闭决策期间暂留的行动力面板；没有暂留时什么都不做。"""
+        if getattr(self, '_scheduling_ap_panel_open', False):
+            self._scheduling_ap_panel_open = False
+            self.action_point_quit()
+
+    def _get_scheduling_action_point(self, keep_open=False):
+        """读取智能调度决策所需的行动力。
+
+        Args:
+            keep_open (bool): 决策期间保留面板，确定子任务后再关闭或合并开工补充。
+
+        Returns:
+            tuple[int, int]: (弹窗口径总行动力, 当前真实行动力)。
+
+        Pages:
+            in: page_os
+            out: keep_open=True 时为 ACTION_POINT_USE，否则为 page_os
+        """
+        self._close_scheduling_action_point()
+        self.action_point_enter()
+        self.action_point_safe_get()
+        if keep_open:
+            self._scheduling_ap_panel_open = True
+            self._scheduling_ap_box_use = self.config.OS_ACTION_POINT_BOX_USE
+        else:
+            self.action_point_quit()
+        return (
+            int(getattr(self, '_action_point_total', 0) or 0),
+            int(getattr(self, '_action_point_current', 0) or 0),
+        )
+
+    def _prepare_scheduling_action_point(self, fresh_ap, *, cost):
+        """确定子任务后，在决策首读的同一个面板里完成开工补充并返回新读数。
+
+        调用前须绑定子任务配置并设好它的行动力保留值，期间不能有地图操作。
+        面板没有被保留时直接沿用传入读数，让子任务走原来的开工检查。
+
+        Args:
+            fresh_ap (tuple[int, int] | None): 本轮首读的 (总行动力, 当前行动力)。
+            cost (int): 子任务开工检查所需的行动力。
+
+        Returns:
+            tuple[int, int] | None: 补充后的实际读数；没保留面板时原样返回。
+        """
+        if not getattr(self, '_scheduling_ap_panel_open', False):
+            return fresh_ap
+        self._scheduling_ap_panel_open = False
+        if not self._is_in_action_point():
+            return None
+
+        # 只有「含箱口径没变」时才能把首读的读数直接拿来复用。
+        same_box_use = self._scheduling_ap_box_use == self.config.OS_ACTION_POINT_BOX_USE
+        if same_box_use and self.action_point_reusable(fresh_ap, cost):
+            self.action_point_quit()
+            return fresh_ap
+
+        logger.info('[大世界-调度] 在首次读取的行动力面板内完成开工补充')
+        if not self.handle_action_point(
+            zone=None, pinned=None, cost=cost, keep_current_ap=True,
+            check_rest_ap=True, skip_first_read=same_box_use,
+        ):
+            self.action_point_quit()
+            return None
+        return (int(self._action_point_total), int(self._action_point_current))
+
     # ------------------------------------------------------------ main entry
 
     def run_opsi_scheduler_once(self):
@@ -410,11 +496,18 @@ class OpsiScheduling(OSMap):
             return
 
         yellow_coins = self.get_yellow_coins()
-        self.action_point_enter()
-        self.action_point_safe_get()
-        total_ap = int(self._action_point_total)
-        self.action_point_quit()
-        current_ap = total_ap
+        try:
+            total_ap, current_ap = self._get_scheduling_action_point(keep_open=True)
+            return self._run_opsi_scheduler_decision(yellow_coins, total_ap, current_ap)
+        except (GameStuckError, GameTooManyClickError, RequestHumanTakeover):
+            # 已经进入设备恢复流程，不再追加界面操作去干扰原异常
+            self._scheduling_ap_panel_open = False
+            raise
+        finally:
+            self._close_scheduling_action_point()
+
+    def _run_opsi_scheduler_decision(self, yellow_coins, total_ap, current_ap):
+        """使用首读的行动力做决策；面板在实际地图操作之前关闭或合并开工补充。"""
         meow_ap_preserve = min(
             self.get_action_point_limit(),
             self.config.OpsiScheduling_MeowfficerActionPointPreserve,

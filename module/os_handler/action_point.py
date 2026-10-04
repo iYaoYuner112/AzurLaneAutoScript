@@ -380,7 +380,11 @@ class ActionPointHandler(UI, MapEventHandler):
             if self.handle_map_event():
                 continue
 
-    def handle_action_point(self, zone, pinned, cost=None, keep_current_ap=True, check_rest_ap=False):
+        # 已正向确认弹窗关闭：下一次有意打开不必再等上一次留下的 3 秒重试冷却。
+        self.interval_clear(OS_CHECK)
+
+    def handle_action_point(self, zone, pinned, cost=None, keep_current_ap=True, check_rest_ap=False,
+                            *, skip_first_read=False):
         """
         Args:
             zone (Zone): Zone to enter.
@@ -390,6 +394,8 @@ class ActionPointHandler(UI, MapEventHandler):
                 when it is not enough for tomorrow's daily.
             check_rest_ap (bool): Skip keep_current_ap if the sum of current action points and rest action points
                 that can be obtained today exceeds 200.
+            skip_first_read (bool): 已在同一面板安全读过行动力时跳过这次首读。
+                只省掉操作前的重复读取；购买或开箱之后的实际读数仍会刷新。
 
         Returns:
             bool: If handled.
@@ -404,7 +410,8 @@ class ActionPointHandler(UI, MapEventHandler):
             return False
 
         # AP boxes have an animation to show
-        self.action_point_safe_get()
+        if not skip_first_read:
+            self.action_point_safe_get()
         if cost is None:
             cost = self.action_point_get_cost(zone, pinned)
         buy_checked = False
@@ -506,6 +513,32 @@ class ActionPointHandler(UI, MapEventHandler):
                 continue
             if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50)):
                 continue
+
+    def action_point_reusable(self, fresh_ap, cost):
+        """判断能否复用刚读到的行动力、跳过 action_point_set 的行动点弹窗。
+
+        只有复用后与「开弹窗走 handle_action_point」结果完全一致时才返回 True：
+        弹窗口径的总行动力高于 OS_ACTION_POINT_PRESERVE（不会触发保留拦截，
+        也覆盖了 check_rest_ap 的 200 线），且当前行动力已达到开工线 cost ——
+        弹窗路径在这种情况下也只会「行动点充足」直接关掉。
+        任一条件不满足都必须照常调用 action_point_set：开行动力箱和石油购买
+        都在那里处理。
+
+        Args:
+            fresh_ap (tuple[int, int] | None): 调用方刚读到的
+                (弹窗口径总行动力, 当前行动力)。读数与本次调用之间不得有任何
+                行动力消耗；为 None 时返回 False。
+            cost (int): 目标海域消耗，与 action_point_set 的 cost 相同。
+
+        Returns:
+            bool: 是否可以跳过弹窗。
+        """
+        if fresh_ap is None:
+            return False
+        fresh_total, fresh_current = fresh_ap
+        if fresh_total <= self.config.OS_ACTION_POINT_PRESERVE:
+            return False
+        return fresh_current >= cost
 
     def action_point_set(self, zone=None, pinned=None, cost=None, keep_current_ap=True, check_rest_ap=False):
         """

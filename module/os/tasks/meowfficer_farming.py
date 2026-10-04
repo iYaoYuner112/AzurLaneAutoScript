@@ -29,11 +29,18 @@ class OpsiMeowfficerFarming(OSMap):
         # clear_question_any_fleet restores the primary fleet itself.
         self.clear_question_any_fleet()
 
-    def os_meowfficer_farming(self):
-        """
-        Recommend 3 or 5 for higher meowfficer searching point per action points ratio.
+    def os_meowfficer_farming(self, fresh_ap=None):
+        """耄耋相接入口。
+
+        Args:
+            fresh_ap (tuple[int, int] | None): 智能调度代跑时传入的决策首读。
+                短猫的行动力前置检查（`_meow_ap_check`）自带完整的弹窗流程，
+                这一步会把决策暂留的面板消耗掉，所以该读数在这里不复用——
+                只负责把面板收尾，避免它残留到后续的截图识别。
         """
         logger.hr(f'OS meowfficer farming, hazard_level={self.config.OpsiMeowfficerFarming_HazardLevel}', level=1)
+        # 收尾决策暂留的行动力面板（短猫的开工检查会自己重开弹窗）
+        self._close_scheduling_action_point()
         if self.is_cl1_mode_enabled and not self.is_smart_scheduling_enabled \
             and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
             logger.info('With CL1 leveling enabled, set action point preserve to 1000')

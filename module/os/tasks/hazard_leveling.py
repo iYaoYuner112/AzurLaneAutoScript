@@ -4,7 +4,14 @@ from module.os.tasks.task_context import is_running_opsi_proxy
 
 
 class OpsiHazard1Leveling(OSMap):
-    def os_hazard1_leveling(self):
+    def os_hazard1_leveling(self, fresh_ap=None):
+        """侵蚀 1 练级入口。
+
+        Args:
+            fresh_ap (tuple[int, int] | None): 智能调度代理执行时传入的
+                (总行动力, 当前行动力) 首读；用于在同一个行动力面板里确认开工、
+                跳过重复的弹窗往返。独立运行时为 None。
+        """
         logger.hr('OS hazard 1 leveling', level=1)
         # Without these enabled, CL1 gains 0 profits
         self.config.override(
@@ -51,12 +58,25 @@ class OpsiHazard1Leveling(OSMap):
 
             self.get_current_zone()
 
+            # 智能调度代跑时，决策刚读过行动力：能在同一个面板里确认开工的就跳过弹窗。
+            # 面板没被保留（独立运行 / 途中被打断）时这里原样返回，走下面的弹窗路径。
+            if is_running_opsi_proxy(self.config):
+                fresh_ap = self._prepare_scheduling_action_point(fresh_ap, cost=70)
+
             # Preset action point to 70
             # When running CL1 oil is for running CL1, not meowfficer farming
             keep_current_ap = True
             if self.config.OpsiGeneral_BuyActionPointLimit > 0:
                 keep_current_ap = False
-            self.action_point_set(cost=70, keep_current_ap=keep_current_ap, check_rest_ap=True)
+            if keep_current_ap and self.action_point_reusable(fresh_ap, cost=70):
+                _fresh_total, _fresh_current = fresh_ap
+                logger.info(
+                    f'[大世界-侵蚀1练级] 复用刚读到的行动力'
+                    f'(当前={_fresh_current}, 总={_fresh_total})，跳过行动点弹窗')
+            else:
+                self.action_point_set(cost=70, keep_current_ap=keep_current_ap, check_rest_ap=True)
+            # 首读只复用一次：面板已经关掉了，后续轮次照常走弹窗
+            fresh_ap = None
             if self._action_point_total >= 3000 and not self.is_smart_scheduling_enabled:
                 with self.config.multi_set():
                     self.config.task_delay(server_update=True)
