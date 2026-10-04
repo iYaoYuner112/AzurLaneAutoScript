@@ -4,11 +4,12 @@ from contextlib import suppress
 import inflection
 
 from module.base.timer import Timer
-from module.config.config import OS_MAP_STALE_KEY, OS_RESUME_RECOVERY_KEY
+from module.config.config import OS_MAP_STALE_KEY, OS_RESUME_RECOVERY_KEY, TaskEnd
 from module.os.tasks.task_context import current_opsi_context
 from module.config.utils import get_os_reset_remain
-from module.exception import CampaignEnd, GameStuckError, GameTooManyClickError, MapDetectionError, \
-    MapWalkError, RequestHumanTakeover, ScriptEnd, ScriptError
+from module.exception import CampaignEnd, GameBugError, GameNotRunningError, GamePageUnknownError, \
+    GameStuckError, GameTooManyClickError, MapDetectionError, MapWalkError, RequestHumanTakeover, \
+    ScriptEnd, ScriptError
 from module.handler.login import LoginHandler, MAINTENANCE_ANNOUNCE
 from module.logger import logger
 from module.map.map import Map
@@ -45,6 +46,17 @@ DEVICE_STATE_KEY = 'Opsi.Storage.DeviceState'
 
 def should_move_fleet_for_fixed_patrol(current_ap, question_unreachable):
     return question_unreachable or current_ap > 7
+
+
+# Exceptions the framework already has a recovery plan for. A best-effort wrapper
+# (an extra map scan, a patrol rescan) must never swallow them: `TaskEnd` is what
+# `config.task_stop()` raises when another task takes over, and it is NOT a subclass
+# of `ScriptEnd`, so leaving it out makes the wrapper keep clicking on the screen the
+# incoming task navigated to, then die on a non-map frame.
+UNSWALLOWABLE_ERRORS = (
+    TaskEnd, ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
+    GameBugError, GameNotRunningError, GamePageUnknownError, RequestHumanTakeover,
+)
 
 
 class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
@@ -136,8 +148,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         logger.info('[OS RESUME] Running FULL MAP RESCAN after interruption')
         try:
             self.map_rescan(rescan_mode='full')
-        except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
-                RequestHumanTakeover):
+        except UNSWALLOWABLE_ERRORS:
             raise
         except Exception as e:
             logger.warning(f'[OS RESUME] full rescan failed, continue: {e}')
@@ -1031,8 +1042,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self._solved_fleet_mechanism = False
                 try:
                     self.map_rescan_once(rescan_mode='full')
-                except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
-                        RequestHumanTakeover):
+                except UNSWALLOWABLE_ERRORS:
                     raise
                 except Exception as e:
                     logger.debug(
@@ -1429,8 +1439,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.info(f'[FIXED PATROL][L2] FULL RESCAN after Fleet {fleet} movement')
                 try:
                     self.map_rescan(rescan_mode='full')
-                except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
-                        RequestHumanTakeover):
+                except UNSWALLOWABLE_ERRORS:
                     raise
                 except Exception as e:
                     logger.debug(
@@ -1871,8 +1880,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.os_auto_search_run(strategic=True)
             self.hp_reset()
             self.hp_get()
-        except (ScriptEnd, CampaignEnd, GameStuckError, GameTooManyClickError,
-                RequestHumanTakeover):
+        except UNSWALLOWABLE_ERRORS:
             raise
         except Exception as e:
             logger.warning(f'Strategic search interrupted: {e}', exc_info=True)

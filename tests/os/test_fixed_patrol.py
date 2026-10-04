@@ -9,7 +9,7 @@
 
 from types import SimpleNamespace
 
-from module.exception import GameStuckError, GameTooManyClickError, MapWalkError
+from module.exception import GameStuckError, GameTooManyClickError, MapWalkError, RequestHumanTakeover
 from module.os.fixed_patrol import AntiLoopGuard
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 
@@ -780,14 +780,60 @@ def test_strategic_search_unexpected_error_still_scans_the_map():
 
 
 def test_strategic_search_rethrows_task_and_recovery_errors():
-    """任务切换与恢复型异常必须上抛，不能被当成「本轮搜索失败」继续点图。"""
-    from module.exception import ScriptEnd
-    for error in (ScriptEnd('switch'), GameStuckError('stuck'), GameTooManyClickError('clicks')):
-        stub = StrategicSearchStub(error=error)
+    """框架已有处置方案的异常一律上抛，不能被当成「本轮搜索失败」继续点图。
+
+    `TaskEnd` 是 `config.task_stop()` 抛的那个（自律被打断去切任务就是它），它**不是**
+    `ScriptEnd` 的子类，所以必须单独列在放行清单里：漏掉它就会在被切走的画面上继续
+    清问号 + 整图重扫，最后撞在一帧非地图上抛 MapDetectionError 把整次运行弄崩
+    （2026-10-04 实跑踩过，见 UNSWALLOWABLE_ERRORS）。
+    """
+    from module.os.map import UNSWALLOWABLE_ERRORS
+    for error_class in UNSWALLOWABLE_ERRORS:
+        stub = StrategicSearchStub(error=error_class('switch'))
         try:
             OSMap.run_strategic_search(stub)
-        except type(error):
+        except error_class:
             pass
         else:
-            raise AssertionError(f'{type(error).__name__} was swallowed')
+            raise AssertionError(f'{error_class.__name__} was swallowed')
         assert 'map_rescan' not in stub.events
+
+
+class L2RescanStub:
+    """只提供 `_move_fleets_and_rescan`（L2）需要的属性；重扫时收到切任务信号。"""
+
+    def __init__(self):
+        self.config = SimpleNamespace(
+            OpsiFleet_Fleet=1,
+            temporary=lambda **kwargs: SimpleNamespace(recover=lambda: None))
+        self._solved_map_event = set()
+        self._solved_fleet_mechanism = False
+        self._fixed_patrol_loop_guard = AntiLoopGuard(max_repeats=3)
+        self.moves = []
+
+    def _set_fixed_patrol_fleet(self, fleet):
+        return True
+
+    def clear_question(self, drop=None):
+        pass
+
+    def _move_fleet_to_patrol(self, fleet, target_loc):
+        self.moves.append(fleet)
+        return True
+
+    def map_rescan(self, rescan_mode='full'):
+        from module.config.config import TaskEnd
+        raise TaskEnd('switch')
+
+
+def test_l2_rescan_task_switch_is_not_swallowed():
+    """L2 挪完一支队后整图重扫时来了切任务：立刻上抛，不能接着挪剩下三支。"""
+    from module.config.config import TaskEnd
+    stub = L2RescanStub()
+    try:
+        OSMap._move_fleets_and_rescan(stub)
+    except TaskEnd:
+        pass
+    else:
+        raise AssertionError('TaskEnd was swallowed by fixed patrol L2')
+    assert stub.moves == [1]
