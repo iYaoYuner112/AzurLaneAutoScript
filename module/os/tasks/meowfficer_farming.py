@@ -17,11 +17,7 @@ class OpsiMeowfficerFarming(OSMap):
         the L2 fixed landing move (C1/D1/E1/F1 are defined for the hazard level 1
         map, not for the meowfficer zones).
         """
-        enabled = getattr(self.config, 'OpsiMeowfficerFarming_ExecuteFixedPatrolScan', None)
-        if enabled is None:
-            enabled = self.config.cross_get(
-                'OpsiMeowfficerFarming.OpsiMeowfficerFarming.ExecuteFixedPatrolScan', default=False)
-        if not enabled:
+        if not self._meowfficer_patrol_enabled():
             return
         if self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS:
             return

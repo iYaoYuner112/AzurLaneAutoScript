@@ -756,6 +756,10 @@ class StrategicSearchStub:
     def hp_get(self):
         self.events.append('hp_get')
 
+    def _primary_radar_swept_later(self):
+        # 这两个用例锁的是"被打断也要照样扫图"，按强制移动关着的分支走
+        return False
+
     def clear_question(self):
         self.events.append('clear_question')
 

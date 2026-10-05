@@ -1705,6 +1705,34 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         except (TypeError, ValueError):
             return bool(value)
 
+    def _meowfficer_patrol_enabled(self):
+        """
+        Read `OpsiMeowfficerFarming.ExecuteFixedPatrolScan`, tolerating a missing key.
+        """
+        value = getattr(self.config, 'OpsiMeowfficerFarming_ExecuteFixedPatrolScan', None)
+        if value is None:
+            value = self.config.cross_get(
+                'OpsiMeowfficerFarming.OpsiMeowfficerFarming.ExecuteFixedPatrolScan', default=False)
+        return bool(value)
+
+    def _primary_radar_swept_later(self):
+        """
+        Whether the per-fleet radar sweep of this same round already covers the primary
+        fleet, so clearing its question marks before the rescan would read that radar twice.
+
+        Both patrols start with the primary fleet, so with a patrol running this round the
+        clear is done there instead. AzurPilot removed its own step-by-step chain for
+        exactly this reason (d784de8fc: reading radars is the fixed patrol's job), but it
+        gave up the clear entirely when the patrol switch is off -- we keep it there, since
+        that read is what finds an akashi or a device hiding behind a question mark.
+
+        Returns:
+            bool: True when the sweep happens later in the same round anyway.
+        """
+        if self._is_meowfficer_task():
+            return self._meowfficer_patrol_enabled()
+        return self._forced_move_enabled()
+
     _fixed_patrol_loop_guard = AntiLoopGuard(max_repeats=3)
     _in_forced_recovery = False
 
@@ -1903,7 +1931,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         self._solved_map_event = set()
         self._solved_fleet_mechanism = False
-        self.clear_question()
+        # A patrol that runs later in this same round reads the primary fleet's radar first
+        # anyway, so clearing it here would sweep the same radar twice. Only when no patrol
+        # runs does this call carry the question-mark hunt. See _primary_radar_swept_later().
+        if not self._primary_radar_swept_later():
+            self.clear_question()
         self.map_rescan()
         return not interrupted
 
