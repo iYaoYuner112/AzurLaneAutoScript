@@ -1892,6 +1892,39 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         self.map_rescan()
         return not interrupted
 
+    def _siren_device_search_plan(self):
+        """
+        How many auto search rounds the device dialog is worth, and which fleet runs them.
+
+        Aligned with AzurPilot: probing enemies keeps spawning targets, so it is worth
+        three rounds in a row (optionally with a dedicated fleet); probing resources pays
+        off in one round; a logging tower / product pillar was already clicked and needs
+        none. The mode is read right after the dialog, before any round runs.
+
+        Returns:
+            tuple[int, int]: (rounds, fleet). Fleet is 0 when the current fleet is used.
+        """
+        mode = getattr(self, 'siren_device_mode', None)
+        if mode == 'enemy':
+            rounds = 3
+        elif mode == 'collected':
+            rounds = 0
+        else:
+            rounds = 1
+        if rounds <= 1:
+            # Only the enemy mode can ask for a specific fleet to farm with.
+            return rounds, 0
+
+        task = self.config.task.command
+        if task not in ('OpsiHazard1Leveling', 'OpsiMeowfficerFarming'):
+            task = 'OpsiHazard1Leveling'
+        fleet = self.config.cross_get(keys=f'{task}.OpsiSirenBug.Siren_Fleet', default=0)
+        try:
+            fleet = int(fleet)
+        except (TypeError, ValueError):
+            fleet = 0
+        return rounds, fleet
+
     def map_rescan_current(self, drop=None):
         """
 
@@ -1986,12 +2019,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # The walk can be blocked by an idle fleet, in which case the device
                 # dialog never opens: try the other fleets before giving up.
                 reached = self._goto_scanning_device_with_other_fleets(drop=drop)
-            self.os_auto_search_run(drop=drop)
-            if reached:
-                self._solved_map_event.add('is_scanning_device')
-                self._set_device_state(DEVICE_COMPLETED)
-                return True
-            else:
+            if not reached:
                 # No fleet could reach the device: remember this grid and fall back to
                 # the fixed patrol to move the blocking fleet away. Must return False —
                 # returning True would make map_rescan believe the event was handled and
@@ -2001,6 +2029,40 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self._set_device_state(DEVICE_NONE)
                 self.execute_fixed_patrol_scan()
                 return False
+
+            # How many auto search rounds this dialog is worth, decided from the mode
+            # just chosen (read before the rounds, otherwise a pillar collected on the
+            # way would overwrite the mode with 'collected' and eat the rounds).
+            rounds, siren_fleet = self._siren_device_search_plan()
+            mode = getattr(self, 'siren_device_mode', None)
+            current_fleet = self.fleet_selector.get()
+            switched = False
+            if rounds > 1 and siren_fleet > 0 and siren_fleet != current_fleet:
+                logger.info(f'Siren device: run the search rounds with fleet {siren_fleet} '
+                            f'instead of {current_fleet}')
+                self.fleet_set(siren_fleet)
+                switched = True
+            for index in range(rounds):
+                logger.info(f'Siren device ({mode}): auto search {index + 1}/{rounds}')
+                self.os_auto_search_run(drop=drop)
+            if switched:
+                self.fleet_set(current_fleet)
+
+            # Mark it solved before the extra scan, so the second pass cannot re-enter
+            # this branch for the same device. The extra scan matters: the device drops
+            # its products right next to it, and without it the outer map_rescan stops as
+            # soon as it sees one solved event, so those products wait for the next
+            # battle plan round (AzurPilot rescans the current view here for the same
+            # reason).
+            self._solved_map_event.add('is_scanning_device')
+            try:
+                self.device.screenshot()
+                self.update()
+                self.map_rescan_current(drop=drop)
+            except MapDetectionError:
+                logger.warning('Siren device: current view is unreadable, skip the extra rescan')
+            self._set_device_state(DEVICE_COMPLETED)
+            return True
 
         grids = self.view.select(is_logging_tower=True)
         if 'is_logging_tower' not in self._solved_map_event and grids and grids[0].is_logging_tower:
