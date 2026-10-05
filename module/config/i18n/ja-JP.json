@@ -1778,6 +1778,10 @@
       "name": "GeneralShop._info.name",
       "help": "GeneralShop._info.help"
     },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
+    },
     "UseGems": {
       "name": "GeneralShop.UseGems.name",
       "help": "GeneralShop.UseGems.help"
@@ -1803,6 +1807,10 @@
     "_info": {
       "name": "GuildShop._info.name",
       "help": "GuildShop._info.help"
+    },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     },
     "Refresh": {
       "name": "GuildShop.Refresh.name",
@@ -1917,6 +1925,10 @@
       "name": "MedalShop._info.name",
       "help": "MedalShop._info.help"
     },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
+    },
     "Filter": {
       "name": "MedalShop.Filter.name",
       "help": "MedalShop.Filter.help"
@@ -1978,6 +1990,10 @@
       "name": "MeritShop._info.name",
       "help": "MeritShop._info.help"
     },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
+    },
     "Refresh": {
       "name": "MeritShop.Refresh.name",
       "help": "MeritShop.Refresh.help"
@@ -1995,6 +2011,10 @@
     "_info": {
       "name": "CoreShop._info.name",
       "help": "CoreShop._info.help"
+    },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     },
     "Filter": {
       "name": "CoreShop.Filter.name",

@@ -1778,6 +1778,10 @@
       "name": "General Shop Settings",
       "help": ""
     },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
+    },
     "UseGems": {
       "name": "Use Gems",
       "help": ""
@@ -1803,6 +1807,10 @@
     "_info": {
       "name": "Guild Shop Settings",
       "help": ""
+    },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     },
     "Refresh": {
       "name": "Allow Shop Refresh",
@@ -1917,6 +1925,10 @@
       "name": "Medal Shop Settings",
       "help": ""
     },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
+    },
     "Filter": {
       "name": "Item Filter",
       "help": "All options have been defined at <https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/reward_shop_filter_string>\nDifferent from other shops, the below select options assist with filling the unknowns for the vague items 'Retrofit' and 'Plate'\nFurthermore restricted for 'Plate', there are both specific and wild types\nIf you are targeting a specific type then use a string combination such as 'PlateGeneralT3 > PlateWildT3' otherwise 'PlateT3' will purchase every available T3 Plate\nFor research blueprints it is adviseable to use 'DR > PR', players should convert surplus into Prototype Core currency"
@@ -1978,6 +1990,10 @@
       "name": "Merit Shop Settings",
       "help": ""
     },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
+    },
     "Refresh": {
       "name": "Allow Shop Refresh",
       "help": "Refreshing will consume 50 gems"
@@ -1995,6 +2011,10 @@
     "_info": {
       "name": "Core Shop Settings",
       "help": ""
+    },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     },
     "Filter": {
       "name": "Item Filter",
