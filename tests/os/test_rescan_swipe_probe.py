@@ -131,6 +131,23 @@ def test_single_stalled_frame_is_not_enough():
     assert stub.camera == (18, 13), stub.camera
 
 
+def test_sub_tile_residual_is_not_mistaken_for_a_stall():
+    """实测合法滑动的锚点残差只有约 0.1 格（9~19 像素），不能被判成"画面没滚"。
+
+    判据设在半格的话，正常爬角两三跳就会被误判到头，还会把真实移动从相机坐标里退掉，
+    所以这里锁一个"合法但很小"的位移必须照常继续滑、一帧都不许退回坐标。
+    """
+    stub = PanStub([
+        frame(move=(0.11, 0.13)), frame(move=(0.11, 0.13)), frame(move=(0.11, 0.13)),
+        frame(edges=ALL_EDGE, move=(0.11, 0.13)),
+    ])
+    run_pan(stub)
+    # 四跳都被认成"真的滚了"：既没提前停轴，也没退回任何相机坐标
+    # （旧阈值半格时第二跳就会停轴并把坐标减掉）
+    assert stub.gestures == [(3, 2)] * 4, stub.gestures
+    assert stub.camera == (15, 11), stub.camera
+
+
 def test_in_place_anchor_update_does_not_fool_the_guard():
     """锚点数组被原地改写时也不能误判：滑动前必须先拷一份。"""
     stub = PanStub([

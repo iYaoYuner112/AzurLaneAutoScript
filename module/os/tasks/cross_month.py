@@ -48,7 +48,14 @@ class OpsiCrossMonth(OSMap):
             return False
 
         self.is_in_opsi_explore = false_func
-        self.config.task_switched = false_func
+        # Deliberately NOT patching `config.task_switched` here (upstream does, AzurPilot
+        # removed it and we follow): `config` is a cached_property shared by the whole
+        # process and `merge()` returns self, so that assignment survives the task and
+        # nothing ever restores it until AlasApp rebuilds the config. Every
+        # `check_task_switch()` in the process would then stop switching, and
+        # OpsiScheduling -- whose only exit from its round loop is that check -- would
+        # spin forever after a single month-end run. Being preempted here is safe: the
+        # Opsi resume barrier rebuilds the map state.
 
         logger.hr('OpSi clear daily', level=1)
         self.config.override(

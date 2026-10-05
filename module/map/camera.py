@@ -34,10 +34,14 @@ class Camera(MapOperation):
     # other caller of ensure_edge_insight() / focus_to() exactly as they were.
     _swipe_probe = None
     # A swipe that scrolls the map by less than this fraction of a grid counts as "the game
-    # refused to scroll". SWIPE_STALL_FRAMES consecutive ones are required, because
-    # homo_loca is kept modulo one tile (module/map_detection/homography.py), so a swipe
-    # that happened to land on an exact tile boundary looks the same for a single frame.
-    SWIPE_STALL_RATIO = 0.5
+    # refused to scroll". Measured on a real 2026-10-05 run: swipes that did scroll the map
+    # moved the anchor by 9-19 pixels, i.e. about 0.1 grid, so a threshold anywhere near half
+    # a grid would stop a legitimate pan. 0.05 grid is above the pixel noise of a map that
+    # really did not move and below every real scroll. Needs SWIPE_STALL_FRAMES consecutive
+    # ones, because homo_loca is kept modulo one tile (module/map_detection/homography.py) and
+    # a swipe landing on an exact tile boundary also gives a near-zero delta. The hard swipe
+    # cap below is the backstop if this test ever misses.
+    SWIPE_STALL_RATIO = 0.05
     SWIPE_STALL_FRAMES = 2
     # ensure_edge_insight() only stops once the detector reports an edge on each axis, so a
     # boundary it cannot see (dark tiles, info bar over the bottom edge) would pan forever.
