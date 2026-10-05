@@ -244,6 +244,26 @@ RESOURCE_STORAGE_PATH = 'Alas.Storage.Storage.ResourceMonitor'
 RESOURCE_UPDATE_INTERVAL_SECONDS = 20
 
 
+def dashboard_resource_age(config, name, now=None):
+    """看板里某个资源距今多少秒没更新过；从来没记过则返回 None。
+
+    调用方用它决定要不要为监视器去做一次昂贵的读取（比如打开行动力面板）：
+    任务流程自己读过时会自动上报，值还新鲜就不必重复读。
+    """
+    resources = config.cross_get(RESOURCE_STORAGE_PATH, default={})
+    if not isinstance(resources, dict):
+        return None
+    record = resources.get(name, {})
+    if not isinstance(record, dict):
+        return None
+    try:
+        recorded = datetime.strptime(record.get('Record', ''), '%Y-%m-%d %H:%M:%S')
+    except (TypeError, ValueError):
+        return None
+    now = now or datetime.now()
+    return (now - recorded).total_seconds()
+
+
 def record_dashboard_resource(config, name, value, total=None, limit=None, now=None):
     try:
         value = int(value)

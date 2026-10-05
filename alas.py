@@ -104,8 +104,9 @@ class AzurLaneAutoScript:
         self._resource_last_refresh = now
         try:
             from module.statistics.resource_collector import ResourceCollector
+            names = ResourceCollector.refresh_names(self.config, interval)
             collector = ResourceCollector(self.config, self.device, monitor=self.resource_monitor)
-            collector.refresh()
+            collector.refresh(names=names)
         except Exception as e:
             logger.warning(f'[ResourceMonitor] refresh failed: {e}')
 
