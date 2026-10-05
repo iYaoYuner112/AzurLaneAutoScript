@@ -837,3 +837,58 @@ def test_l2_rescan_task_switch_is_not_swallowed():
     else:
         raise AssertionError('TaskEnd was swallowed by fixed patrol L2')
     assert stub.moves == [1]
+
+
+class RescanGateStub:
+    """只提供 `map_rescan()` 入口判定需要的属性，并记录它到底扫没扫。"""
+
+    def __init__(self, cl1_standalone=True, meowfficer_enabled=False, patrol_enabled=False,
+                 is_port=False):
+        self.config = SimpleNamespace(
+            OpsiFleet_Fleet=1,
+            is_task_enabled=lambda name: meowfficer_enabled if name == 'OpsiMeowfficerFarming' else False,
+        )
+        self.zone = SimpleNamespace(is_port=is_port)
+        self.is_in_task_cl1_leveling = cl1_standalone
+        self.is_in_task_explore = False
+        self._forced_move_enabled_value = patrol_enabled
+        self._solved_map_event = set()
+        self._solved_fleet_mechanism = False
+        self.rescans = 0
+
+    def _forced_move_enabled(self):
+        return self._forced_move_enabled_value
+
+    def fleet_set(self, index=1):
+        return True
+
+    def map_rescan_once(self, rescan_mode='full', drop=None):
+        # False = 这一遍没找到事件，`map_rescan` 就此收工，所以只会调用一次
+        self.rescans += 1
+        return False
+
+
+def test_rescan_still_skipped_when_nothing_hunts_events():
+    """独立侵蚀1、短猫关、强制移动也关：保持原取向，不为探索箱绕路。"""
+    stub = RescanGateStub()
+    assert OSMap.map_rescan(stub) is False
+    assert stub.rescans == 0
+
+
+def test_rescan_not_skipped_when_fixed_patrol_is_on():
+    """强制移动开着就必须先做这次便宜的整图扫描，否则编排会直接跳进 50~90 秒的重流程。"""
+    stub = RescanGateStub(patrol_enabled=True)
+    assert OSMap.map_rescan(stub) is True
+    assert stub.rescans == 1
+
+
+def test_rescan_never_skipped_for_meowfficer_or_scheduling():
+    """开了短猫、或者由智能调度代跑（不是独立侵蚀1）时照旧要扫。"""
+    assert OSMap.map_rescan(RescanGateStub(meowfficer_enabled=True)) is True
+    assert OSMap.map_rescan(RescanGateStub(cl1_standalone=False)) is True
+
+
+def test_rescan_skipped_in_port():
+    stub = RescanGateStub(patrol_enabled=True, is_port=True)
+    assert OSMap.map_rescan(stub) is False
+    assert stub.rescans == 0

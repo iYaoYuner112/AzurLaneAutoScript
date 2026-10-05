@@ -2259,13 +2259,20 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if self.zone.is_port:
             logger.info('Current zone is a port, do not need rescan')
             return False
-        # Only skip in STANDALONE CL1 (task.command == 'OpsiHazard1Leveling'),
-        # not under smart scheduling: standalone CL1 preserves AP, so visiting
-        # exploration events is skipped unless meowfficer farming is also enabled.
-        # Under OpsiScheduling the fixed patrol / resume barrier need this rescan
-        # to find missed events, so it must never be skipped there.
-        if self.is_in_task_cl1_leveling and not self.config.is_task_enabled('OpsiMeowfficerFarming'):
-            logger.info('Map rescan skipped: standalone CL1 without meowfficer farming')
+        # Skip only in STANDALONE CL1 (task.command == 'OpsiHazard1Leveling') that also has
+        # meowfficer farming off AND fixed patrol off: standalone CL1 preserves AP, so it
+        # should not detour to exploration events.
+        # With fixed patrol on, this rescan is the cheap first layer of the very same hunt
+        # (one sweep, ~12s on a hazard level 1 map), and skipping it makes
+        # `hazard_leveling` see an empty `_solved_map_event` and fall through to L0/L1 plus
+        # the L2 fleet moving, which costs 50-90s to find what this scan would have found.
+        # Under OpsiScheduling the fixed patrol / resume barrier need this rescan to find
+        # missed events, so it must never be skipped there.
+        if self.is_in_task_cl1_leveling \
+                and not self.config.is_task_enabled('OpsiMeowfficerFarming') \
+                and not self._forced_move_enabled():
+            logger.info('Map rescan skipped: standalone CL1 without meowfficer farming '
+                        'and without fixed patrol')
             return False
 
         last_map_error = None
