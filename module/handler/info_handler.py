@@ -7,7 +7,7 @@ from module.base.utils import *
 from module.exception import GameNotRunningError, GameTooManyClickError
 from module.handler.assets import *
 from module.logger import logger
-from module.os_handler.assets import CLICK_SAFE_AREA as OS_CLICK_SAFE_AREA
+from module.os_handler.assets import CLICK_SAFE_AREA as OS_CLICK_SAFE_AREA, LEAVE_OS_POPUP_CHECK, LEAVE_OS_POPUP_CLOSE
 from module.ui_white.assets import POPUP_CANCEL_WHITE, POPUP_CONFIRM_WHITE, POPUP_SINGLE_WHITE
 
 
@@ -91,6 +91,26 @@ class InfoHandler(ModuleBase):
     """
     _popup_offset = (3, 30)
 
+    def handle_leave_os_popup(self):
+        """
+        Close the OpSi "leave the Operation Siren for now" popup with its own X.
+
+        Clicking too fast around the globe or the port can hit the empty sea outside a
+        zone, and the game asks whether to leave OpSi. Its confirm button sits at the same
+        place as POPUP_CONFIRM, so a generic confirm would quit OpSi outright, while
+        ignoring it stalls until the device stuck detection fires (AzurPilot e71945363,
+        2026-09-28 field log). Only the "暂时离开" caption template distinguishes it, so the
+        check is inert on every other popup and on campaign maps.
+
+        Returns:
+            bool: True while the popup is on screen, whether or not this frame clicked.
+        """
+        if self.appear(LEAVE_OS_POPUP_CHECK, offset=(20, 20)):
+            if self.appear_then_click(LEAVE_OS_POPUP_CLOSE, offset=(20, 20), interval=2):
+                logger.info('Leave-OpSi popup detected, closing it instead of confirming')
+            return True
+        return False
+
     def handle_popup_confirm(self, name='', offset=None, interval=2, threshold=10):
         """点标准「信息」弹窗的确定键。
 
@@ -103,6 +123,9 @@ class InfoHandler(ModuleBase):
         """
         if offset is None:
             offset = self._popup_offset
+        # Ask the leave-OpSi popup first: its confirm button would otherwise match here.
+        if self.handle_leave_os_popup():
+            return True
         if self.appear(POPUP_CANCEL, offset=offset, threshold=threshold) \
                 and self.appear(POPUP_CONFIRM, offset=offset, interval=interval, threshold=threshold):
             POPUP_CONFIRM.name = POPUP_CONFIRM.name + '_' + name

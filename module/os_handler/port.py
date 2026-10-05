@@ -35,8 +35,11 @@ class PortHandler(OSShop):
             out: IN_MAP
         """
         logger.info('Port quit')
+        # Quitting the port clicks the back arrow; a too fast click can land outside the map
+        # and raise the "leave OpSi?" popup, whose confirm would quit OpSi.
         self.ui_back(appear_button=PORT_CHECK, check_button=self.is_in_map,
-                     skip_first_screenshot=skip_first_screenshot)
+                     skip_first_screenshot=skip_first_screenshot,
+                     additional=self.handle_leave_os_popup)
         # Buttons at the bottom has an animation to show
         self.wait_os_map_buttons()
 

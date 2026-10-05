@@ -91,6 +91,8 @@ class PopupStub:
         # 必须两个键都匹配才算数，所以这里按各自需要的容差分别判
         return threshold >= self.needed.get(button.name, 99)
 
+    # 通用确定键现在先问一次「暂时离开大型作战」守卫；这里没那个弹窗，守卫恒为 False
+    handle_leave_os_popup = InfoHandler.handle_leave_os_popup
     handle_popup_confirm = InfoHandler.handle_popup_confirm
 
 

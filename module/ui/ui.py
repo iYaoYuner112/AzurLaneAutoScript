@@ -354,7 +354,8 @@ class UI(InfoHandler):
                     self.device.click(button)
                 retry.reset()
 
-    def ui_back(self, check_button, appear_button=None, offset=(30, 30), retry_wait=10, skip_first_screenshot=False):
+    def ui_back(self, check_button, appear_button=None, offset=(30, 30), retry_wait=10, skip_first_screenshot=False,
+                additional=None):
         return self.ui_click(
             click_button=BACK_ARROW,
             check_button=check_button,
@@ -362,6 +363,7 @@ class UI(InfoHandler):
             offset=offset,
             retry_wait=retry_wait,
             skip_first_screenshot=skip_first_screenshot,
+            additional=additional,
         )
 
     _opsi_reset_fleet_preparation_click = 0
