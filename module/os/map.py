@@ -2255,6 +2255,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         logger.info(f'Map rescan once end, result={result}')
         return result
 
+    # Sweeps allowed per rescan when the map cannot be read. Most such failures mean "this
+    # zone is cleared", which the game never resolves into a readable grid, so a high count
+    # only burns a whole sweep (~12s) per try. Three covers a transient black/loading frame.
+    _RESCAN_TRIALS = 3
+
     def map_rescan(self, rescan_mode='full', drop=None):
         if self.zone.is_port:
             logger.info('Current zone is a port, do not need rescan')
@@ -2276,7 +2281,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             return False
 
         last_map_error = None
-        for _ in range(5):
+        for _ in range(self._RESCAN_TRIALS):
             if not self._solved_fleet_mechanism:
                 self.fleet_set(self.config.OpsiFleet_Fleet)
             else:
@@ -2289,12 +2294,13 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             try:
                 result = self.map_rescan_once(rescan_mode=rescan_mode, drop=drop)
             except MapDetectionError as e:
-                # The game may be on a black/loading screen right after auto search,
-                # so the first map detection can fail with "no free tile". Retry a few
-                # times instead of letting the error kill the whole task.
                 last_map_error = e
-                logger.warning('Map rescan: map detection failed (black screen), retrying')
                 self.device.screenshot()
+                if not self.is_in_map():
+                    # A popup, or another task that took over, covers the map: scanning again
+                    # would click on that screen, so let the caller handle this frame.
+                    raise
+                logger.warning(f'Map rescan: no readable map grid ({e}), retrying')
                 continue
             if not result:
                 logger.attr('Solved_map_event', self._solved_map_event)
@@ -2302,7 +2308,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 return True
 
         if last_map_error is not None:
-            raise last_map_error
+            # A cleared OpSi zone has no free tile for the homography to lock on, and that is
+            # its normal steady state, not something worth killing the task over. AzurPilot
+            # warns and carries on; the old behaviour spent up to 5 whole sweeps (about a
+            # minute) and then raised, so a finished map cost the round *and* a task failure.
+            # Events can be missed here, so the log has to say so.
+            logger.warning(f'Map rescan gave up after {self._RESCAN_TRIALS} unreadable tries: '
+                           f'the map is probably cleared, some events may be missed')
+            self.fleet_set(self.config.OpsiFleet_Fleet)
+            return False
         logger.attr('Solved_map_event', self._solved_map_event)
         logger.warning('Too many trial on map rescan, stop')
         self.fleet_set(self.config.OpsiFleet_Fleet)

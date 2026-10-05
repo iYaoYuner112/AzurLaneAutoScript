@@ -842,6 +842,8 @@ def test_l2_rescan_task_switch_is_not_swallowed():
 class RescanGateStub:
     """只提供 `map_rescan()` 入口判定需要的属性，并记录它到底扫没扫。"""
 
+    _RESCAN_TRIALS = OSMap._RESCAN_TRIALS
+
     def __init__(self, cl1_standalone=True, meowfficer_enabled=False, patrol_enabled=False,
                  is_port=False):
         self.config = SimpleNamespace(
