@@ -28,6 +28,22 @@ class Camera(MapOperation):
     grid_class = Grid
     _prev_view = None
     _prev_swipe = None
+    # Callable installed by the OpSi map rescan (module/os/map.py), so that a camera move
+    # can handle a map event the moment it comes into sight instead of waiting for the
+    # planned camera position. None everywhere else, which leaves campaign maps and every
+    # other caller of ensure_edge_insight() / focus_to() exactly as they were.
+    _swipe_probe = None
+    # A swipe that scrolls the map by less than this fraction of a grid counts as "the game
+    # refused to scroll". SWIPE_STALL_FRAMES consecutive ones are required, because
+    # homo_loca is kept modulo one tile (module/map_detection/homography.py), so a swipe
+    # that happened to land on an exact tile boundary looks the same for a single frame.
+    SWIPE_STALL_RATIO = 0.5
+    SWIPE_STALL_FRAMES = 2
+    # ensure_edge_insight() only stops once the detector reports an edge on each axis, so a
+    # boundary it cannot see (dark tiles, info bar over the bottom edge) would pan forever.
+    # 12 is well above any legitimate pan: the tallest OpSi map is 25 grids and it swipes 5
+    # rows at a time, so even starting from the far corner it needs about 5 swipes.
+    EDGE_INSIGHT_SWIPE_LIMIT = 12
 
     def _map_swipe(self, vector, box=(123, 159, 1175, 628)):
         """
@@ -337,6 +353,72 @@ class Camera(MapOperation):
     def show_camera(self):
         logger.attr_align('Camera', location2node(self.camera))
 
+    def _probe_after_swipe(self):
+        """
+        Ask the optional rescan probe whether it handled something on this frame.
+
+        Returns:
+            bool: True means the caller must stop swiping immediately.
+        """
+        if self._swipe_probe is None:
+            return False
+        return bool(self._swipe_probe())
+
+    def _swipe_moved_grids(self, prev_homo):
+        """
+        How far the detected map actually moved during the last swipe, in grids.
+
+        Args:
+            prev_homo (np.ndarray): `view.backend.homo_loca` copied before the swipe. A copy
+                is needed, because `load()` rewrites that array in place (`%= HOMO_TILE`).
+
+        Returns:
+            tuple | None: (x, y) grids moved, or None when either anchor is unavailable.
+        """
+        cur_homo = self.view.backend.homo_loca
+        if prev_homo is None or cur_homo is None:
+            return None
+        delta = np.subtract(np.array(cur_homo), np.array(prev_homo))
+        return tuple(np.abs(delta) / self.view.swipe_base)
+
+    def _swipe_stall_check(self, moved, index, amount, stall, phantom, swipe_axis):
+        """
+        Track one axis of the corner pan, to notice the game refusing to scroll.
+
+        Without an edge in sight the camera position is pure dead reckoning, so a swipe that
+        did not move the map still pushes the camera along. Left alone it never satisfies the
+        "edge in sight" condition and the pan spins forever.
+
+        Args:
+            moved (tuple | None): grids the map moved during the last swipe.
+            index (int): 0 for the x axis, 1 for the y axis.
+            amount (int): swipe sent on that axis during the last swipe.
+            stall (dict): consecutive non-moving swipes, per axis.
+            phantom (dict): camera grids those swipes added without the map moving.
+            swipe_axis (dict): remaining swipe size per axis, zeroed when the axis is stuck.
+
+        Returns:
+            int: Camera grids to take back, 0 when the axis is still scrolling normally.
+        """
+        key = 'xy'[index]
+        if amount == 0:
+            return 0
+        if moved is None or abs(moved[index]) >= self.SWIPE_STALL_RATIO:
+            stall[key] = 0
+            phantom[key] = 0
+            return 0
+        stall[key] += 1
+        phantom[key] += amount
+        if stall[key] < self.SWIPE_STALL_FRAMES:
+            return 0
+        logger.info(f'Map no longer scrolls on the {"horizontal" if index == 0 else "vertical"} axis, '
+                    f'assume the edge is already in reach')
+        stall[key] = 0
+        swipe_axis[key] = 0
+        back = phantom[key]
+        phantom[key] = 0
+        return back
+
     def ensure_edge_insight(self, reverse=False, preset=None, swipe_limit=(3, 2), skip_first_update=True):
         """
         Swipe to bottom left until two edges insight.
@@ -353,7 +435,10 @@ class Camera(MapOperation):
         """
         logger.info(f'Ensure edge in sight.')
         record = []
-        x_swipe, y_swipe = np.multiply(swipe_limit, random_direction(self.config.MAP_ENSURE_EDGE_INSIGHT_CORNER))
+        corner = random_direction(self.config.MAP_ENSURE_EDGE_INSIGHT_CORNER)
+        swipe_axis = dict(zip('xy', np.multiply(swipe_limit, corner)))
+        stall = dict.fromkeys('xy', 0)
+        phantom = dict.fromkeys('xy', 0)
 
         while 1:
             if len(record) == 0:
@@ -363,16 +448,34 @@ class Camera(MapOperation):
                     self.map_swipe(preset)
                     record.append(preset)
 
-            x = 0 if self.view.left_edge or self.view.right_edge else x_swipe
-            y = 0 if self.view.lower_edge or self.view.upper_edge else y_swipe
+            x = 0 if self.view.left_edge or self.view.right_edge else swipe_axis['x']
+            y = 0 if self.view.lower_edge or self.view.upper_edge else swipe_axis['y']
 
             if len(record) > 0:
                 # Swipe even if two edges insight, this will avoid some embarrassing camera position.
+                prev_homo = self.view.backend.homo_loca
+                prev_homo = None if prev_homo is None else np.array(prev_homo)
                 self.map_swipe((x, y))
+                moved = self._swipe_moved_grids(prev_homo)
+
+                back = self._swipe_stall_check(moved, 0, x, stall, phantom, swipe_axis)
+                if back and not (self.view.left_edge or self.view.right_edge):
+                    self.camera = (self.camera[0] - back, self.camera[1])
+                back = self._swipe_stall_check(moved, 1, y, stall, phantom, swipe_axis)
+                if back and not (self.view.upper_edge or self.view.lower_edge):
+                    self.camera = (self.camera[0], self.camera[1] - back)
+
+                if self._probe_after_swipe():
+                    record.append((x, y))
+                    break
 
             record.append((x, y))
 
             if x == 0 and y == 0:
+                break
+
+            if len(record) > self.EDGE_INSIGHT_SWIPE_LIMIT:
+                logger.warning(f'Edge insight swiped {len(record)} times without seeing both edges, stop here')
                 break
 
         if reverse:
@@ -400,6 +503,11 @@ class Camera(MapOperation):
             has_swiped = self.map_swipe(swipe)
 
             if not has_swiped:
+                break
+
+            # The grid worth clicking is often on screen one swipe before the camera
+            # reaches its planned position; the rescan probe ends the approach early then.
+            if self._probe_after_swipe():
                 break
 
     def full_scan(self, queue=None, must_scan=None, battle_count=0, mystery_count=0, siren_count=0, carrier_count=0,
