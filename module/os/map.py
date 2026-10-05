@@ -21,7 +21,6 @@ from module.os.fixed_patrol import (
     DEVICE_INTERRUPTIBLE_STATES,
     DEVICE_NONE,
     DEVICE_TARGETED,
-    AntiLoopGuard,
 )
 from module.os.fleet import OSFleet
 from module.os.globe_camera import GlobeCamera
@@ -1168,6 +1167,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.map_init(map_=None)
             self.update()
             return True
+        except UNSWALLOWABLE_ERRORS:
+            # `ui_ensure()` raises GamePageUnknownError/GameNotRunningError and the task layer
+            # raises TaskEnd. Swallowing them here means "recovery failed but the screen is
+            # fine", so the caller keeps clicking candidate grids on a screen that is not the
+            # map -- the failure that ended a 2026-10-04 run.
+            raise
         except Exception:
             logger.debug('Fixed patrol: soft recover failed', exc_info=True)
             return False
@@ -1190,6 +1195,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.map_init(map_=None)
             self.update()
             return True
+        except UNSWALLOWABLE_ERRORS:
+            # `handle_app_login()` raises RequestHumanTakeover when the game will not come up
+            # (maintenance, login timeout, a popup it cannot clear). Those need the task
+            # layer's handling -- error log, push, controlled stop -- not a local
+            # "recovery failed, carry on clicking" return.
+            raise
         except Exception:
             logger.error('Fixed patrol: restarting game failed', exc_info=True)
             return False
@@ -1397,8 +1408,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         Each fleet is moved to its landing column (1 -> C1, 2 -> D1, 3 -> E1,
         4 -> F1) to get a blocking fleet out of the way, then the whole map is
         rescanned. A radar pre-check runs before each move; the move stops as soon
-        as an event is solved, so it never blindly cycles all four fleets. The
-        AntiLoopGuard is only a safety net, not a controller.
+        as an event is solved, so it never blindly cycles all four fleets.
 
         Returns:
             bool: True if an event was found and solved, False otherwise.
@@ -1422,13 +1432,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     logger.info('[FIXED PATROL][L2] Event solved during radar pre-check, stop')
                     return True
                 logger.info('[FIXED PATROL][L2] Radar pre-check: no actionable event')
-
-                if self._fixed_patrol_loop_guard.check(None, None, fleet, 'move'):
-                    logger.error(
-                        f'[OS] Stuck while moving fleets: no progress for '
-                        f'{self._fixed_patrol_loop_guard.repeat_count} iterations, stop'
-                    )
-                    return False
 
                 if not self._move_fleet_to_patrol(fleet, columns[fleet]):
                     continue
@@ -1733,7 +1736,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             return self._meowfficer_patrol_enabled()
         return self._forced_move_enabled()
 
-    _fixed_patrol_loop_guard = AntiLoopGuard(max_repeats=3)
     _in_forced_recovery = False
 
     def execute_fixed_patrol_scan(self):
@@ -1782,7 +1784,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             logger.warning('Fixed patrol: no map grids detected, skipped')
             return False
 
-        self._fixed_patrol_loop_guard.reset()
         self._in_forced_recovery = True
         try:
             # ---- L0/L1: switch fleets to read the radar, move nothing ----
@@ -2251,7 +2252,13 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             logger.hr('Map rescan full', level=2)
             # Let every frame the camera produces count as a look for events, not only the
             # planned camera positions. See _probe_events_after_swipe().
-            prev_probe = self._swipe_probe
+            # Save the whole probe state, not just the hook: handling an event found this way
+            # can nest a complete rescan (an unreachable Akashi or device runs the fixed
+            # patrol, which rescans), and that inner round has to hand the outer one back
+            # exactly what it had, instead of switching the probe off for its remaining
+            # camera positions and dropping its drop record.
+            outer = (self._swipe_probe, self._rescan_probe_on,
+                     self._rescan_probe_drop, self._rescan_probe_solved)
             self._rescan_probe_drop = drop
             self._rescan_probe_solved = False
             self._rescan_probe_on = True
@@ -2280,9 +2287,8 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                         break
                     queue = queue[1:]
             finally:
-                self._swipe_probe = prev_probe
-                self._rescan_probe_on = False
-                self._rescan_probe_drop = None
+                (self._swipe_probe, self._rescan_probe_on,
+                 self._rescan_probe_drop, self._rescan_probe_solved) = outer
 
         logger.info(f'Map rescan once end, result={result}')
         return result

@@ -472,3 +472,22 @@ def test_probe_is_removed_when_the_rescan_raises():
     assert raised
     assert stub._swipe_probe is None
     assert stub._rescan_probe_on is False
+
+
+def test_nested_rescan_hands_the_probe_state_back_to_the_outer_one():
+    """探测处理事件时会嵌套一次整图重扫（明石/装置够不着走强制移动）。
+
+    内层收尾必须把外层的钩子、开关、掉落记录、已处理标记原样交还，否则外层剩下的
+    镜头位置静默失去探测，掉落记录也少一帧。
+    """
+    stub = RescanStub()
+    sentinel = lambda: False
+    stub._swipe_probe = sentinel
+    stub._rescan_probe_on = True
+    stub._rescan_probe_drop = 'outer_drop'
+    stub._rescan_probe_solved = True
+    assert run_rescan(stub) is False
+    assert stub._swipe_probe is sentinel
+    assert stub._rescan_probe_on is True
+    assert stub._rescan_probe_drop == 'outer_drop'
+    assert stub._rescan_probe_solved is True

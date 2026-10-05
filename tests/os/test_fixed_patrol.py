@@ -10,7 +10,6 @@
 from types import SimpleNamespace
 
 from module.exception import GameStuckError, GameTooManyClickError, MapWalkError, RequestHumanTakeover
-from module.os.fixed_patrol import AntiLoopGuard
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 
 
@@ -63,7 +62,6 @@ class ScanStub:
         )
         self.zone = SimpleNamespace(is_port=is_port, hazard_level=hazard_level)
         self.map = SimpleNamespace(grids=[object()] if has_grids else [])
-        self._fixed_patrol_loop_guard = AntiLoopGuard(max_repeats=3)
         self._in_forced_recovery = False
         self.enabled = enabled
         self.radar_solved = radar_solved
@@ -812,7 +810,6 @@ class L2RescanStub:
             temporary=lambda **kwargs: SimpleNamespace(recover=lambda: None))
         self._solved_map_event = set()
         self._solved_fleet_mechanism = False
-        self._fixed_patrol_loop_guard = AntiLoopGuard(max_repeats=3)
         self.moves = []
 
     def _set_fixed_patrol_fleet(self, fleet):
@@ -898,3 +895,52 @@ def test_rescan_skipped_in_port():
     stub = RescanGateStub(patrol_enabled=True, is_port=True)
     assert OSMap.map_rescan(stub) is False
     assert stub.rescans == 0
+
+
+class RecoverStub:
+    """固定移动的两处恢复逻辑（软恢复 / 重启游戏）需要的最小对象。"""
+
+    def __init__(self, error):
+        self.error = error
+        self.config = SimpleNamespace()
+        self.device = SimpleNamespace(
+            screenshot=lambda: None, app_stop=self._boom, app_start=lambda: None)
+
+    def _boom(self):
+        raise self.error
+
+    def ui_ensure(self, page):
+        raise self.error
+
+    def map_init(self, map_=None):
+        pass
+
+    def update(self, *args, **kwargs):
+        pass
+
+
+def test_soft_recover_passes_control_flow_errors_up():
+    """恢复失败如果是切任务/游戏没了/页面未知，必须上抛，不能回 False 继续点。"""
+    from module.config.config import TaskEnd
+    raised = False
+    try:
+        OSMap._fixed_patrol_soft_recover(RecoverStub(TaskEnd('switch')))
+    except TaskEnd:
+        raised = True
+    assert raised
+
+
+def test_soft_recover_still_swallows_a_bad_frame():
+    """普通识别失败照旧本地兜住，别把一次黑帧升级成任务失败。"""
+    assert OSMap._fixed_patrol_soft_recover(RecoverStub(RuntimeError('black frame'))) is False
+
+
+def test_app_restart_passes_request_human_takeover_up():
+    """重启游戏时登录不了（维护/弹窗）→ 交回框架做日志+推送+停机，不本地重试。"""
+    from module.exception import RequestHumanTakeover
+    raised = False
+    try:
+        OSMap._fixed_patrol_app_restart(RecoverStub(RequestHumanTakeover('maintenance')))
+    except RequestHumanTakeover:
+        raised = True
+    assert raised

@@ -1,9 +1,8 @@
-"""本轮可靠性增强的纯逻辑单测：stale 接口、塞壬装置状态机、防死循环守卫。
+"""本轮可靠性增强的纯逻辑单测：stale 接口、塞壬装置状态机。
 
 覆盖：
 - invalidate_map_state -> ensure_map_state_current 做 FULL RESCAN 并清 stale；
 - 装置子状态 + 中断恢复时重新观察 UI（不 replay stale click）；
-- AntiLoopGuard 防死循环保险丝。
 """
 
 from types import SimpleNamespace
@@ -15,7 +14,6 @@ from module.os.fixed_patrol import (
     DEVICE_INTERRUPTIBLE_STATES,
     DEVICE_NONE,
     DEVICE_TARGETED,
-    AntiLoopGuard,
 )
 from module.os.map import DEVICE_STATE_KEY, OSMap
 
@@ -96,29 +94,3 @@ def test_ensure_map_state_current_reexamines_interrupted_device():
     OSMap.ensure_map_state_current(stub)
     assert stub.rescan_calls == [{'rescan_mode': 'full'}]
     assert stub.config.values[OS_MAP_STALE_KEY] is False
-
-
-# ---- 防死循环守卫 ----
-
-def test_anti_loop_guards_no_progress():
-    guard = AntiLoopGuard(max_repeats=3)
-    assert not guard.check(None, None, 1, 'move')
-    assert not guard.check(None, None, 1, 'move')
-    assert not guard.check(None, None, 1, 'move')
-    assert guard.check(None, None, 1, 'move')
-
-
-def test_anti_loop_resets_on_state_change():
-    guard = AntiLoopGuard(max_repeats=3)
-    for _ in range(3):
-        assert not guard.check(None, None, 1, 'move')
-    assert not guard.check(None, None, 2, 'move')
-
-
-def test_anti_loop_reset_method_clears_state():
-    guard = AntiLoopGuard(max_repeats=3)
-    for _ in range(4):
-        guard.check(None, None, 1, 'move')
-    guard.reset()
-    assert guard.repeat_count == 0
-    assert not guard.check(None, None, 1, 'move')
