@@ -91,16 +91,25 @@ class InfoHandler(ModuleBase):
     """
     _popup_offset = (3, 30)
 
-    def handle_popup_confirm(self, name='', offset=None, interval=2):
+    def handle_popup_confirm(self, name='', offset=None, interval=2, threshold=10):
+        """点标准「信息」弹窗的确定键。
+
+        Args:
+            name (str): 记日志用的调用点标记。
+            offset: 位置容差。
+            interval (int): 点击间隔保护。
+            threshold (int): 颜色容差，默认沿用 10。某些弹窗压在别的弹窗之上时整体会偏暗，
+                调用点可以放宽，但仍要求「取消」和「确定」两个键同时匹配，不会退化成盲点。
+        """
         if offset is None:
             offset = self._popup_offset
-        if self.appear(POPUP_CANCEL, offset=offset) \
-                and self.appear(POPUP_CONFIRM, offset=offset, interval=interval):
+        if self.appear(POPUP_CANCEL, offset=offset, threshold=threshold) \
+                and self.appear(POPUP_CONFIRM, offset=offset, interval=interval, threshold=threshold):
             POPUP_CONFIRM.name = POPUP_CONFIRM.name + '_' + name
             self.device.click(POPUP_CONFIRM)
             POPUP_CONFIRM.name = POPUP_CONFIRM.name[:-len(name) - 1]
             return True
-        if self.appear(POPUP_CONFIRM_WHITE, offset=offset, interval=interval):
+        if self.appear(POPUP_CONFIRM_WHITE, offset=offset, interval=interval, threshold=threshold):
             POPUP_CONFIRM_WHITE.name = POPUP_CONFIRM_WHITE.name + '_' + name
             self.device.click(POPUP_CONFIRM_WHITE)
             POPUP_CONFIRM_WHITE.name = POPUP_CONFIRM_WHITE.name[:-len(name) - 1]

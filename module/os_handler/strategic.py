@@ -115,12 +115,25 @@ class StrategicSearchHandler(MapEventHandler):
 
     def strategic_search_confirm(self):
         logger.info('Strategic search confirm')
+        # 第一段（前 3 帧，约 1 秒）：只认计划作战确认自己的标题条，行为与原来完全一致。
+        # 第二段：标题条一直认不出来，说明卡在了另一层弹窗上 —— 海域里有指挥喵在搜寻时，
+        # 游戏会在确认之后追加一层「是否强制召回」的标准弹窗。它压在确认弹窗之上、整体偏暗，
+        # 实测标题条均色 (97,135,179) vs 定义 (150,170,209)，容差 53 远超阈值 10，所以旧逻辑
+        # 会一路空等到 60 秒被判卡死 -> 重启 -> 猫还在 -> 再撞，三次后停机等人工。
+        # 这时退一步，按「取消 + 确定」两个标准按钮同时匹配来点掉它（不是按坐标盲点）。
+        # 兜底只可能在前 3 帧严格判定失败之后生效，正常流程一步都不会多走。
+        frames = 0
         for _ in self.loop():
+            frames += 1
             if self.appear(STRATEGIC_SEARCH_POPUP_CHECK, offset=(20, 20)) \
                     and self.handle_popup_confirm(offset=(30, 30), name='STRATEGIC_SEARCH'):
                 continue
             if self.is_in_map():
                 return True
+            if frames > 3 and self.handle_popup_confirm(
+                    offset=(30, 30), name='STRATEGIC_SEARCH', threshold=20):
+                logger.warning('Strategic search: an extra confirm popup covered the map, confirmed it')
+                continue
 
     def strategic_search_start(self):
         """

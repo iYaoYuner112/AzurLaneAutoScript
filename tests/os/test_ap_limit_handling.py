@@ -7,7 +7,7 @@
 """
 
 from types import SimpleNamespace
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta
 from contextlib import contextmanager
 
 import module.os.tasks.scheduling as sched_mod
@@ -234,8 +234,11 @@ def _make_stronghold_stub(weekly, monthly):
 def test_stronghold_postpone_until_next_refresh():
     import module.os.tasks.scheduling as sched_mod
 
-    weekly = dt(2026, 10, 5, 0, 0, 0)       # 下个周一
-    monthly = dt(2026, 11, 1, 0, 0, 0)      # 下次月度重置（更晚）
+    # 日期必须相对"现在"取：推迟标记一旦过期就会被读的时候丢掉，
+    # 写死日期会让这个用例只在写它的那天成立。
+    now = dt.now()
+    weekly = dt(now.year, now.month, now.day) + timedelta(days=3)   # 下个要塞刷新点
+    monthly = dt(now.year, now.month, now.day) + timedelta(days=26)  # 下次月度重置（更晚）
     stub, state, patches = _make_stronghold_stub(weekly, monthly)
     p_w, p_m, p_r = patches
     saved = (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
@@ -248,8 +251,7 @@ def test_stronghold_postpone_until_next_refresh():
         stored = stub._get_coin_task_postpone('OpsiStronghold')
         grace = OpsiScheduling.RESET_CHECK_GRACE
         assert stored == weekly + grace          # 周一早于月度重置 → 取周一
-        assert stored != get_server_next_update('00:00') or weekly.day == \
-            get_server_next_update('00:00').day
+        assert stored != get_server_next_update('00:00')   # 不是「延到下次刷新」那条路
     finally:
         (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
          sched_mod.get_os_reset_remain) = saved
@@ -258,8 +260,9 @@ def test_stronghold_postpone_until_next_refresh():
 def test_stronghold_postpone_takes_earlier_of_weekly_and_monthly():
     import module.os.tasks.scheduling as sched_mod
 
-    weekly = dt(2026, 10, 12, 0, 0, 0)      # 下个周一（更晚）
-    monthly = dt(2026, 10, 5, 0, 0, 0)      # 月度重置（更早）
+    now = dt.now()
+    weekly = dt(now.year, now.month, now.day) + timedelta(days=10)  # 下个要塞刷新点（更晚）
+    monthly = dt(now.year, now.month, now.day) + timedelta(days=2)   # 月度重置（更早）
     stub, state, patches = _make_stronghold_stub(weekly, monthly)
     p_w, p_m, p_r = patches
     saved = (sched_mod.get_nearest_weekday_date, sched_mod.get_os_next_reset,
