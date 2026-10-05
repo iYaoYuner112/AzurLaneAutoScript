@@ -9,13 +9,18 @@
 3. `OpsiDaily`：进不去的委托海域跳过并继续别的（AP 5979fc1cb）。旧写法只兜 `ActionPointLimit`，
    一个被锁住的海域能把整个每日任务打死；现在加了连续上限，避免同一格被无限重挑。
 4. 短猫随机海域：没有可用海域时优雅收工（AP 30b5a2b7d），不再 `zones[0]` 报 IndexError。
+5. 重扫点明石：`wait_until_walk_stable` 的稳定窗口按路程算（AP `1.5 + 0.6 * distance`，
+   `count=4`）。固定 0.8 秒在远处的明石上会在舰队还在走的时候就说"没到"，接着白换一队
+   再点、再换回来。
 """
 
 from datetime import datetime, timedelta
 from time import sleep
 from types import SimpleNamespace
 
+from module.map.map_base import location2node
 from module.os.globe_operation import GlobeOperation, OSExploreError
+from module.os.map import OSMap
 from module.os.tasks.daily import OpsiDaily
 from module.os.tasks.meowfficer_farming import OpsiMeowfficerFarming
 from module.os_handler.mission import MissionHandler
@@ -295,3 +300,129 @@ def test_normal_search_still_runs_with_zones_left():
     assert stub.entered is not None
     assert stub.searched == 1
     assert stub.delay == []
+
+
+# ---- 5. 重扫点明石：稳定窗口按路程算 ----
+
+class TempContext:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class Point:
+    """格子替代品：只需要 location 和格子距离（跟 GridInfo.distance_to 一样是曼哈顿距离）。"""
+
+    def __init__(self, location):
+        self.location = location
+
+    def distance_to(self, other):
+        a, b = self.location, other.location
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+    def __str__(self):
+        return str(self.location)
+
+
+class AkashiGrid(Point):
+    is_akashi = True
+
+
+class PointList(list):
+    @property
+    def count(self):
+        return len(self)
+
+
+class AkashiView:
+    def __init__(self, fleet=None, akashi=None):
+        self.fleet = fleet
+        self.akashi = akashi
+
+    def select(self, **kwargs):
+        if kwargs.get('is_current_fleet'):
+            return PointList([] if self.fleet is None else [self.fleet])
+        if kwargs.get('is_akashi'):
+            return PointList([] if self.akashi is None else [self.akashi])
+        return PointList([])
+
+
+class AkashiStub:
+    """跑真实的 `map_rescan_current` 明石分支，把 confirm_timer 收下来看给它多长窗口。"""
+
+    map_rescan_current = OSMap.map_rescan_current
+
+    def __init__(self, view, radar_fleet=(5, 5)):
+        self.view = view
+        self._radar_fleet = Point(radar_fleet)
+        self._solved_map_event = set()
+        self._unreachable_event_nodes = set()
+        self.config = SimpleNamespace(temporary=lambda **kwargs: TempContext())
+        self.device = SimpleNamespace(click=lambda grid: None, screenshot=lambda: None)
+        self.confirms = []
+        self.buys = 0
+        self.recovered = []
+
+    def convert_radar_to_local(self, location):
+        return self._radar_fleet
+
+    def wait_until_walk_stable(self, confirm_timer=None, **kwargs):
+        self.confirms.append(confirm_timer)
+        return 'timeout'
+
+    def handle_akashi_supply_buy(self, grid):
+        self.buys += 1
+
+    def _recover_unreachable_akashi(self, drop, node):
+        self.recovered.append(node)
+        return False
+
+
+def akashi_stub(akashi_loc, fleet_loc=(5, 5), radar_fleet=None):
+    """fleet_loc=None 表示当前视野里看不到自己的舰队（整图重扫时镜头被滑走了）。"""
+    view = AkashiView(
+        fleet=None if fleet_loc is None else Point(fleet_loc),
+        akashi=AkashiGrid(akashi_loc))
+    return AkashiStub(view, radar_fleet=radar_fleet if radar_fleet is not None else (5, 5))
+
+
+def test_distant_akashi_gets_a_walk_scaled_window():
+    stub = akashi_stub((9, 6))
+    assert stub.map_rescan_current() is False
+    assert len(stub.confirms) == 1
+    timer = stub.confirms[0]
+    # 5 格路 -> 1.5 + 0.6 * 5 = 4.5 秒，而不是原先固定的 0.8 秒
+    assert abs(timer.limit - 4.5) < 1e-6, timer.limit
+    assert timer.count == 4
+    # 走到没点开商店：按 AP 的梯子去换队，而不是当场判没事
+    assert stub.recovered == [location2node((9, 6))]
+
+
+def test_window_shrinks_with_the_distance():
+    far = akashi_stub((9, 6))
+    near = akashi_stub((7, 6))
+    assert far.map_rescan_current() is False
+    assert near.map_rescan_current() is False
+    assert abs(far.confirms[0].limit - 4.5) < 1e-6, far.confirms[0].limit
+    assert abs(near.confirms[0].limit - 3.3) < 1e-6, near.confirms[0].limit
+
+
+def test_adjacent_akashi_is_bought_without_walking():
+    """舰队就在明石旁边：直接开商店，一点也不要等。"""
+    stub = akashi_stub((6, 5))
+    assert stub.map_rescan_current() is True
+    assert stub.buys == 1
+    assert stub.confirms == []
+    assert stub._solved_map_event == {'is_akashi'}
+
+
+def test_invisible_fleet_does_not_take_the_adjacent_shortcut():
+    """看不到自己的舰队时不能按"紧贴"短路，只能用雷达换算的位置估路程。"""
+    stub = akashi_stub((6, 5), fleet_loc=None, radar_fleet=(6, 5))
+    assert stub.map_rescan_current() is False
+    assert stub.buys == 0
+    assert len(stub.confirms) == 1
+    # 雷达换算说就在旁边 -> 1.5 秒起步，仍然比原来的 0.8 秒稳
+    assert abs(stub.confirms[0].limit - 1.5) < 1e-6, stub.confirms[0].limit

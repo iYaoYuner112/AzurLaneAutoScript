@@ -52,7 +52,7 @@ class DeviceStub:
     is_in_task_explore = False
 
     def __init__(self, walk_result='event', mode='resource', siren_fleet=0,
-                 task='OpsiHazard1Leveling', update_fails=False):
+                 task='OpsiHazard1Leveling', update_fails=False, dialog=True):
         self.view = DeviceView()
         self._solved_map_event = set()
         self._unreachable_event_nodes = set()
@@ -61,7 +61,9 @@ class DeviceStub:
         self.fleets_set = []
         self.patrol_calls = 0
         self.siren_device_mode = mode
+        self.is_siren_device_confirmed = False
         self._walk_result = walk_result
+        self._dialog = dialog
         self._update_fails = update_fails
         self.current = 1
         self.config = SimpleNamespace(
@@ -74,6 +76,9 @@ class DeviceStub:
         self.fleet_selector = SimpleNamespace(get=lambda: self.current)
 
     def wait_until_walk_stable(self, **kwargs):
+        # 真实现里剧情选项被认成装置剧情才置位（story_skip -> _identify_siren_device_option）
+        if self._dialog and 'event' in self._walk_result:
+            self.is_siren_device_confirmed = True
         return self._walk_result
 
     def _goto_scanning_device_with_other_fleets(self, drop=None):
@@ -153,6 +158,28 @@ def test_unreachable_device_runs_no_auto_search_and_no_rescan():
     assert stub.patrol_calls == 1
     assert location2node(DeviceGrid.location) in stub._unreachable_event_nodes
     assert stub.states[-1] == DEVICE_NONE
+
+
+def test_event_on_the_way_is_not_arrival_at_the_device():
+    """路上撞见的是敌人/箱子（walk 也回 'event'）但装置对话没开：不算到达。
+
+    旧判据 `'event' in result` 会在这里当成到位，白跑一轮自律还标成已解决。
+    """
+    stub = DeviceStub(walk_result='event_combat', dialog=False)
+    assert stub.map_rescan_current() is False
+    assert stub.auto_searches == 0
+    assert stub._solved_map_event == set()
+    assert stub.patrol_calls == 1
+    assert location2node(DeviceGrid.location) in stub._unreachable_event_nodes
+
+
+def test_stale_confirmation_does_not_count_as_arrival():
+    """上一个装置留下的确认位必须先清掉，否则这一队一点就"到位"。"""
+    stub = DeviceStub(walk_result='timeout', dialog=False)
+    stub.is_siren_device_confirmed = True
+    assert stub.map_rescan_current() is False
+    assert stub.auto_searches == 0
+    assert stub.patrol_calls == 1
 
 
 def test_extra_rescan_failure_does_not_break_the_round():

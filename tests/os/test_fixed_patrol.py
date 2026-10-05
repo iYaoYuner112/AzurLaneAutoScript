@@ -468,9 +468,10 @@ class _TempContext:
 
 
 class DeviceRotationStub:
-    def __init__(self, reachable_fleet=None):
+    def __init__(self, reachable_fleet=None, event_fleets=()):
         self.config = SimpleNamespace(temporary=lambda **kwargs: _TempContext())
         self._reachable = reachable_fleet
+        self._events = set(event_fleets)
         self._current = 1
         self.fleet_events = []
         self.device_states = []
@@ -496,7 +497,10 @@ class DeviceRotationStub:
 
     def wait_until_walk_stable(self, **kwargs):
         self.walk_calls += 1
-        return 'event' if self._current == self._reachable else 'timeout'
+        reached = self._current == self._reachable
+        # 真实现：只有装置剧情被认出来才置位，'event' 本身不算到达
+        self.is_siren_device_confirmed = reached
+        return 'event' if (reached or self._current in self._events) else 'timeout'
 
     def _set_device_state(self, state):
         self.device_states.append(state)
@@ -517,6 +521,17 @@ def test_device_rotation_fails_and_restores_original_fleet():
     assert OSMap._goto_scanning_device_with_other_fleets(stub, None) is False
     assert stub.fleet_events[-1] == 1
     assert stub.walk_calls == 3      # 除了原舰队，另外三队都试过
+
+
+def test_device_rotation_needs_the_dialog_not_an_event():
+    """每队路上都开了场战斗（walk 回 'event'）但装置对话没弹出：四队都得试完。
+
+    旧判据 `'event' in result` 会在第二队就收队回去跑自律，装置其实一次没被用掉。
+    """
+    stub = DeviceRotationStub(reachable_fleet=None, event_fleets=(2, 3, 4))
+    assert OSMap._goto_scanning_device_with_other_fleets(stub, None) is False
+    assert stub.walk_calls == 3
+    assert stub.device_states == []   # 一次也没进"对话已开"状态
 
 
 # ---- clear_question 的 _question_unreachable 语义（对齐 AP master）----

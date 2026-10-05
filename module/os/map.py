@@ -2,6 +2,7 @@ import time
 from contextlib import suppress
 
 import inflection
+import numpy as np
 
 from module.base.timer import Timer
 from module.config.config import OS_MAP_STALE_KEY, OS_RESUME_RECOVERY_KEY, TaskEnd
@@ -1632,11 +1633,14 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                         continue
                     logger.info(f'Fleet {fleet} did not identify the device, fallback to the radar question')
                 logger.info(f'Fleet {fleet} clicks the device ({grid}) and tries to walk there')
+                self.is_siren_device_confirmed = False
                 self.device.click(grid)
                 with self.config.temporary(STORY_ALLOW_SKIP=False):
-                    result = self.wait_until_walk_stable(
+                    self.wait_until_walk_stable(
                         drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
-                if 'event' in result:
+                # Same criterion as the first attempt: only the device dialog counts, so an
+                # unrelated event met on the way does not end the rotation early.
+                if self.is_siren_device_confirmed:
                     logger.info(f'Fleet {fleet} reached the siren device')
                     self._set_device_state(DEVICE_DIALOG_OPEN)
                     return True
@@ -1904,6 +1908,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     # second fleet, which is set up by map_rescan() before it calls the walk.
     PROBE_EVENT_FLAGS = ('is_exploration_container', 'is_exploration_reward', 'is_akashi',
                          'is_scanning_device', 'is_logging_tower')
+    # The frame that brings an event into sight is often still sliding: `Camera._map_swipe()`
+    # only waits 0.35s for the map to reach a grid center, while a 5-row pan kept easing for
+    # 2.3s in the 2026-10-05 21:00 run. A tap sent then is swallowed by the game, and the
+    # recovery (switch fleet, click again, switch back) cost 17s there. So the probe reads the
+    # view until two consecutive reads agree within this many pixels -- the same tolerance
+    # `wait_until_camera_stable()` uses -- and gives up after that many reads, leaving the
+    # event to the planned camera position.
+    PROBE_STABLE_PX = 3
+    PROBE_SETTLE_ROUNDS = 3
 
     def run_strategic_search(self):
         """Run strategic search, then scan the map for events.
@@ -1991,6 +2004,31 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return (x1 >= left and y1 >= top
                 and x2 <= width - right and y2 <= height - bottom)
 
+    def _probe_settle_view(self):
+        """
+        Let the map stop easing, and end up with a view read from a still frame.
+
+        `Camera._map_swipe()` waits only 0.35s for the map to reach a grid center, so the
+        frame that brings an event into sight is usually still sliding. Clicking from it is
+        what the probe must not do. `self.update()` re-reads the whole view, so the grid keeps
+        both a correct name and a correct click area.
+
+        Returns:
+            bool: False when the map was still moving after PROBE_SETTLE_ROUNDS reads, in
+                which case the event is left to the planned camera position.
+        """
+        prev = None
+        for _ in range(self.PROBE_SETTLE_ROUNDS):
+            self.update()
+            current = self.view.backend.homo_loca
+            if current is None:
+                return False
+            if prev is not None \
+                    and np.linalg.norm(np.subtract(current, prev)) < self.PROBE_STABLE_PX:
+                return True
+            prev = current
+        return False
+
     def _probe_events_after_swipe(self):
         """
         Handle a map event the moment a camera move brings it into sight.
@@ -2031,6 +2069,18 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             # re-enter this probe), and the rescan is not allowed to nest.
             self._rescan_probe_busy = True
             try:
+                if not self._probe_settle_view():
+                    logger.info('Rescan probe: the map has not stopped easing, '
+                                'leave this event to the camera walk')
+                    return False
+                grids = self.view.select(**{flag: True})
+                if not grids or not getattr(grids[0], flag, False) \
+                        or not self._probe_grid_clickable(grids[0]):
+                    # The settled view is shifted by the fraction of a grid the map eased
+                    # through, so the grid can be gone or have moved under the fixed UI.
+                    logger.info('Rescan probe: not clickable in the settled view, '
+                                'leave this event to the camera walk')
+                    return False
                 if self.map_rescan_current(drop=self._rescan_probe_drop):
                     self._rescan_probe_solved = True
                     return True
@@ -2099,7 +2149,16 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             # wait_until_walk_stable opens the shop once the fleet arrives.
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
-                result = self.wait_until_walk_stable(drop=drop, walk_out_of_step=False)
+                # Akashi has to be *seen* in the shop to count as reached, so the window that
+                # decides "nothing happened" is scaled with how far the fleet still has to
+                # walk (AzurPilot's formula): a fixed short one returns "cannot reach" while a
+                # distant Akashi is being walked to, and the recovery costs a fleet switch
+                # plus the fixed patrol. `convert_radar_to_local()` gives the fleet's grid when
+                # it is in sight, otherwise the camera center.
+                fleet = self.convert_radar_to_local((0, 0))
+                walk_time = 1.5 + 0.6 * grid.distance_to(fleet)
+                result = self.wait_until_walk_stable(
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(walk_time, count=4))
             if 'akashi' in result:
                 self._solved_map_event.add('is_akashi')
                 return True
@@ -2128,12 +2187,19 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             # wait for the operation popup, confirm it, then rescan. Never skip it to
             # continue the battle plan, otherwise its hidden events are missed.
             self._set_device_state(DEVICE_TARGETED)
+            # Cleared before the click: the story option handler raises it when a device
+            # dialog really was opened, which is what "reached" means below.
+            self.is_siren_device_confirmed = False
             self.device.click(grid)
             self._set_device_state(DEVICE_DIALOG_OPEN)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
-                result = self.wait_until_walk_stable(
+                self.wait_until_walk_stable(
                     drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
-            reached = 'event' in result
+            # Not `'event' in result`: an enemy, a container or a pillar met on the way also
+            # answers 'event', and then the search rounds below would run on a device that was
+            # never used. AzurPilot judges by the same flag (map_rescan_current / its
+            # `_goto_scanning_device_with_other_fleets`).
+            reached = bool(self.is_siren_device_confirmed)
             if not reached:
                 # The walk can be blocked by an idle fleet, in which case the device
                 # dialog never opens: try the other fleets before giving up.

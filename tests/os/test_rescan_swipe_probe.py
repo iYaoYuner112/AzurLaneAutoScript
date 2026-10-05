@@ -11,6 +11,9 @@
 2. 滑动过程看见了事件也不理，要等镜头走到规划好的格子才点（2026-10-05 的日志里塞壬信息塔
    第一次滑动就进画面，4.2 秒后才点上）。现在每次滑动后顺手看一眼，看见就立刻处理并结束
    重扫；贴屏幕边的格子交给原来的站定流程，免得点到底部按钮排。
+   但"立刻"不能是"那一帧就点"：`_map_swipe()` 只等 0.35 秒就让画面去站定，地图其实还在缓动，
+   拿滑行中的画面点击会被游戏整点吃掉（同一份日志 21:00 那次：点了装置、舰队一格没动、换队
+   重点再换回来烧掉 17 秒）。所以现在读到两次一致才动手，读不稳就干脆不点、留给站定那一趟。
 """
 
 import numpy as np
@@ -218,6 +221,7 @@ class ViewStub:
     def __init__(self, hits=None):
         self.hits = hits or {}
         self.select_calls = []
+        self.backend = SimpleNamespace(homo_loca=np.array([50.0, 50.0]))
 
     def select(self, **kwargs):
         self.select_calls.append(tuple(kwargs))
@@ -225,14 +229,21 @@ class ViewStub:
 
 
 class ProbeStub:
-    """只提供 `_probe_events_after_swipe()` / `_probe_grid_clickable()` 需要的东西。"""
+    """只提供 `_probe_events_after_swipe()` / `_probe_grid_clickable()` 需要的东西。
+
+    `homo` 是停稳判定的锚点剧本：`update()` 每调一次取下一个值，取完就重复最后一个
+    （真机器上地图最后总会停下来）。默认两个相同值 = 第二次读就稳。
+    """
 
     PROBE_CLICK_SAFE_MARGIN = OSMap.PROBE_CLICK_SAFE_MARGIN
     PROBE_EVENT_FLAGS = OSMap.PROBE_EVENT_FLAGS
+    PROBE_STABLE_PX = OSMap.PROBE_STABLE_PX
+    PROBE_SETTLE_ROUNDS = OSMap.PROBE_SETTLE_ROUNDS
     _probe_grid_clickable = OSMap._probe_grid_clickable
+    _probe_settle_view = OSMap._probe_settle_view
 
     def __init__(self, hits=None, solved=(), handler_result=True, handler_error=None,
-                 image=(720, 1280, 3), active=True, busy=False):
+                 image=(720, 1280, 3), active=True, busy=False, homo=None, settled_hits=None):
         self.view = ViewStub(hits)
         self.device = SimpleNamespace(image=None if image is None else np.zeros(image))
         self._solved_map_event = set(solved)
@@ -244,6 +255,17 @@ class ProbeStub:
         self.handler_drops = []
         self._result = handler_result
         self._error = handler_error
+        script = homo if homo is not None else [(50.0, 50.0), (50.0, 50.0)]
+        self._homo = [np.array(point, dtype=float) for point in script]
+        self._settled_hits = settled_hits
+        self.updates = 0
+
+    def update(self, *args, **kwargs):
+        self.updates += 1
+        self.view.backend.homo_loca = self._homo[min(self.updates - 1, len(self._homo) - 1)]
+        if self._settled_hits is not None and self.updates >= 2:
+            # 地图缓动会把画面挪走一小截：停稳后重读到的就是另一份视野
+            self.view.hits = self._settled_hits
 
     def map_rescan_current(self, drop=None):
         self.handler_calls += 1
@@ -279,6 +301,8 @@ def test_probe_leaves_edge_hugging_grid_to_the_walk():
     stub = ProbeStub(hits=tower(button=(20, 600, 90, 700)))
     assert stub.probe() is False
     assert stub.handler_calls == 0
+    # 连停稳的冤枉功夫都不该花
+    assert stub.updates == 0, stub.updates
 
 
 def test_probe_ignores_already_solved_event():
@@ -303,6 +327,48 @@ def test_probe_follows_rescan_branch_order():
     assert checked(stub.view.select_calls) == [('is_exploration_container',),
                                                ('is_exploration_reward',),
                                                ('is_akashi',)]
+
+
+def test_probe_settles_the_map_before_clicking():
+    """滑动刚结束那一帧地图还在缓动：先读到停稳，再拿停稳后的视野去点。
+
+    实例日志（2026-10-05 21:00）：5 行大滑动后 1.8 秒就点了装置，地图又缓了 2.3 秒，
+    那一点被游戏吃掉，舰队一格没动，换队重点再换回来花了 17 秒。
+    """
+    stub = ProbeStub(hits=tower(), homo=[(50.0, 50.0), (50.0, 62.0), (50.0, 62.0)])
+    assert stub.probe() is True
+    # 第一次读到的锚点还在动（12 像素），第二次两读一致才算停
+    assert stub.updates == 3, stub.updates
+    assert stub.handler_calls == 1
+    # 点之前按停稳后的画面重新认了一遍（装置类型按 PROBE_EVENT_FLAGS 的顺序各认一次）
+    assert checked(stub.view.select_calls).count(('is_logging_tower',)) == 2
+
+
+def test_probe_gives_up_while_the_map_is_still_easing():
+    """读到上限还在滚就不点：留给原来站定那一趟，不能拿滑行中的画面赌点击。"""
+    stub = ProbeStub(hits=tower(),
+                     homo=[(50.0, 50.0), (60.0, 60.0), (70.0, 70.0), (80.0, 80.0)])
+    assert stub.probe() is False
+    assert stub.updates == OSMap.PROBE_SETTLE_ROUNDS, stub.updates
+    assert stub.handler_calls == 0
+    # 没点成就不许置已处理标记，否则整趟重扫会以为这一站已经交代过了
+    assert stub._rescan_probe_solved is False
+    assert stub._rescan_probe_busy is False
+
+
+def test_probe_needs_the_event_in_the_settled_view():
+    """缓动之后那一格不再被认出来：不点，等站定那一趟重新认。"""
+    stub = ProbeStub(hits=tower(), settled_hits={})
+    assert stub.probe() is False
+    assert stub.handler_calls == 0
+    assert stub._rescan_probe_solved is False
+
+
+def test_probe_rechecks_the_screen_margin_after_the_settle():
+    """缓动把格子甩到屏幕边沿（贴底部按钮排）时也不点。"""
+    stub = ProbeStub(hits=tower(), settled_hits=tower(button=(20, 600, 90, 700)))
+    assert stub.probe() is False
+    assert stub.handler_calls == 0
 
 
 def test_probe_is_off_outside_a_rescan():
