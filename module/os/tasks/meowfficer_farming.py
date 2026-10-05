@@ -293,6 +293,15 @@ class OpsiMeowfficerFarming(OSMap):
             .delete(SelectedGrids(self.zones.select(is_port=True))) \
             .sort_by_clock_degree(center=(1252, 1012), start=self.zone.location)
 
+        if not zones:
+            # Every zone of the configured hazard level is cleared. Without this guard the
+            # next line raises IndexError and the task dies (AzurPilot 30b5a2b7d).
+            hazard = self.config.OpsiMeowfficerFarming_HazardLevel
+            logger.warning(f'No zone left for hazard level {hazard}, nothing to search')
+            self.config.task_delay(server_update=True)
+            self.config.task_stop()
+            return False
+
         logger.hr(f'OS meowfficer farming, zone_id={zones[0].zone_id}', level=1)
         self.globe_goto(zones[0])
         self.fleet_set(self.config.OpsiFleet_Fleet)

@@ -18,6 +18,16 @@ class MissionAtCurrentZone(Exception):
 
 class MissionHandler(GlobeOperation, ZoneManager):
     _os_mission_submitted = False
+    # A locked mission zone stays in the mission list, so a caller that simply retries would
+    # re-pick the same mission forever. Give up after this many unenterable zones in a row.
+    OS_DAILY_UNAVAILABLE_ZONE_LIMIT = 3
+
+    def _os_return_from_unavailable_mission(self):
+        """
+        Get back onto the OpSi map after a mission zone turned out to be unenterable.
+        """
+        self.ensure_no_zone_pinned()
+        self.os_globe_goto_map()
 
     def get_mission_zone(self):
         """

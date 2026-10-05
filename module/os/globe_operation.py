@@ -327,14 +327,16 @@ class GlobeOperation(ActionPointHandler):
                 continue
 
         confirm_timer = Timer(1, count=2).start()
-        unpinned = 0
         for _ in self.loop():
             if unpin:
                 if self.handle_zone_pinned():
-                    unpinned += 1
                     confirm_timer.reset()
                 else:
-                    if unpinned and confirm_timer.reached():
+                    # Do not gate this on "we unpinned something": a zone is not always pinned,
+                    # and then that never breaks until the stuck detection restarts the game
+                    # (AzurPilot edb9c11f1, "修复全球地图等待卡死"). Being on the globe is the
+                    # real end condition.
+                    if self.is_in_globe() and confirm_timer.reached():
                         break
             else:
                 if self.is_zone_pinned():

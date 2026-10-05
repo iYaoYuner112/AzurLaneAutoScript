@@ -5,7 +5,9 @@ from module.config.utils import get_os_reset_remain
 from module.exception import ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
+from module.os.globe_operation import OSExploreError
 from module.os.map import OSMap
+from module.os.tasks.task_context import current_opsi_context
 from module.os_handler.action_point import ActionPointLimit
 from module.os_handler.assets import MISSION_COMPLETE_POPUP
 from module.ui.assets import OS_CHECK
@@ -94,6 +96,13 @@ class OpsiDaily(OSMap):
                 self.globe_goto(zone, types='SAFE', refresh=True)
             except ActionPointLimit:
                 continue
+            except OSExploreError:
+                # A locked zone must not poison the rest of the list: it is still in the
+                # config, so the next run picks it up again (AzurPilot 5979fc1cb defers it
+                # until the daily reset; we just skip it for now).
+                logger.warning(f'[OS DAILY] Uncleared sector {zone.zone_id} is not enterable, skip it')
+                self._os_return_from_unavailable_mission()
+                continue
             self.fleet_set(self.config.OpsiFleet_Fleet)
             self.os_order_execute(recon_scan=False, submarine_call=False)
             self.run_auto_search(question=False, rescan=False)
@@ -142,6 +151,17 @@ class OpsiDaily(OSMap):
                     break
             self.fleet_set(primary)
 
+    def _is_daily_mission_task(self):
+        """
+        Whether the running task is OpsiDaily itself, including while OpsiScheduling proxies it.
+        `config.task.command` alone is not enough there, the proxy keeps its own identity in the
+        Opsi task context (see module/os/tasks/task_context).
+        """
+        if self.config.task.command == 'OpsiDaily':
+            return True
+        context = current_opsi_context(self.config)
+        return getattr(context, 'current_task', '') == 'OpsiDaily'
+
     def os_finish_daily_mission(self, skip_siren_mission=False, keep_mission_zone=False, question=True, rescan=None):
         """
         Finish all daily mission in Operation Siren.
@@ -158,18 +178,39 @@ class OpsiDaily(OSMap):
             int: Number of missions finished
         """
         logger.hr('OS finish daily mission', level=1)
+        # Only the daily mission flow drops an unenterable mission zone and carries on with the
+        # rest; archive and month-end runs must still see the failure (AzurPilot 5979fc1cb
+        # gates it on the running task the same way).
+        skip_unavailable = self._is_daily_mission_task()
         count = 0
+        unavailable = 0
         while True:
-            result = self.os_get_next_mission(skip_siren_mission=skip_siren_mission)
-            if not result:
-                break
+            try:
+                result = self.os_get_next_mission(skip_siren_mission=skip_siren_mission)
+                if not result:
+                    break
 
-            if result != 'pinned_at_archive_zone':
-                # The name of archive zone is "archive zone", which is not an existing zone.
-                # After archive zone, it go back to previous zone automatically.
-                self.zone_init()
-            if result == 'already_at_mission_zone':
-                self.globe_goto(self.zone, refresh=True)
+                if result != 'pinned_at_archive_zone':
+                    # The name of archive zone is "archive zone", which is not an existing zone.
+                    # After archive zone, it go back to previous zone automatically.
+                    self.zone_init()
+                if result == 'already_at_mission_zone':
+                    self.globe_goto(self.zone, refresh=True)
+            except OSExploreError:
+                if not skip_unavailable:
+                    raise
+                # The zone is locked (a neighbour is still unexplored) but it stays in the
+                # mission list, so retrying the same mission forever is the real failure mode.
+                unavailable += 1
+                logger.warning(f'[OS DAILY] Mission zone is not enterable, skipped '
+                               f'({unavailable} in a row)')
+                self._os_return_from_unavailable_mission()
+                if unavailable >= self.OS_DAILY_UNAVAILABLE_ZONE_LIMIT:
+                    logger.warning('[OS DAILY] Too many mission zones cannot be entered, '
+                                   'leave the rest to the next run')
+                    break
+                continue
+            unavailable = 0
             self.fleet_set(self.config.OpsiFleet_Fleet)
             self.os_order_execute(
                 recon_scan=False,

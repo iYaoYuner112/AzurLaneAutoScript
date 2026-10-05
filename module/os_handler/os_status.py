@@ -52,6 +52,32 @@ class OSStatus(UI):
     def is_cl1_mode_enabled(self) -> bool:
         return self.is_cl1_enabled or self.is_smart_scheduling_enabled
 
+    @staticmethod
+    def task_cooling_soon(task, now, update) -> bool:
+        """
+        Whether this task is cooling down and will be ready within an hour.
+
+        A task whose `next_run` has already passed is not cooling down. Handing a past time to
+        `task_delay(target=...)` makes the waiting task run again in the same round, and a
+        non-None result here also blocks calling OpsiObscure / OpsiAbyssal / OpsiStronghold
+        (AzurPilot d43a1361e, 「修复大世界可能在某个任务死循环的问题」).
+
+        Args:
+            task (Function):
+            now (datetime):
+            update (datetime): Next server update.
+
+        Returns:
+            bool:
+        """
+        if not (task.command in ('OpsiObscure', 'OpsiAbyssal', 'OpsiStronghold', 'OpsiDaily')
+                and task.enable):
+            return False
+        if task.next_run == update:
+            # Scheduled at the daily reset: the scheduler handles it, it is not a cooldown.
+            return False
+        return now < task.next_run <= now + timedelta(minutes=60)
+
     @property
     def nearest_task_cooling_down(self) -> t.Optional[Function]:
         """
@@ -60,21 +86,9 @@ class OSStatus(UI):
         """
         now = datetime.now()
         update = get_server_next_update('00:00')
-        cd_tasks = [
-            'OpsiObscure',
-            'OpsiAbyssal',
-            'OpsiStronghold',
-            'OpsiDaily',
-        ]
 
-        def func(task: Function):
-            if task.command in cd_tasks and task.enable:
-                if task.next_run != update and task.next_run - now <= timedelta(minutes=60):
-                    return True
-
-            return False
-
-        tasks = SelectedGrids(self.config.pending_task + self.config.waiting_task).filter(func).sort('next_run')
+        tasks = SelectedGrids(self.config.pending_task + self.config.waiting_task) \
+            .filter(lambda task: self.task_cooling_soon(task, now, update)).sort('next_run')
         return tasks.first_or_none()
 
     @property
