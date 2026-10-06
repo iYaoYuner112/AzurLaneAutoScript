@@ -455,6 +455,14 @@ pre.rich-traceback-code {
     width: 22px;
     height: 22px;
     object-fit: contain;
+    /* pywebio ships two rules that ruin these icons: markdown.min.css paints
+       ".markdown-body img" with a white background, and app.css gives every img
+       a blur plus fade-in animation that replays each time the cards rebuild.
+       The id plus class selector here outranks both.
+       Never put an apostrophe in these files: add_css embeds the whole sheet
+       inside a single-quoted JS string, so one apostrophe breaks all of alas.css. */
+    background-color: transparent;
+    animation: none;
 }
 
 #pywebio-scope-resource-cards .ov-res-value {
