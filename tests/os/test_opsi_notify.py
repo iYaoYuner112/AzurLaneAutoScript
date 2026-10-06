@@ -218,6 +218,17 @@ def test_numpy_action_point_still_pushes():
     assert type(stub.state[STATE_KEY_LAST_ACTION_POINT]) is int
 
 
+def test_legacy_string_record_still_computes_delta():
+    """老版本可能把 numpy 读数序列化成字符串存了盘，比较时一样要能算出涨跌。"""
+    stub = NotifyStub()
+    stub.state[STATE_KEY_LAST_ACTION_POINT] = '1500'
+    stub.set_ap(1620)
+    with push_recorder() as recorder:
+        assert notify_action_point_change(stub) is True
+    assert recorder.calls[0]['content'] == '总行动力: 1620 上涨120行动力'
+    assert type(stub.state[STATE_KEY_LAST_ACTION_POINT]) is int
+
+
 def test_unusable_action_point_reading_is_reported():
     stub = NotifyStub()
     stub.set_ap(None)
