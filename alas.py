@@ -72,7 +72,7 @@ class AzurLaneAutoScript:
             return True
         except GameNotRunningError as e:
             logger.warning(e)
-            self._notify_recoverable(command, '游戏未运行 - 将自动重启游戏', self._error_summary(e))
+            self._notify_recoverable('游戏未运行，已安排重启游戏')
             self.config.task_call('Restart')
             return False
         except (GameStuckError, GameTooManyClickError) as e:
@@ -80,7 +80,7 @@ class AzurLaneAutoScript:
             self.save_error_log()
             logger.warning(f'Game stuck, {self.device.package} will be restarted in 10 seconds')
             logger.warning('If you are playing by hand, please stop Alas')
-            self._notify_recoverable(command, '游戏卡住 - 将自动重启游戏', self._error_summary(e))
+            self._notify_recoverable('游戏卡住，10 秒后自动重启游戏')
             self.config.task_call('Restart')
             self.device.sleep(10)
             return False
@@ -89,7 +89,7 @@ class AzurLaneAutoScript:
             self.save_error_log()
             logger.warning('An error has occurred in Azur Lane game client, Alas is unable to handle')
             logger.warning(f'Restarting {self.device.package} to fix it')
-            self._notify_recoverable(command, '游戏客户端错误 - 将自动重启游戏', self._error_summary(e))
+            self._notify_recoverable('游戏客户端出错，10 秒后自动重启游戏')
             self.config.task_call('Restart')
             self.device.sleep(10)
             return False
@@ -99,12 +99,7 @@ class AzurLaneAutoScript:
             if self.checker.is_available():
                 logger.critical('Game page unknown')
                 self.save_error_log()
-                handle_notify(
-                    self.config.Error_OnePushConfig,
-                    title=f"Alas <{self.config_name}> crashed",
-                    content=(f"<{self.config_name}> GamePageUnknownError ({command})\n"
-                             f"{self._error_summary(e)}"),
-                )
+                self._notify_crashed(command, '无法识别游戏页面（服务器正常），已停止运行', error=e)
                 exit(1)
             else:
                 self.checker.wait_until_available()
@@ -112,48 +107,43 @@ class AzurLaneAutoScript:
         except ScriptError as e:
             logger.exception(e)
             logger.critical('This is likely to be a mistake of developers, but sometimes just random issues')
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config_name}> crashed",
-                content=(f"<{self.config_name}> ScriptError ({command})\n"
-                         f"{self._error_summary(e)}"),
-            )
+            self._notify_crashed(command, '脚本执行出错，已停止运行', error=e)
             exit(1)
         except RequestHumanTakeover as e:
             logger.critical('Request human takeover')
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config_name}> crashed",
-                content=(f"<{self.config_name}> RequestHumanTakeover ({command})\n"
-                         f"{self._error_summary(e)}"),
-            )
+            self._notify_crashed(command, '需要人工介入，已停止运行', error=e)
             exit(1)
         except Exception as e:
             logger.exception(e)
             self.save_error_log()
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config_name}> crashed",
-                content=(f"<{self.config_name}> Exception occured ({command})\n"
-                         f"{self._error_summary(e)}"),
-            )
+            self._notify_crashed(command, '发生未处理的异常，已停止运行', error=e)
             exit(1)
 
     @staticmethod
     def _error_summary(error) -> str:
-        """推送正文只带一行错误摘要：完整堆栈留在 log/ 里，渠道也会截断长文本。"""
+        """异常压成一行：完整堆栈在 log/ 里，推送渠道也会截断长文本。"""
         return ' '.join(str(error).split())[:200]
 
-    def _notify_recoverable(self, command, message, detail):
+    def _notify_crashed(self, command, message, error=None):
+        """致命错误的推送：中文说明 + 任务名，异常只留一行摘要供排查。"""
+        content = f"<{self.config_name}> {message}\n任务: {inflection.camelize(command)}"
+        if error is not None:
+            content += f"\n原因: {self._error_summary(error)}"
+        handle_notify(
+            self.config.Error_OnePushConfig,
+            title=f"Alas <{self.config_name}> 已停止",
+            content=content,
+        )
+
+    def _notify_recoverable(self, message):
         """可自动恢复的错误的推送。
 
         这类错误调度器会安排 Restart 自行恢复，无人值守时每次都推就成了轰炸，
         所以「低推送量模式」下整体跳过、只在日志留痕；需要人工介入的错误不走这里。
+        正文只有一句中文——异常原文已经在日志和错误现场里，不必塞进手机。
 
         Args:
-            command (str): 出错的任务方法名。
             message (str): 错误描述。
-            detail (str): 一行错误摘要。
         """
         if self.config.Error_LowPushMode:
             logger.info(f'[Alas] 低推送量模式：跳过可恢复错误的推送 - {message}')
@@ -161,7 +151,7 @@ class AzurLaneAutoScript:
         handle_notify(
             self.config.Error_OnePushConfig,
             title=f"Alas <{self.config_name}> 警告",
-            content=f"<{self.config_name}> {message} ({command})\n{detail}",
+            content=f"<{self.config_name}> {message}",
         )
 
     def save_error_log(self):
@@ -642,8 +632,9 @@ class AzurLaneAutoScript:
                 logger.critical('Request human takeover')
                 handle_notify(
                     self.config.Error_OnePushConfig,
-                    title=f"Alas <{self.config_name}> crashed",
-                    content=f"<{self.config_name}> RequestHumanTakeover\nTask `{task}` failed 3 or more times.",
+                    title=f"Alas <{self.config_name}> 需要人工介入",
+                    content=(f"<{self.config_name}> 任务 {task} 连续失败 3 次以上，已停止运行\n"
+                             f"可能是该任务的设置不正确，也可能是一个 bug"),
                 )
                 exit(1)
 

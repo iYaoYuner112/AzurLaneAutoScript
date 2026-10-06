@@ -78,8 +78,8 @@ class CampaignRun(CampaignEvent):
             self.config.Scheduler_Enable = False
             handle_notify(
                 self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config.config_name}> campaign finished",
-                content=f"<{self.config.config_name}> {self.name} reached run count limit"
+                title=f"Alas <{self.config.config_name}> 战役结束",
+                content=f"<{self.config.config_name}> {self.name} 已达到设置的次数上限，停止刷图"
             )
             return True
         # Lv120 limit
@@ -88,8 +88,8 @@ class CampaignRun(CampaignEvent):
             self.config.Scheduler_Enable = False
             handle_notify(
                 self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config.config_name}> campaign finished",
-                content=f"<{self.config.config_name}> {self.name} reached level limit"
+                title=f"Alas <{self.config.config_name}> 战役结束",
+                content=f"<{self.config.config_name}> {self.name} 已达到等级上限",
             )
             return True
         # Oil limit
@@ -109,8 +109,8 @@ class CampaignRun(CampaignEvent):
             self.config.Scheduler_Enable = False
             handle_notify(
                 self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config.config_name}> campaign finished",
-                content=f"<{self.config.config_name}> {self.name} got new ship"
+                title=f"Alas <{self.config.config_name}> 战役结束",
+                content=f"<{self.config.config_name}> {self.name} 出击已获得新船"
             )
             return True
         # Event limit

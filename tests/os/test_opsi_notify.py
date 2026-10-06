@@ -205,6 +205,27 @@ def test_action_point_delta_is_reported():
     assert recorder.calls[2]['content'] == '总行动力: 1420 下跌200行动力'
 
 
+def test_numpy_action_point_still_pushes():
+    """含箱口径下的读数是 numpy 标量，也必须推得出（曾经被 int 类型判断静默挡掉）。"""
+    import numpy as np
+
+    stub = NotifyStub(ap=0)
+    stub.set_ap(np.int64(1620))
+    with push_recorder() as recorder:
+        assert notify_action_point_change(stub) is True
+    assert recorder.calls[0]['content'] == '总行动力: 1620'
+    # 落盘的比较值必须是纯 int，否则序列化会变成字符串
+    assert type(stub.state[STATE_KEY_LAST_ACTION_POINT]) is int
+
+
+def test_unusable_action_point_reading_is_reported():
+    stub = NotifyStub()
+    stub.set_ap(None)
+    with push_recorder() as recorder:
+        assert notify_action_point_change(stub) is False
+    assert recorder.calls == []
+
+
 def test_task_boundary_resets_the_push_window():
     """窗口挂在 config 上：任务边界换了 Config，同类消息立刻可以再推（照 AP）。"""
     stub = NotifyStub(ap=1500)

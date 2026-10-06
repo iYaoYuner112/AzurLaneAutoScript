@@ -53,10 +53,21 @@ def _window() -> timedelta:
     return timedelta(minutes=AP_NOTIFY_MIN_INTERVAL_MINUTES)
 
 
+def _as_int(value):
+    """把读数归一化成 int，不可用则返回 None。
+
+    行动力含箱时的读数是 numpy 标量（`action_point_update` 里加了 `np.sum`），
+    用 `isinstance(x, int)` 判会一律 False，所以一律先转 int 再用。
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _last_pushed_action_point(scheduler):
-    """上次推送行动力变化时的总行动力；没推过返回 None。"""
-    value = scheduler._get_smart_state().get(STATE_KEY_LAST_ACTION_POINT)
-    return value if isinstance(value, int) else None
+    """上次推送行动力变化时的总行动力；没推过或值不可用返回 None。"""
+    return _as_int(scheduler._get_smart_state().get(STATE_KEY_LAST_ACTION_POINT))
 
 
 def _mark_action_point_pushed(scheduler, total_ap):
@@ -153,8 +164,10 @@ def notify_action_point_change(scheduler) -> bool:
     """行动力相比上次推送发生变化时推送（涨了多少、跌了多少都说清）。"""
     if not push_enabled(scheduler):
         return False
-    total = getattr(scheduler, '_action_point_total', None)
-    if not isinstance(total, int):
+    raw = getattr(scheduler, '_action_point_total', None)
+    total = _as_int(raw)
+    if total is None:
+        logger.warning(f'[大世界-推送] 行动力读数不可用（{raw!r}），跳过推送')
         return False
 
     content = f'总行动力: {total}'
