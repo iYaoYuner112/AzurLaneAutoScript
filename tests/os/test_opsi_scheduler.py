@@ -38,6 +38,10 @@ class FakeConfig:
     def __init__(self, values=None, task='OpsiScheduling'):
         self.values = dict(values or {})
         self.task = SimpleNamespace(command=task)
+        # 补黄币阈值是属性形式的配置项，推送正文会用到它
+        self.OpsiScheduling_OperationCoinsPreserve = 20000
+        self.OpsiScheduling_OperationCoinsReturnThreshold = 60000
+        self.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
 
     def cross_get(self, keys, default=None):
         return self.values.get(keys, default)
@@ -57,10 +61,13 @@ def bind(stub, *names):
 
 def make_scheduler(values=None):
     stub = SimpleNamespace(config=FakeConfig(values))
+    # 这些用例只验证任务选择，大世界推送整体关掉（见 test_opsi_notify）
+    stub.is_smart_scheduling_enabled = False
     bind(
         stub,
         '_get_smart_state', '_save_smart_state', '_sync_scheduling_mode',
         '_get_task_priority', '_is_coin_task_enabled', '_get_enabled_coin_tasks',
+        '_get_coin_replenish_target',
         '_postpone_coin_task_check', '_get_coin_task_postpone',
     )
     return stub

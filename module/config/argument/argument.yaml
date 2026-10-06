@@ -88,6 +88,7 @@ Error:
     type: textarea
     mode: yaml
     value: 'provider: null'
+  LowPushMode: false
   ScreenshotLength: 1
 Optimization:
   ScreenshotInterval: 0.3
@@ -712,6 +713,7 @@ OpsiGeneral:
   DoRandomMapEvent: true
   AkashiShopFilter: |-
     ActionPoint > PurpleCoins
+  NotifyOpsiMail: true
 OpsiAshBeacon:
   AttackMode:
     value: current

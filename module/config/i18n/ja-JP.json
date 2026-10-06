@@ -540,6 +540,10 @@
       "name": "Error.OnePushConfig.name",
       "help": "Error.OnePushConfig.help"
     },
+    "LowPushMode": {
+      "name": "低通知モード",
+      "help": "手動対応が必要なエラーのみ通知します。ゲーム未起動、ゲームのフリーズなど自動復旧できるエラーはログに記録するだけで通知しません"
+    },
     "ScreenshotLength": {
       "name": "Error.ScreenshotLength.name",
       "help": "Error.ScreenshotLength.help"
@@ -2481,6 +2485,10 @@
     "AkashiShopFilter": {
       "name": "OpsiGeneral.AkashiShopFilter.name",
       "help": "OpsiGeneral.AkashiShopFilter.help"
+    },
+    "NotifyOpsiMail": {
+      "name": "セイレーン作戦関連情報をプッシュ",
+      "help": "OnePush で侵蝕1と短猫相接に関する情報を通知します。情報量が多いため、騒がしく感じる可能性があります"
     }
   },
   "OpsiAshBeacon": {

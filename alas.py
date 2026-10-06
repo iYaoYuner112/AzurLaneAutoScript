@@ -120,6 +120,7 @@ class AzurLaneAutoScript:
             return True
         except GameNotRunningError as e:
             logger.warning(e)
+            self._notify_recoverable(command, '游戏未运行 - 将自动重启游戏', self._error_summary(e))
             self.config.task_call('Restart')
             return False
         except (GameStuckError, GameTooManyClickError) as e:
@@ -127,6 +128,7 @@ class AzurLaneAutoScript:
             self.save_error_log()
             logger.warning(f'Game stuck, {self.device.package} will be restarted in 10 seconds')
             logger.warning('If you are playing by hand, please stop Alas')
+            self._notify_recoverable(command, '游戏卡住 - 将自动重启游戏', self._error_summary(e))
             self.config.task_call('Restart')
             self.device.sleep(10)
             return False
@@ -135,10 +137,11 @@ class AzurLaneAutoScript:
             self.save_error_log()
             logger.warning('An error has occurred in Azur Lane game client, Alas is unable to handle')
             logger.warning(f'Restarting {self.device.package} to fix it')
+            self._notify_recoverable(command, '游戏客户端错误 - 将自动重启游戏', self._error_summary(e))
             self.config.task_call('Restart')
             self.device.sleep(10)
             return False
-        except GamePageUnknownError:
+        except GamePageUnknownError as e:
             logger.info('Game server may be under maintenance or network may be broken, check server status now')
             self.checker.check_now()
             if self.checker.is_available():
@@ -147,7 +150,8 @@ class AzurLaneAutoScript:
                 handle_notify(
                     self.config.Error_OnePushConfig,
                     title=f"Alas <{self.config_name}> crashed",
-                    content=f"<{self.config_name}> GamePageUnknownError",
+                    content=(f"<{self.config_name}> GamePageUnknownError ({command})\n"
+                             f"{self._error_summary(e)}"),
                 )
                 exit(1)
             else:
@@ -159,15 +163,17 @@ class AzurLaneAutoScript:
             handle_notify(
                 self.config.Error_OnePushConfig,
                 title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> ScriptError",
+                content=(f"<{self.config_name}> ScriptError ({command})\n"
+                         f"{self._error_summary(e)}"),
             )
             exit(1)
-        except RequestHumanTakeover:
+        except RequestHumanTakeover as e:
             logger.critical('Request human takeover')
             handle_notify(
                 self.config.Error_OnePushConfig,
                 title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> RequestHumanTakeover",
+                content=(f"<{self.config_name}> RequestHumanTakeover ({command})\n"
+                         f"{self._error_summary(e)}"),
             )
             exit(1)
         except Exception as e:
@@ -176,9 +182,35 @@ class AzurLaneAutoScript:
             handle_notify(
                 self.config.Error_OnePushConfig,
                 title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> Exception occured",
+                content=(f"<{self.config_name}> Exception occured ({command})\n"
+                         f"{self._error_summary(e)}"),
             )
             exit(1)
+
+    @staticmethod
+    def _error_summary(error) -> str:
+        """推送正文只带一行错误摘要：完整堆栈留在 log/ 里，渠道也会截断长文本。"""
+        return ' '.join(str(error).split())[:200]
+
+    def _notify_recoverable(self, command, message, detail):
+        """可自动恢复的错误的推送。
+
+        这类错误调度器会安排 Restart 自行恢复，无人值守时每次都推就成了轰炸，
+        所以「低推送量模式」下整体跳过、只在日志留痕；需要人工介入的错误不走这里。
+
+        Args:
+            command (str): 出错的任务方法名。
+            message (str): 错误描述。
+            detail (str): 一行错误摘要。
+        """
+        if self.config.Error_LowPushMode:
+            logger.info(f'[Alas] 低推送量模式：跳过可恢复错误的推送 - {message}')
+            return
+        handle_notify(
+            self.config.Error_OnePushConfig,
+            title=f"Alas <{self.config_name}> 警告",
+            content=f"<{self.config_name}> {message} ({command})\n{detail}",
+        )
 
     def save_error_log(self):
         """

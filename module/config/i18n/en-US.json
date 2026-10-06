@@ -540,6 +540,10 @@
       "name": "Error notify config",
       "help": "When Alas cannot handle exception, send a message through Onepush. Configuration document: \nhttps://github.com/LmeSzinc/AzurLaneAutoScript/wiki/Onepush-configuration-%5BEN%5D"
     },
+    "LowPushMode": {
+      "name": "Low Push Mode",
+      "help": "Only push errors that require manual intervention. Recoverable errors such as the game not running or the game being stuck are only logged, not pushed"
+    },
     "ScreenshotLength": {
       "name": "Record Screenshot(s)",
       "help": "Number of screenshots saved when exception occurs"
@@ -2481,6 +2485,10 @@
     "AkashiShopFilter": {
       "name": "Akashi Shop Filter",
       "help": "Generally does not need to be modified or re-arranged but can do so if desired\nBuy AP boxes and Purple Coins"
+    },
+    "NotifyOpsiMail": {
+      "name": "Push Operation Siren notifications",
+      "help": "Send notifications about Corrosion 1 and Meowfficer farming through OnePush. May be noisy due to high message volume."
     }
   },
   "OpsiAshBeacon": {

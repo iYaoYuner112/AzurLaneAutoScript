@@ -127,6 +127,9 @@ class _StopCounter:
 
 
 class ProxyStub:
+    # 本文件只验证行动力不足的兜底路径，大世界推送关掉（见 test_opsi_notify）
+    is_smart_scheduling_enabled = False
+
     def __init__(self, raise_limit=True):
         self.delayed = []
         self.stop_counter = _StopCounter()

@@ -4,6 +4,7 @@ from module.logger import logger
 from module.os_handler.action_point import ActionPointLimit
 from module.map.map_grids import SelectedGrids
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
+from module.os.opsi_notify import notify_action_point_change
 from module.os.tasks.task_context import is_running_opsi_proxy
 
 
@@ -181,6 +182,9 @@ class OpsiMeowfficerFarming(OSMap):
             else:
                 self.action_point_set(
                     cost=0, keep_current_ap=keep_current_ap, check_rest_ap=check_rest_ap)
+            # 独立跑短猫时由本任务报行动力变化；被智能调度代理时决策首读已经报过。
+            if not smart_scheduled:
+                notify_action_point_change(self)
             ap_checked = True
         return ap_checked
 

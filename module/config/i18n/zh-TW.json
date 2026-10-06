@@ -540,6 +540,10 @@
       "name": "錯誤推送設定",
       "help": "發生無法處理的異常後，使用 Onepush 推送错误消息。設定參考文檔：https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/Onepush-configuration-%5BCN%5D"
     },
+    "LowPushMode": {
+      "name": "低推送量模式",
+      "help": "只推送需要人工介入的錯誤。遊戲未執行、遊戲卡住等能自動復原的錯誤只記錄日誌，不再推送"
+    },
     "ScreenshotLength": {
       "name": "出錯時，保留最後 X 張截圖",
       "help": ""
@@ -2481,6 +2485,10 @@
     "AkashiShopFilter": {
       "name": "明石商店過濾器",
       "help": "一般不需要修改，只買行動力和紫幣即可"
+    },
+    "NotifyOpsiMail": {
+      "name": "推送大世界相關資訊",
+      "help": "使用 OnePush 推送關於侵蝕1和短貓的資訊。由於資訊較多，可能會比較吵"
     }
   },
   "OpsiAshBeacon": {

@@ -27,6 +27,14 @@ from module.exception import GameStuckError, GameTooManyClickError, RequestHuman
 from module.logger import logger
 from module.os_handler.action_point import ActionPointLimit
 from module.os.map import OSMap
+from module.os.opsi_notify import (
+    clear_coin_task_push_state,
+    notify_action_point_change,
+    notify_ap_insufficient,
+    notify_coin_task_disabled,
+    notify_coin_task_proxy,
+    notify_coins_ap_insufficient,
+)
 from module.os.tasks.task_context import (
     OpsiNoContent,
     OpsiStatus,
@@ -231,6 +239,13 @@ class OpsiScheduling(OSMap):
             2000,
         )
 
+    def _get_coin_replenish_target(self) -> int:
+        """本轮补黄币的目标值：目标模式按 保留值 + 回补阈值，否则就是保留值。"""
+        target = int(self.config.OpsiScheduling_OperationCoinsPreserve)
+        if self.config.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve:
+            target += int(self.config.OpsiScheduling_OperationCoinsReturnThreshold)
+        return target
+
     # ------------------------------------------------------------- postpone
 
     def _get_next_stronghold_check_time(self):
@@ -338,6 +353,7 @@ class OpsiScheduling(OSMap):
             logger.warning(
                 f'[大世界-调度] {task_name} 行动力不足（达到保留线），推迟到服务器刷新: '
                 f'total={e.total} preserve={e.preserve}')
+            notify_ap_insufficient(self, e.total, e.preserve)
             self.config.task_delay(server_update=True)
             self.config.task_stop()
             return OpsiTaskResult(OpsiStatus.FAILED, task=task_name, reason='action point limit')
@@ -359,6 +375,7 @@ class OpsiScheduling(OSMap):
         candidates = self._get_enabled_coin_tasks()
         if not candidates:
             logger.error('[大世界-调度] 没有启用任何黄币补充任务')
+            notify_coin_task_disabled(self)
             return OpsiTaskResult(OpsiStatus.NO_TASK, reason='no coin task enabled')
 
         logger.info(f'[大世界-调度] 黄币补充候选: {"、".join(candidates)}')
@@ -376,6 +393,9 @@ class OpsiScheduling(OSMap):
                 fresh_ap=(total_ap, current_ap) if current_ap is not None else None,
             )
             if result.executed:
+                notify_coin_task_proxy(
+                    self, yellow_coins, total_ap,
+                    self._get_coin_replenish_target(), meow_ap_preserve, task_name)
                 return result
             skipped.append(task_name)
 
@@ -403,6 +423,9 @@ class OpsiScheduling(OSMap):
         """Proxy one round of侵蚀 1 练级, which is the default NORMAL action."""
         logger.info(f'[大世界-调度] 选择任务: {TASK_NAME_HAZARD1_LEVELING}（原因: 黄币充足）')
         logger.info(f'[大世界-调度] TASK_START {TASK_NAME_HAZARD1_LEVELING}')
+        # 黄币补够、回到侵蚀 1 练级：清掉补币推送的去重状态，
+        # 否则下次再进入补币阶段时同一个任务不会再推（对齐 AP 的通知清理）。
+        clear_coin_task_push_state(self)
         # 侵蚀 1 练级自带完整的清场流程（计划作战 + clear_question + map_rescan），
         # 所以 os_init 挂起的首次自律寻敌在这里必须跳过：一旦先跑了自律，
         # 当前海域会被打空，随后的计划作战无目标可打，地图事件也就失去了
@@ -478,6 +501,7 @@ class OpsiScheduling(OSMap):
             self._scheduling_ap_box_use = self.config.OS_ACTION_POINT_BOX_USE
         else:
             self.action_point_quit()
+        notify_action_point_change(self)
         return (
             int(getattr(self, '_action_point_total', 0) or 0),
             int(getattr(self, '_action_point_current', 0) or 0),
@@ -586,6 +610,17 @@ class OpsiScheduling(OSMap):
 
         if action == 'wait':
             logger.info('[大世界-调度] 原因: 行动力达到保留值，无任务可执行')
+            # 黄币没补够、行动力又跌破补黄币开工线，才叫「双重不足」；
+            # 否则本轮只是撞在行动力保留线上（对齐 AP 的两条分支条件）。
+            coin_preserve = int(self.config.OpsiScheduling_OperationCoinsPreserve)
+            coins_short = coin_replenish_active or yellow_coins < coin_preserve
+            if coins_short and total_ap <= meow_ap_preserve:
+                notify_coins_ap_insufficient(
+                    self, yellow_coins, total_ap,
+                    self._get_coin_replenish_target(), meow_ap_preserve)
+            else:
+                notify_ap_insufficient(
+                    self, total_ap, int(self.config.OpsiScheduling_ActionPointPreserve))
             self._delay_to_server_update('行动力不足')
             self.config.task_stop()
 

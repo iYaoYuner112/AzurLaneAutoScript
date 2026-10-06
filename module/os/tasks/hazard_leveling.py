@@ -1,5 +1,6 @@
 from module.logger import logger
 from module.os.map import OSMap
+from module.os.opsi_notify import notify_action_point_change
 from module.os.tasks.task_context import is_running_opsi_proxy
 
 
@@ -61,6 +62,9 @@ class OpsiHazard1Leveling(OSMap):
                 self.action_point_set(cost=70, keep_current_ap=keep_current_ap, check_rest_ap=True)
             # 首读只复用一次：面板已经关掉了，后续轮次照常走弹窗
             fresh_ap = None
+            # 独立跑侵蚀 1 时由本任务报行动力变化；被智能调度代理时，决策首读已经报过一次。
+            if not is_running_opsi_proxy(self.config):
+                notify_action_point_change(self)
             if self._action_point_total >= 3000 and not self.is_smart_scheduling_enabled:
                 with self.config.multi_set():
                     self.config.task_delay(server_update=True)

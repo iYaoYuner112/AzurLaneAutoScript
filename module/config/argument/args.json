@@ -193,6 +193,10 @@
         "value": "provider: null",
         "mode": "yaml"
       },
+      "LowPushMode": {
+        "type": "checkbox",
+        "value": false
+      },
       "ScreenshotLength": {
         "type": "input",
         "value": 1
@@ -8528,6 +8532,10 @@
       "AkashiShopFilter": {
         "type": "textarea",
         "value": "ActionPoint > PurpleCoins"
+      },
+      "NotifyOpsiMail": {
+        "type": "checkbox",
+        "value": true
       }
     },
     "Storage": {

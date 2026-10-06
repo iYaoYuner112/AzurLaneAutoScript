@@ -104,6 +104,9 @@ def _make_function(command):
 class ProxyStub:
     """替换掉界面与配置读写，只保留 _run_scheduled_coin_task_once 的派发。"""
 
+    # 这些用例只验证阈值传递与行动力不足的处理，大世界推送关掉（见 test_opsi_notify）
+    is_smart_scheduling_enabled = False
+
     def __init__(self, handler):
         self.config = SimpleNamespace(
             task=_make_function('OpsiScheduling'),

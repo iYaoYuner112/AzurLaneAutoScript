@@ -18,6 +18,7 @@
       "HandleError": true,
       "SaveError": true,
       "OnePushConfig": "provider: null",
+      "LowPushMode": false,
       "ScreenshotLength": 1
     },
     "Optimization": {
@@ -1676,7 +1677,8 @@
       "OilLimit": 1000,
       "RepairThreshold": 0.4,
       "DoRandomMapEvent": true,
-      "AkashiShopFilter": "ActionPoint > PurpleCoins"
+      "AkashiShopFilter": "ActionPoint > PurpleCoins",
+      "NotifyOpsiMail": true
     },
     "Storage": {
       "Storage": {}

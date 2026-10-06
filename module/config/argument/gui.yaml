@@ -55,6 +55,10 @@ Overview:
   ResourceYellowCoin:
   ResourcePurpleCoin:
   ResourceActionPoint:
+  ResourceGems:
+  ResourceCore:
+  ResourceMedal:
+  ResourceMerit:
   ResourceActionPointTotal:
   ResourceWaiting:
   ResourceUpdated:

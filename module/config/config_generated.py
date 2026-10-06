@@ -35,6 +35,7 @@ class GeneratedConfig:
     Error_HandleError = True
     Error_SaveError = True
     Error_OnePushConfig = 'provider: null'
+    Error_LowPushMode = False
     Error_ScreenshotLength = 1
 
     # Group `Optimization`
@@ -402,6 +403,7 @@ class GeneratedConfig:
     OpsiGeneral_RepairThreshold = 0.4
     OpsiGeneral_DoRandomMapEvent = True
     OpsiGeneral_AkashiShopFilter = 'ActionPoint > PurpleCoins'
+    OpsiGeneral_NotifyOpsiMail = True
 
     # Group `OpsiAshBeacon`
     OpsiAshBeacon_AttackMode = 'current'  # current, current_dossier
