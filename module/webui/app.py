@@ -708,8 +708,8 @@ class AlasGUI(Frame):
             cards.append(
                 f'<div class="ov-res-card{stale}">'
                 f'<div class="ov-res-head">'
-                f'<span class="ov-res-label">{t(f"Gui.Overview.{item.label}")}</span>'
                 f'<img class="ov-res-icon" src="/static/icon/resource/{item.icon}.png" alt="">'
+                f'<span class="ov-res-label">{t(f"Gui.Overview.{item.label}")}</span>'
                 f'</div>'
                 f'<div class="ov-res-value">{value_text}</div>'
                 f'<div class="ov-res-time">{updated}</div>'

@@ -47,7 +47,7 @@
 }
 
 #pywebio-scope-resource-cards .ov-res-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
 }
 
 #pywebio-scope-daemon-overview {
