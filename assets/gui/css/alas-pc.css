@@ -10,8 +10,26 @@
 }
 
 #pywebio-scope-overview {
-    grid-auto-flow: row;
     grid-template-columns: minmax(16rem, 20rem) minmax(24rem, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    /* Scheduler stack owns the left column across both rows; the resource grid
+       sits above the log in the right column. */
+    grid-template-areas:
+        "schedulers resources"
+        "schedulers logs";
+}
+
+#pywebio-scope-resources {
+    /* Overrides the full-width grid-column from alas.css. */
+    grid-area: resources;
+}
+
+#pywebio-scope-schedulers {
+    grid-area: schedulers;
+}
+
+#pywebio-scope-logs {
+    grid-area: logs;
 }
 
 #pywebio-scope-daemon-overview {

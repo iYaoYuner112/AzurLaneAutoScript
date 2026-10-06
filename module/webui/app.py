@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import queue
 import threading
 import time
@@ -670,6 +671,16 @@ class AlasGUI(Frame):
             else:
                 put_text(t("Gui.Overview.NoTask")).style("--overview-notask-text--")
 
+    @staticmethod
+    def _resource_icon_url(icon: str) -> str:
+        # 图标换了内容但路径不变时，浏览器会一直给旧图；拿文件修改时间当版本号，
+        # 这样替换图标不需要用户清缓存。
+        try:
+            version = int(os.path.getmtime(f"./assets/gui/icon/resource/{icon}.png"))
+        except OSError:
+            version = 0
+        return f"/static/icon/resource/{icon}.png?v={version}"
+
     def _update_overview_resources(self) -> None:
         resources = deep_get(
             self.alas_config.data,
@@ -708,8 +719,8 @@ class AlasGUI(Frame):
             cards.append(
                 f'<div class="ov-res-card{stale}">'
                 f'<div class="ov-res-head">'
-                f'<img class="ov-res-icon" src="/static/icon/resource/{item.icon}.png" alt="">'
                 f'<span class="ov-res-label">{t(f"Gui.Overview.{item.label}")}</span>'
+                f'<img class="ov-res-icon" src="{self._resource_icon_url(item.icon)}" alt="">'
                 f'</div>'
                 f'<div class="ov-res-value">{value_text}</div>'
                 f'<div class="ov-res-time">{updated}</div>'
