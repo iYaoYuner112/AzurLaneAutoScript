@@ -8896,8 +8896,9 @@
         "value": false
       },
       "MissionZones": {
-        "type": "input",
-        "value": null
+        "type": "stored",
+        "value": null,
+        "display": "hide"
       }
     },
     "OpsiFleet": {

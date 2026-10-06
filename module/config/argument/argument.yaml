@@ -748,7 +748,13 @@ OpsiDaily:
   UseTuningSample: true
   SkipSirenResearchMission: false
   KeepMissionZone: false
-  MissionZones: null
+  # 程序自维护的海域 ID 列表：os_daily_set_keep_mission_zone 追加、
+  # os_daily_clear_all_mission_zones 消费。stored + hide 成对使用，
+  # 少了 stored 的话 config_update 会在每次加载配置时把它抹回 null（见 AP 的同款定义）。
+  MissionZones:
+    type: stored
+    value: null
+    display: hide
 OpsiObscure:
   ForceRun: false
 OpsiAbyssal:
