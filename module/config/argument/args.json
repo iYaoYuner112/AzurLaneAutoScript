@@ -225,21 +225,6 @@
         ]
       }
     },
-    "ResourceMonitor": {
-      "Enabled": {
-        "type": "checkbox",
-        "value": false,
-        "option": [
-          true,
-          false
-        ]
-      },
-      "Interval": {
-        "type": "input",
-        "value": 10,
-        "validate": "^\\d+$"
-      }
-    },
     "DropRecord": {
       "SaveFolder": {
         "type": "input",

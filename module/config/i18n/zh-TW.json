@@ -574,22 +574,6 @@
       "close_game": "關閉遊戲"
     }
   },
-  "ResourceMonitor": {
-    "_info": {
-      "name": "資源監視器",
-      "help": "定時讀取遊戲資源（石油、物資、活動PT等）並記錄數值變化歷史。"
-    },
-    "Enabled": {
-      "name": "啟用",
-      "help": "開啟後在大世界閒置時定時重新整理資源資料。",
-      "True": "已啟用",
-      "False": "False"
-    },
-    "Interval": {
-      "name": "重新整理間隔（分鐘）",
-      "help": "兩次資源重新整理之間的最小間隔，避免頻繁截圖識別。"
-    }
-  },
   "DropRecord": {
     "_info": {
       "name": "掉落紀錄",

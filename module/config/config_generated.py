@@ -44,10 +44,6 @@ class GeneratedConfig:
     Optimization_TaskHoardingDuration = 0
     Optimization_WhenTaskQueueEmpty = 'goto_main'  # stay_there, goto_main, close_game
 
-    # Group `ResourceMonitor`
-    ResourceMonitor_Enabled = False  # True, False
-    ResourceMonitor_Interval = 10
-
     # Group `DropRecord`
     DropRecord_SaveFolder = './screenshots'
     DropRecord_AzurStatsID = None

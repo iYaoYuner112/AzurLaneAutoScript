@@ -574,22 +574,6 @@
       "close_game": "关闭游戏"
     }
   },
-  "ResourceMonitor": {
-    "_info": {
-      "name": "资源监视器",
-      "help": "定时读取游戏资源（石油、物资、活动PT等）并记录数值变化历史。"
-    },
-    "Enabled": {
-      "name": "启用",
-      "help": "开启后在大世界空闲时定时刷新资源数据。",
-      "True": "已启用",
-      "False": "False"
-    },
-    "Interval": {
-      "name": "刷新间隔（分钟）",
-      "help": "两次资源刷新之间的最小间隔，避免频繁截图识别。"
-    }
-  },
   "DropRecord": {
     "_info": {
       "name": "掉落记录",

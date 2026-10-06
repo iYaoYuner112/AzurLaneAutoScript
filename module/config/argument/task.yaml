@@ -13,7 +13,6 @@ Alas:
       - EmulatorInfo
       - Error
       - Optimization
-      - ResourceMonitor
       - DropRecord
     General:
       - Retirement

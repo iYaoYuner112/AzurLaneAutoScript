@@ -574,22 +574,6 @@
       "close_game": "close_game"
     }
   },
-  "ResourceMonitor": {
-    "_info": {
-      "name": "リソースモニター",
-      "help": "ゲームリソース（燃料、資金、イベントPT等）を定期的に読み取り、変動履歴を記録します。"
-    },
-    "Enabled": {
-      "name": "有効化",
-      "help": "有効にすると、大世界で待機中にリソースを定期的に更新します。",
-      "True": "有効",
-      "False": "False"
-    },
-    "Interval": {
-      "name": "更新間隔（分）",
-      "help": "リソース更新の最小間隔。頻繁なスクリーンショットを避けます。"
-    }
-  },
   "DropRecord": {
     "_info": {
       "name": "DropRecord._info.name",

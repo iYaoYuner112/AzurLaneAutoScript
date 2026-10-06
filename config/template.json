@@ -27,10 +27,6 @@
       "TaskHoardingDuration": 0,
       "WhenTaskQueueEmpty": "goto_main"
     },
-    "ResourceMonitor": {
-      "Enabled": false,
-      "Interval": 10
-    },
     "DropRecord": {
       "SaveFolder": "./screenshots",
       "AzurStatsID": null,

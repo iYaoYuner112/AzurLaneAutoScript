@@ -574,22 +574,6 @@
       "close_game": "Close Game"
     }
   },
-  "ResourceMonitor": {
-    "_info": {
-      "name": "Resource Monitor",
-      "help": "Periodically read game resources (oil, coins, event PT, etc.) and record change history."
-    },
-    "Enabled": {
-      "name": "Enable",
-      "help": "When enabled, resources are refreshed while idle in Operation Siren.",
-      "True": "Enabled",
-      "False": "False"
-    },
-    "Interval": {
-      "name": "Refresh interval (minutes)",
-      "help": "Minimum interval between two resource refreshes, to avoid frequent screenshots."
-    }
-  },
   "DropRecord": {
     "_info": {
       "name": "Drop Record Settings",
