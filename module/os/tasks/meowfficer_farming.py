@@ -25,7 +25,7 @@ class OpsiMeowfficerFarming(OSMap):
         # clear_question_any_fleet restores the primary fleet itself.
         self.clear_question_any_fleet()
 
-    def os_meowfficer_farming(self, fresh_ap=None, ap_checked=False):
+    def os_meowfficer_farming(self, fresh_ap=None, ap_checked=False, ap_preserve=None):
         """耄耋相接入口。
 
         Args:
@@ -36,6 +36,8 @@ class OpsiMeowfficerFarming(OSMap):
             ap_checked (bool): 智能调度代跑时为 True —— 本轮调度决策刚用新鲜
                 读数验证过总行动力高于短猫保留线，短猫不必再开一次弹窗重复
                 检查，否则一轮里会多出一组「REMAIN_OS + CANCEL」点击。
+            ap_preserve (int | None): 智能调度代跑时本轮的补黄币开工线。
+                None 表示独立运行，按任务自己的保留值配置。
         """
         logger.hr(f'OS meowfficer farming, hazard_level={self.config.OpsiMeowfficerFarming_HazardLevel}', level=1)
         if not ap_checked:
@@ -43,29 +45,48 @@ class OpsiMeowfficerFarming(OSMap):
             self._close_scheduling_action_point()
             fresh_ap = None
         try:
-            self._run_meowfficer_farming(fresh_ap=fresh_ap, ap_checked=ap_checked)
+            self._run_meowfficer_farming(
+                fresh_ap=fresh_ap, ap_checked=ap_checked, ap_preserve=ap_preserve)
         finally:
             # 面板暂留期间任何出口都必须收尾（含 task_delay + task_stop 与异常），
             # 否则它会挡住后续的截图识别——黄币 OCR、海域名识别都会读到错值。
             self._close_scheduling_action_point()
 
-    def _run_meowfficer_farming(self, fresh_ap=None, ap_checked=False):
+    def _meow_preserve_value(self, ap_preserve=None) -> int:
+        """本轮短猫的行动力保留线（总行动力低于或等于它就停手）。
+
+        代跑时阈值由调度层给（对齐 AzurPilot 的 `ap_preserve` 传递），独立运行时
+        仍按配置读；两种情况都再套一层月末动态保留，让月底能把剩余行动力吃干。
+
+        Args:
+            ap_preserve (int | None): 智能调度本轮的补黄币开工线。
+
+        Returns:
+            int: 本轮生效的行动力保留值。
+        """
+        if ap_preserve is not None:
+            action_point_preserve = int(ap_preserve)
+        else:
+            action_point_preserve = (
+                self.config.OpsiScheduling_MeowfficerActionPointPreserve
+                if self.is_smart_scheduling_enabled
+                else self.config.OpsiMeowfficerFarming_ActionPointPreserve
+            )
+        return min(self.get_action_point_limit(), action_point_preserve, 2000)
+
+    def _run_meowfficer_farming(self, fresh_ap=None, ap_checked=False, ap_preserve=None):
         """耄耋相接主流程：准备配置，然后按轮派发。行动力面板由调用方收尾。
 
         Args:
             fresh_ap (tuple[int, int] | None): 决策首读的 (总行动力, 当前行动力)。
             ap_checked (bool): 本轮是否已完成行动力检查。
+            ap_preserve (int | None): 智能调度本轮的补黄币开工线。
         """
         if self.is_cl1_mode_enabled and not self.is_smart_scheduling_enabled \
             and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
             logger.info('With CL1 leveling enabled, set action point preserve to 1000')
             self.config.OpsiMeowfficerFarming_ActionPointPreserve = 1000
-        action_point_preserve = (
-            self.config.OpsiScheduling_MeowfficerActionPointPreserve
-            if self.is_smart_scheduling_enabled
-            else self.config.OpsiMeowfficerFarming_ActionPointPreserve
-        )
-        preserve = min(self.get_action_point_limit(), action_point_preserve, 2000)
+        preserve = self._meow_preserve_value(ap_preserve=ap_preserve)
         if preserve == 0:
             self.config.override(OpsiFleet_Submarine=False)
         if self.is_cl1_mode_enabled:

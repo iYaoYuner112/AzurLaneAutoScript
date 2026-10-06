@@ -211,6 +211,26 @@ class OpsiScheduling(OSMap):
         enabled = [name for name in COIN_TASK_NAMES if self._is_coin_task_enabled(name)]
         return sorted(enabled, key=lambda name: priority.index(name))
 
+    def _get_coin_task_action_point_preserve(self) -> int:
+        """Total AP a coin replenish task needs before it may start.
+
+        The scheduler's own line rules, and the meowfficer line is only a
+        fallback for when that line is switched off (0) -- this is AzurPilot's
+        precedence (`_get_coin_task_action_point_preserve`).
+        """
+        ap_preserve = max(int(self.config.OpsiScheduling_ActionPointPreserve), 0)
+        if ap_preserve > 0:
+            return ap_preserve
+        return max(int(self.config.OpsiScheduling_MeowfficerActionPointPreserve), 0)
+
+    def _get_scheduled_meow_ap_preserve(self) -> int:
+        """This round's coin-task AP line, still lowered by the month-end limit."""
+        return min(
+            self.get_action_point_limit(),
+            self._get_coin_task_action_point_preserve(),
+            2000,
+        )
+
     # ------------------------------------------------------------- postpone
 
     def _get_next_stronghold_check_time(self):
@@ -294,13 +314,25 @@ class OpsiScheduling(OSMap):
                     # 耄耋相接与决策共用同一个行动力面板：本轮决策刚用新鲜读数
                     # 验证过总行动力高于短猫保留线，ap_checked=True 让短猫跳过
                     # 那次重复的前置检查（否则一轮里多一组 REMAIN_OS + CANCEL）。
-                    handler(fresh_ap=fresh_ap, ap_checked=True)
+                    # ap_preserve 一起传下去：否则短猫按自己的配置另算保留线，
+                    # 要么被 ActionPointLimit 打死整轮调度，要么把行动力吃穿到 0。
+                    handler(ap_preserve=ap_preserve, fresh_ap=fresh_ap, ap_checked=True)
                 else:
-                    handler()
+                    # 这三个任务不自己设保留值，代跑期间统一用本轮调度阈值。
+                    with self.config.temporary(OS_ACTION_POINT_PRESERVE=int(ap_preserve)):
+                        handler()
         except OpsiNoContent as e:
             self._postpone_coin_task_check(task_name, str(e))
             return OpsiTaskResult(OpsiStatus.NO_CONTENT, task=task_name, reason=str(e))
         except ActionPointLimit as e:
+            if (task_name == TASK_NAME_MEOWFFICER_FARMING and int(ap_preserve) > 0
+                    and getattr(e, 'preserve', None) == int(ap_preserve)):
+                # 打到本轮调度线属于正常收尾，交回决策重新判断，不记成「行动力不足」。
+                logger.info(
+                    f'[大世界-调度] {task_name} 达到本轮保留线，返回调度决策: '
+                    f'total={e.total} preserve={e.preserve}')
+                return OpsiTaskResult(
+                    OpsiStatus.SUCCESS, task=task_name, reason='reached scheduling AP line')
             # 行动力打到保留线：优雅推迟到服务器刷新，而不是以任务报错收场
             # （对齐 AP master 的调度器兜底）。
             logger.warning(
@@ -513,11 +545,7 @@ class OpsiScheduling(OSMap):
 
     def _run_opsi_scheduler_decision(self, yellow_coins, total_ap, current_ap):
         """使用首读的行动力做决策；面板在实际地图操作之前关闭或合并开工补充。"""
-        meow_ap_preserve = min(
-            self.get_action_point_limit(),
-            self.config.OpsiScheduling_MeowfficerActionPointPreserve,
-            2000,
-        )
+        meow_ap_preserve = self._get_scheduled_meow_ap_preserve()
 
         state = self._get_smart_state()
         coin_replenish_active = bool(state.get(STATE_KEY_COIN_REPLENISH, False))

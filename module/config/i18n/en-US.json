@@ -2750,11 +2750,11 @@
     },
     "ActionPointPreserve": {
       "name": "CL1 Action Point Reserve",
-      "help": "Minimum total action points to keep while running CL1. CL1 pauses at or below this value. Meowfficer farming has a separate reserve setting. Default: 200."
+      "help": "The single action point line for OpSi farming: CL1 pauses at or below it, and coin replenishment tasks (meowfficer farming, obscure, abyssal, stronghold) no longer start at or below it. Default: 200. Set it to 0 and coin replenishment falls back to the Meowfficer Farming reserve. Near the OpSi reset the coin line is also lowered to 300 or 0 by Cross Month Daily so the remaining action points get spent."
     },
     "MeowfficerActionPointPreserve": {
       "name": "Meowfficer Farming Action Point Reserve",
-      "help": "Total action points to keep while farming; coin replenishment pauses at or below this value. Default: 1000, capped at 2000. On the OpSi reset day this is automatically lowered to 300 or 0 according to Cross Month Daily, so remaining action points can be spent."
+      "help": "Fallback coin line: only used when the CL1 Action Point Reserve is set to 0, otherwise the scheduler uses that reserve and this setting does not gate anything. Default: 1000, capped at 2000. On the OpSi reset day the effective line is still lowered to 300 or 0 according to Cross Month Daily, so remaining action points can be spent. Running meowfficer farming on its own (smart scheduling off) uses that task's own reserve setting."
     },
     "OperationCoinsReturnThreshold": {
       "name": "Replenish X coins",
