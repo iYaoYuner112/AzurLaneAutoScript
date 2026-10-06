@@ -1,6 +1,6 @@
 import argparse
+import base64
 import json
-import os
 import queue
 import threading
 import time
@@ -73,6 +73,7 @@ from module.webui.utils import (
     Switch,
     TaskHandler,
     add_css,
+    add_css_text,
     filepath_css,
     get_alas_config_listen_path,
     get_localstorage,
@@ -97,6 +98,30 @@ patch_executor()
 patch_mimetype()
 fix_py37_subprocess_communicate()
 task_handler = TaskHandler()
+
+RESOURCE_ICON_DIR = "./assets/gui/icon/resource"
+
+
+def resource_icon_css() -> str:
+    """把资源图标编成 data URI，作为一段 CSS 在页面加载时注入一次。
+
+    走 /static 路由需要额外挂静态目录，而图标是后加的二进制文件，往跑实例的机器上
+    同步时最容易漏；漏掉就是一排破图。内联之后只依赖这个 Python 文件本身，
+    少了文件确实不存在时也只是不画图标，不会出现破图占位。
+    """
+    rules = []
+    for item in DASHBOARD_RESOURCES:
+        path = f"{RESOURCE_ICON_DIR}/{item.icon}.png"
+        try:
+            with open(path, "rb") as f:
+                data = base64.b64encode(f.read()).decode("ascii")
+        except OSError:
+            logger.warning(f'[WebUI] 缺少资源图标，跳过: {path}')
+            continue
+        rules.append(
+            f'.ov-res-icon-{item.icon}{{background-image:url(data:image/png;base64,{data})}}'
+        )
+    return ''.join(rules)
 
 
 class AlasGUI(Frame):
@@ -671,16 +696,6 @@ class AlasGUI(Frame):
             else:
                 put_text(t("Gui.Overview.NoTask")).style("--overview-notask-text--")
 
-    @staticmethod
-    def _resource_icon_url(icon: str) -> str:
-        # 图标换了内容但路径不变时，浏览器会一直给旧图；拿文件修改时间当版本号，
-        # 这样替换图标不需要用户清缓存。
-        try:
-            version = int(os.path.getmtime(f"./assets/gui/icon/resource/{icon}.png"))
-        except OSError:
-            version = 0
-        return f"/static/icon/resource/{icon}.png?v={version}"
-
     def _update_overview_resources(self) -> None:
         resources = deep_get(
             self.alas_config.data,
@@ -720,7 +735,7 @@ class AlasGUI(Frame):
                 f'<div class="ov-res-card{stale}">'
                 f'<div class="ov-res-head">'
                 f'<span class="ov-res-label">{t(f"Gui.Overview.{item.label}")}</span>'
-                f'<img class="ov-res-icon" src="{self._resource_icon_url(item.icon)}" alt="">'
+                f'<span class="ov-res-icon ov-res-icon-{item.icon}"></span>'
                 f'</div>'
                 f'<div class="ov-res-value">{value_text}</div>'
                 f'<div class="ov-res-time">{updated}</div>'
@@ -1302,6 +1317,7 @@ class AlasGUI(Frame):
             add_css(filepath_css("dark-alas"))
         else:
             add_css(filepath_css("light-alas"))
+        add_css_text(resource_icon_css())
 
         # Auto refresh when lost connection
         # [For develop] Disable by run `reload=0` in console
@@ -1636,7 +1652,7 @@ def app():
     app = asgi_app(
         applications=[index, manage],
         cdn=cdn,
-        static_dir='assets/gui',
+        static_dir=None,
         debug=True,
         on_startup=[
             startup,

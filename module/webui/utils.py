@@ -367,10 +367,14 @@ def filepath_icon(filename):
     return f"./assets/gui/icon/{filename}.svg"
 
 
+def add_css_text(css):
+    run_js(f"""$('head').append('<style>{css}</style>')""")
+
+
 def add_css(filepath):
     with open(filepath, "r") as f:
         css = f.read().replace("\n", "")
-        run_js(f"""$('head').append('<style>{css}</style>')""")
+        add_css_text(css)
 
 
 def _read(path):
