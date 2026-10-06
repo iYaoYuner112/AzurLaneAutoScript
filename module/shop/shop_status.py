@@ -1,6 +1,7 @@
 import module.config.server as server
 from module.ocr.ocr import Digit
 from module.shop.assets import *
+from module.statistics.resource_monitor import record_dashboard_resource
 from module.ui.ui import UI
 
 if server.server != 'jp':
@@ -44,6 +45,7 @@ class ShopStatus(UI):
             in: page_shop, medal shop
         """
         amount = OCR_SHOP_GEMS.ocr(self.device.image)
+        record_dashboard_resource(self.config, 'Gems', amount)
         return amount
 
     def status_get_medal(self):
@@ -55,6 +57,7 @@ class ShopStatus(UI):
             in: page_shop, medal shop
         """
         amount = OCR_SHOP_MEDAL.ocr(self.device.image)
+        record_dashboard_resource(self.config, 'Medal', amount)
         return amount
 
     def status_get_merit(self):
@@ -66,6 +69,7 @@ class ShopStatus(UI):
             in: page_shop, merit shop
         """
         amount = OCR_SHOP_MERIT.ocr(self.device.image)
+        record_dashboard_resource(self.config, 'Merit', amount)
         return amount
 
     def status_get_guild_coins(self):
@@ -88,6 +92,7 @@ class ShopStatus(UI):
             in: page_shop, core shop
         """
         amount = OCR_SHOP_CORE.ocr(self.device.image)
+        record_dashboard_resource(self.config, 'Core', amount)
         return amount
 
     def status_get_voucher(self):

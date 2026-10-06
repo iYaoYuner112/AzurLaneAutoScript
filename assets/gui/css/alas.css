@@ -407,39 +407,71 @@ pre.rich-traceback-code {
     margin: auto 0 auto .25rem !important;
 }
 
-*[style*="--overview-resource-row--"] {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .35rem;
+/* Overview "current resources" cards: 4 columns on desktop, alas-mobile.css
+   narrows it to 2. Colours are neutral translucent grey only, so both the dark
+   and the light theme read fine without touching the theme files.
+   NOTE: this file is read with the OS locale encoding (module/webui/utils.py
+   add_css), so it has to stay ASCII-only. */
+#pywebio-scope-resource-cards .ov-res-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .4rem;
+    margin: 0 .5rem;
 }
 
-*[style*="--overview-resource-card--"],
-*[style*="--overview-resource-card-stale--"] {
+#pywebio-scope-resource-cards .ov-res-card {
     min-width: 0;
-    padding: .35rem .5rem;
-    border: 1px solid rgba(128, 128, 128, .3);
+    padding: .4rem .55rem .3rem;
+    border: 1px solid rgba(128, 128, 128, .28);
     border-radius: .375rem;
-    background-color: rgba(128, 128, 128, .05);
+    background-color: rgba(128, 128, 128, .07);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
 }
 
-*[style*="--overview-resource-card-stale--"] {
-    opacity: .65;
+#pywebio-scope-resource-cards .ov-res-card-stale {
+    opacity: .6;
 }
 
-*[style*="--overview-resource-label--"] {
-    color: #777;
-    font-size: .72rem;
+#pywebio-scope-resource-cards .ov-res-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .3rem;
 }
 
-*[style*="--overview-resource-value--"] {
-    font-size: .95rem;
+#pywebio-scope-resource-cards .ov-res-label {
+    color: #8b95a5;
+    font-size: .75rem;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#pywebio-scope-resource-cards .ov-res-icon {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+#pywebio-scope-resource-cards .ov-res-value {
+    font-size: 1.1rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+    line-height: 1.45;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-*[style*="--overview-resource-updated--"] {
-    color: #777;
-    font-size: .6rem;
+#pywebio-scope-resource-cards .ov-res-time {
+    margin-top: .15rem;
+    padding-top: .2rem;
+    border-top: 1px solid rgba(128, 128, 128, .22);
+    color: #6f7a8a;
+    font-size: .65rem;
+    font-variant-numeric: tabular-nums;
 }
 
 #pywebio-scope-running,

@@ -56,6 +56,7 @@ from module.logger import logger
 from module.ocr.rpc import start_ocr_server_process, stop_ocr_server_process
 from module.submodule.submodule import load_config
 from module.submodule.utils import get_config_mod
+from module.statistics.resource_monitor import DASHBOARD_RESOURCES
 from module.webui.base import Frame
 from module.webui.discord_presence import close_discord_rpc, init_discord_rpc
 from module.webui.fastapi import asgi_app
@@ -678,63 +679,46 @@ class AlasGUI(Frame):
         if not isinstance(resources, dict):
             resources = {}
 
-        items = [
-            ("ActionPoint", "ResourceActionPoint"),
-            ("YellowCoin", "ResourceYellowCoin"),
-            ("PurpleCoin", "ResourcePurpleCoin"),
-        ]
-        cards = []
         now = datetime.now()
-        for name, label in items:
-            resource = resources.get(name, {})
-            if not isinstance(resource, dict):
-                resource = {}
-            value = resource.get("Value")
-            record = resource.get("Record")
-            total = resource.get("Total")
+        cards = []
+        for item in DASHBOARD_RESOURCES:
+            record = resources.get(item.key)
+            if not isinstance(record, dict):
+                record = {}
+            value = record.get("Value")
             value_text = f"{value:,}" if isinstance(value, int) else "—"
-            if name == "ActionPoint" and isinstance(total, int):
+            total = record.get("Total")
+            if item.shows_total and isinstance(total, int):
                 value_text = f"{value_text} / {total:,}"
-            delta = resource.get("Delta")
-            if isinstance(delta, int) and delta != 0:
-                sign = "+" if delta > 0 else ""
-                value_text = f"{value_text} ({sign}{delta:,})"
 
-            try:
-                record_time = datetime.strptime(record, "%Y-%m-%d %H:%M:%S")
-                is_stale = (now - record_time).total_seconds() > 86400
-            except (TypeError, ValueError):
-                record_time = None
-                is_stale = False
-            if record_time is None:
-                updated = t("Gui.Overview.ResourceWaiting")
-            elif is_stale:
-                updated = f"{t('Gui.Overview.ResourceStale')} {record[11:16]}"
-            else:
-                updated = f"{t('Gui.Overview.ResourceUpdated')} {record[11:16]}"
-            if name == "ActionPoint" and isinstance(total, int):
-                updated = f"{updated} · {t('Gui.Overview.ResourceActionPointTotal')}"
+            stamp = record.get("Record")
+            updated = t("Gui.Overview.ResourceWaiting")
+            stale = ""
+            if isinstance(stamp, str):
+                try:
+                    recorded = datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    recorded = None
+                if recorded is not None:
+                    # 紧凑时间戳 MM-DD-HH：一屏十几张卡，完整时间会把卡片撑高。
+                    updated = f"{stamp[5:7]}-{stamp[8:10]}-{stamp[11:13]}"
+                    if (now - recorded).total_seconds() > 86400:
+                        stale = " ov-res-card-stale"
 
-            card = put_column(
-                [
-                    put_text(t(f"Gui.Overview.{label}")).style(
-                        "--overview-resource-label--"
-                    ),
-                    put_text(value_text).style("--overview-resource-value--"),
-                    put_text(updated).style("--overview-resource-updated--"),
-                ],
-                size="auto auto auto",
+            cards.append(
+                f'<div class="ov-res-card{stale}">'
+                f'<div class="ov-res-head">'
+                f'<span class="ov-res-label">{t(f"Gui.Overview.{item.label}")}</span>'
+                f'<img class="ov-res-icon" src="/static/icon/resource/{item.icon}.png" alt="">'
+                f'</div>'
+                f'<div class="ov-res-value">{value_text}</div>'
+                f'<div class="ov-res-time">{updated}</div>'
+                f'</div>'
             )
-            card.style(
-                "--overview-resource-card-stale--"
-                if is_stale
-                else "--overview-resource-card--"
-            )
-            cards.append(card)
 
         clear("resource-cards")
         with use_scope("resource-cards"):
-            put_row(cards).style("--overview-resource-row--")
+            put_html(f'<div class="ov-res-grid">{"".join(cards)}</div>')
 
     @use_scope("content", clear=True)
     def alas_daemon_overview(self, task: str) -> None:
@@ -1641,7 +1625,7 @@ def app():
     app = asgi_app(
         applications=[index, manage],
         cdn=cdn,
-        static_dir=None,
+        static_dir='assets/gui',
         debug=True,
         on_startup=[
             startup,
