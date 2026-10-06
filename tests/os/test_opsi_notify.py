@@ -10,11 +10,12 @@ from types import SimpleNamespace
 
 import module.notify as notify_module
 from module.config.config import TaskEnd
-from module.os import opsi_notify
 from module.os.opsi_notify import (
     AP_NOTIFY_MIN_INTERVAL_MINUTES,
+    RUNTIME_ATTR_ACTION_POINT,
+    RUNTIME_ATTR_ACTION_POINT_LOW,
+    RUNTIME_ATTR_COIN_TASK,
     STATE_KEY_LAST_ACTION_POINT,
-    STATE_KEY_LAST_COIN_TASK,
     clear_coin_task_push_state,
     notify_action_point_change,
     notify_ap_insufficient,
@@ -43,7 +44,6 @@ class StubConfig:
         self.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
         self.values = {}
         self.delays = []
-        self.use_smart_state = True
 
     def cross_get(self, keys, default=None):
         return self.values.get(keys, default)
@@ -116,15 +116,30 @@ def push_recorder(ok=True, error=None):
 
 
 def expire_push_window(stub):
-    """把 storage 里的推送时间戳全部推到窗口之外，模拟过了 30 分钟。"""
-    past = (datetime.now() - timedelta(minutes=AP_NOTIFY_MIN_INTERVAL_MINUTES + 1)).isoformat()
-    state = dict(stub.state)
-    for key, value in state.items():
-        if opsi_notify._parse_time(value) is not None:
-            state[key] = past
-        elif isinstance(value, dict) and opsi_notify._parse_time(value.get('Time')) is not None:
-            state[key] = dict(value, Time=past)
-    stub._save_smart_state(state)
+    """把挂在 config 上的推送时间戳推到窗口之外，模拟过了 30 分钟。"""
+    past = datetime.now() - timedelta(minutes=AP_NOTIFY_MIN_INTERVAL_MINUTES + 1)
+    for key, value in vars(stub.config).items():
+        if not key.startswith('opsi_notify_'):
+            continue
+        if isinstance(value, datetime):
+            setattr(stub.config, key, past)
+        elif isinstance(value, tuple) and len(value) == 2 and isinstance(value[1], datetime):
+            setattr(stub.config, key, (value[0], past))
+
+
+def resume_after_task_boundary(stub, ap):
+    """换一个 Config 对象：内存里的推送窗口清零，落盘的调度状态原样带过去。
+
+    `Alas.run_loop` 每跑完一个任务就 `del_cached_property(self, 'config')`，
+    重启进程也是同样效果，所以窗口只在单次任务运行内累计。
+    """
+    revived = NotifyStub(
+        ap=ap,
+        push_config=stub.config.Error_OnePushConfig,
+        notify_mail=stub.config.OpsiGeneral_NotifyOpsiMail,
+    )
+    revived.state = dict(stub.state)
+    return revived
 
 
 def test_no_channel_configured_pushes_nothing():
@@ -184,6 +199,27 @@ def test_action_point_delta_is_reported():
     assert recorder.calls[2]['content'] == '总行动力: 1420 下跌200行动力'
 
 
+def test_task_boundary_resets_the_push_window():
+    """窗口挂在 config 上：任务边界换了 Config，同类消息立刻可以再推（照 AP）。"""
+    stub = NotifyStub(ap=1500)
+    with push_recorder() as recorder:
+        assert notify_action_point_change(stub) is True
+        next_run = resume_after_task_boundary(stub, ap=1620)
+        assert notify_action_point_change(next_run) is True
+    assert len(recorder.calls) == 2
+    assert recorder.calls[1]['content'] == '总行动力: 1620 上涨120行动力'
+
+
+def test_restart_does_not_repush_unchanged_action_point():
+    """行动力值落在 storage：任务边界清零了窗口，值没变依然不重复推。"""
+    stub = NotifyStub(ap=1500)
+    with push_recorder() as recorder:
+        assert notify_action_point_change(stub) is True
+        next_run = resume_after_task_boundary(stub, ap=1500)
+        assert notify_action_point_change(next_run) is False
+    assert len(recorder.calls) == 1
+
+
 def test_action_point_change_waits_for_the_window():
     stub = NotifyStub(ap=1500)
     with push_recorder() as recorder:
@@ -222,8 +258,9 @@ def test_failed_push_is_not_marked_as_sent():
         assert notify_ap_insufficient(stub, 180, 200) is False
     # 尝试时刻已经写入，渠道故障期间不会每轮重试；成功时间戳则没有记录。
     assert len(recorder.calls) == 1
-    assert any(key.endswith('_Attempt') for key in stub.state)
-    assert not any(not key.endswith('_Attempt') and 'Time' in key for key in stub.state)
+    assert isinstance(
+        getattr(stub.config, f'{RUNTIME_ATTR_ACTION_POINT_LOW}_attempt', None), datetime)
+    assert getattr(stub.config, RUNTIME_ATTR_ACTION_POINT_LOW, None) is None
 
 
 def test_channel_exception_does_not_break_the_task():
@@ -241,7 +278,7 @@ def test_same_coin_task_proxies_push_once():
         assert notify_coin_task_proxy(stub, 18000, 1400, 20000, 1000, 'OpsiMeowfficerFarming') is False
         assert notify_coin_task_proxy(stub, 17000, 1300, 20000, 1000, 'OpsiObscure') is True
     assert len(recorder.calls) == 2
-    assert stub.state[STATE_KEY_LAST_COIN_TASK] == 'OpsiObscure'
+    assert stub.config.opsi_notify_coin_task == 'OpsiObscure'
     assert '已代理执行一轮隐秘海域获取黄币' in recorder.calls[1]['content']
 
 
@@ -322,7 +359,7 @@ def test_dispatch_hook_pushes_the_proxied_task():
     assert result.task == 'OpsiStronghold'
     assert recorder.titles == ['Alas <Test> 智能调度- 已代理执行黄币补充任务']
     assert '已代理执行一轮塞壬要塞获取黄币' in recorder.calls[0]['content']
-    assert stub.state[STATE_KEY_LAST_COIN_TASK] == 'OpsiStronghold'
+    assert getattr(stub.config, RUNTIME_ATTR_COIN_TASK, None) == 'OpsiStronghold'
 
 
 def test_wait_branch_pushes_coins_and_action_point_shortage():

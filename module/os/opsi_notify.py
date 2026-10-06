@@ -5,8 +5,11 @@
 每类消息在 `AP_NOTIFY_MIN_INTERVAL_MINUTES` 窗口内最多推一次，避免行动力
 缓慢回复或推送渠道挂掉时把手机刷屏。
 
-去重状态和调度决策状态存在同一个 storage 字典里（键名以 Notify 开头），
-所以重启实例后仍然记得上次推过的行动力和补币任务。
+去重状态分两层，和 AzurPilot 一致：
+- **窗口时间戳挂在 config 对象上**（纯内存）。`Alas` 每跑完一个任务都会重建 Config，
+  所以任务边界、进程重启都会把窗口清零：新一轮调度第一次读到行动力变化就立刻推一条。
+- **上次推送时的总行动力落在 `OpsiScheduling.Storage.Storage`**（键名 `NotifyActionPoint`，
+  AzurPilot 用它的 cl1_database 干这件事）。这样重启后行动力没变就不会重复推送。
 """
 
 import re
@@ -17,12 +20,17 @@ from module.logger import logger
 # AzurPilot 的 AP_NOTIFY_MIN_INTERVAL_MINUTES：同类消息的最小推送间隔。
 AP_NOTIFY_MIN_INTERVAL_MINUTES = 30
 
+# 落盘：上次推送行动力变化时的总行动力
 STATE_KEY_LAST_ACTION_POINT = 'NotifyActionPoint'
-STATE_KEY_ACTION_POINT = 'NotifyActionPointTime'
-STATE_KEY_AP_LOW = 'NotifyActionPointLowTime'
-STATE_KEY_COIN_AP_LOW = 'NotifyCoinsAndActionPointLowTime'
-STATE_KEY_LAST_COIN_TASK = 'NotifyCoinTask'
-STATE_KEY_COIN_TASK_ATTEMPT = 'NotifyCoinTaskAttempt'
+
+# 内存（挂在 config 对象上）：各类消息的上次成功推送时刻，
+# 以及上次尝试推送时刻（`<键名>_attempt`，渠道挂掉时也在窗口内不再重试）
+RUNTIME_ATTR_ACTION_POINT = 'opsi_notify_action_point_time'
+RUNTIME_ATTR_ACTION_POINT_LOW = 'opsi_notify_action_point_low_time'
+RUNTIME_ATTR_COINS_AP_LOW = 'opsi_notify_coins_ap_low_time'
+# 内存：本轮代理执行过并已推送的补币任务名，以及该任务的上次推送尝试
+RUNTIME_ATTR_COIN_TASK = 'opsi_notify_coin_task'
+RUNTIME_ATTR_COIN_TASK_ATTEMPT = 'opsi_notify_coin_task_attempt'
 
 COIN_TASK_DISPLAY_NAMES = {
     'OpsiStronghold': '塞壬要塞',
@@ -41,25 +49,35 @@ def _now() -> datetime:
     return datetime.now()
 
 
-def _state_get(scheduler, key, default=None):
-    return scheduler._get_smart_state().get(key, default)
+def _window() -> timedelta:
+    return timedelta(minutes=AP_NOTIFY_MIN_INTERVAL_MINUTES)
 
 
-def _state_update(scheduler, updates: dict):
+def _last_pushed_action_point(scheduler):
+    """上次推送行动力变化时的总行动力；没推过返回 None。"""
+    value = scheduler._get_smart_state().get(STATE_KEY_LAST_ACTION_POINT)
+    return value if isinstance(value, int) else None
+
+
+def _mark_action_point_pushed(scheduler, total_ap):
     state = scheduler._get_smart_state()
-    state.update(updates)
+    state[STATE_KEY_LAST_ACTION_POINT] = total_ap
     scheduler._save_smart_state(state)
 
 
-def _parse_time(value) -> datetime:
-    if isinstance(value, datetime):
-        return value
-    if not isinstance(value, str):
-        return None
+def _flag_get(scheduler, key):
+    return getattr(scheduler.config, key, None)
+
+
+def _flag_set(scheduler, key, value):
+    setattr(scheduler.config, key, value)
+
+
+def _flag_clear(scheduler, key):
     try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
+        delattr(scheduler.config, key)
+    except AttributeError:
+        pass
 
 
 def _push_config_ready(config) -> bool:
@@ -113,22 +131,26 @@ def send_push(scheduler, title, content) -> bool:
 def _window_passed(scheduler, key) -> bool:
     """距上次推送（或上次尝试推送）是否已超过最小间隔。
 
-    尝试时刻也写进 storage：渠道挂着时每轮都重试，等于把一轮一轮的调度变成刷屏。
+    尝试时刻也一起记：渠道挂着时每轮都重试，等于把一轮一轮的调度变成刷屏。
+    两个时刻都只存在 config 对象上，任务边界重建 Config 就自然清零。
     """
     now = _now()
-    last = _parse_time(_state_get(scheduler, f'{key}_Attempt'))
-    if last is None:
-        last = _parse_time(_state_get(scheduler, key))
-    if last is not None and now - last < timedelta(minutes=AP_NOTIFY_MIN_INTERVAL_MINUTES):
+    attempt = _flag_get(scheduler, f'{key}_attempt')
+    last = attempt if isinstance(attempt, datetime) else _flag_get(scheduler, key)
+    if isinstance(last, datetime) and now - last < _window():
         logger.info(
             f'[大世界-推送] 距上次推送不足 {AP_NOTIFY_MIN_INTERVAL_MINUTES} 分钟，跳过: {key}')
         return False
-    _state_update(scheduler, {f'{key}_Attempt': now.isoformat()})
+    _flag_set(scheduler, f'{key}_attempt', now)
     return True
 
 
+def _mark_sent(scheduler, key):
+    _flag_set(scheduler, key, _now())
+
+
 def notify_action_point_change(scheduler) -> bool:
-    """行动力相比上次推送发生变化时推送（读满一轮才推，跌涨都说清）。"""
+    """行动力相比上次推送发生变化时推送（涨了多少、跌了多少都说清）。"""
     if not push_enabled(scheduler):
         return False
     total = getattr(scheduler, '_action_point_total', None)
@@ -136,22 +158,20 @@ def notify_action_point_change(scheduler) -> bool:
         return False
 
     content = f'总行动力: {total}'
-    previous = _state_get(scheduler, STATE_KEY_LAST_ACTION_POINT)
-    if isinstance(previous, int):
+    previous = _last_pushed_action_point(scheduler)
+    if previous is not None:
         delta = total - previous
         if delta == 0:
             logger.info('[大世界-推送] 行动力未发生变化，跳过推送')
             return False
         content += f' 上涨{delta}行动力' if delta > 0 else f' 下跌{-delta}行动力'
 
-    if not _window_passed(scheduler, STATE_KEY_ACTION_POINT):
+    if not _window_passed(scheduler, RUNTIME_ATTR_ACTION_POINT):
         return False
     if not send_push(scheduler, '行动力出现变化！', content):
         return False
-    _state_update(scheduler, {
-        STATE_KEY_ACTION_POINT: _now().isoformat(),
-        STATE_KEY_LAST_ACTION_POINT: total,
-    })
+    _mark_sent(scheduler, RUNTIME_ATTR_ACTION_POINT)
+    _mark_action_point_pushed(scheduler, total)
     return True
 
 
@@ -159,13 +179,13 @@ def notify_ap_insufficient(scheduler, total_ap, reserve) -> bool:
     """行动力跌破保留线、本轮无事可做。"""
     if not push_enabled(scheduler):
         return False
-    if not _window_passed(scheduler, STATE_KEY_AP_LOW):
+    if not _window_passed(scheduler, RUNTIME_ATTR_ACTION_POINT_LOW):
         return False
     if not send_push(
             scheduler, '智能调度- 行动力不足',
             f'总行动力 {total_ap} 低于最低保留 {reserve}，推迟任务'):
         return False
-    _state_update(scheduler, {STATE_KEY_AP_LOW: _now().isoformat()})
+    _mark_sent(scheduler, RUNTIME_ATTR_ACTION_POINT_LOW)
     return True
 
 
@@ -173,13 +193,13 @@ def notify_coins_ap_insufficient(scheduler, yellow_coins, total_ap, coin_target,
     """黄币没补够，行动力又跌到补黄币的开工线以下。"""
     if not push_enabled(scheduler):
         return False
-    if not _window_passed(scheduler, STATE_KEY_COIN_AP_LOW):
+    if not _window_passed(scheduler, RUNTIME_ATTR_COINS_AP_LOW):
         return False
     content = (f'黄币: {yellow_coins}，补黄币阈值: {coin_target}\n'
                f'总行动力 {total_ap} 不足 (需要 {ap_line})\n推迟任务')
     if not send_push(scheduler, '智能调度- 黄币与行动力双重不足', content):
         return False
-    _state_update(scheduler, {STATE_KEY_COIN_AP_LOW: _now().isoformat()})
+    _mark_sent(scheduler, RUNTIME_ATTR_COINS_AP_LOW)
     return True
 
 
@@ -188,21 +208,21 @@ def notify_coin_task_proxy(scheduler, yellow_coins, total_ap, coin_target, ap_li
     if not push_enabled(scheduler):
         return False
 
-    if _state_get(scheduler, STATE_KEY_LAST_COIN_TASK) == task_name:
+    if _flag_get(scheduler, RUNTIME_ATTR_COIN_TASK) == task_name:
         logger.info(f'[大世界-推送] {task_name} 已推送过代理执行，跳过')
         return False
 
     now = _now()
-    window = timedelta(minutes=AP_NOTIFY_MIN_INTERVAL_MINUTES)
-    attempt = _state_get(scheduler, STATE_KEY_COIN_TASK_ATTEMPT)
-    if isinstance(attempt, dict) and attempt.get('Task') == task_name:
-        last = _parse_time(attempt.get('Time'))
-        if last is not None and now - last < window:
-            logger.info(f'[大世界-推送] {task_name} 推送尝试还在窗口内，跳过')
-            return False
-    _state_update(scheduler, {
-        STATE_KEY_COIN_TASK_ATTEMPT: {'Task': task_name, 'Time': now.isoformat()},
-    })
+    attempt = _flag_get(scheduler, RUNTIME_ATTR_COIN_TASK_ATTEMPT)
+    if (
+        isinstance(attempt, tuple) and len(attempt) == 2
+        and attempt[0] == task_name
+        and isinstance(attempt[1], datetime)
+        and now - attempt[1] < _window()
+    ):
+        logger.info(f'[大世界-推送] {task_name} 推送尝试还在窗口内，跳过')
+        return False
+    _flag_set(scheduler, RUNTIME_ATTR_COIN_TASK_ATTEMPT, (task_name, now))
 
     display = COIN_TASK_DISPLAY_NAMES.get(task_name, task_name)
     content = (f'黄币: {yellow_coins}，补黄币阈值: {coin_target}\n'
@@ -210,7 +230,7 @@ def notify_coin_task_proxy(scheduler, yellow_coins, total_ap, coin_target, ap_li
                f'已代理执行一轮{display}获取黄币')
     if not send_push(scheduler, '智能调度- 已代理执行黄币补充任务', content):
         return False
-    _state_update(scheduler, {STATE_KEY_LAST_COIN_TASK: task_name})
+    _flag_set(scheduler, RUNTIME_ATTR_COIN_TASK, task_name)
     return True
 
 
@@ -228,11 +248,5 @@ def clear_coin_task_push_state(scheduler) -> None:
 
     否则下次再进入补币阶段时，同一个任务会被去重吞掉、永远只推第一次。
     """
-    state = scheduler._get_smart_state()
-    removed = False
-    for key in (STATE_KEY_LAST_COIN_TASK, STATE_KEY_COIN_TASK_ATTEMPT):
-        if key in state:
-            state.pop(key)
-            removed = True
-    if removed:
-        scheduler._save_smart_state(state)
+    _flag_clear(scheduler, RUNTIME_ATTR_COIN_TASK)
+    _flag_clear(scheduler, RUNTIME_ATTR_COIN_TASK_ATTEMPT)
