@@ -33,6 +33,16 @@ from module.os.tasks.task_context import (
 
 CONFIG_PATH_SMART_STATE = 'OpsiScheduling.Storage.Storage'
 
+# 本文件测的是排序与派发，所以四个补币开关一律显式打开；
+# 配置默认值只有耄耋相接开（要塞/隐秘/深渊默认关），由
+# test_coin_task_enable_defaults_follow_config_defaults 单独守住。
+ALL_COIN_TASKS_ENABLED = {
+    'OpsiScheduling.OpsiScheduling.EnableStronghold': True,
+    'OpsiScheduling.OpsiScheduling.EnableObscure': True,
+    'OpsiScheduling.OpsiScheduling.EnableAbyssal': True,
+    'OpsiScheduling.OpsiScheduling.EnableMeowfficerFarming': True,
+}
+
 
 class FakeConfig:
     def __init__(self, values=None, task='OpsiScheduling'):
@@ -59,8 +69,10 @@ def bind(stub, *names):
     return stub
 
 
-def make_scheduler(values=None):
-    stub = SimpleNamespace(config=FakeConfig(values))
+def make_scheduler(values=None, enable_all=True):
+    merged = dict(ALL_COIN_TASKS_ENABLED) if enable_all else {}
+    merged.update(values or {})
+    stub = SimpleNamespace(config=FakeConfig(merged))
     # 这些用例只验证任务选择，大世界推送整体关掉（见 test_opsi_notify）
     stub.is_smart_scheduling_enabled = False
     bind(
@@ -71,6 +83,12 @@ def make_scheduler(values=None):
         '_postpone_coin_task_check', '_get_coin_task_postpone',
     )
     return stub
+
+
+def test_coin_task_enable_defaults_follow_config_defaults():
+    """配置里没写这几个键时，只有耄耋相接默认开（与 argument.yaml 一致）。"""
+    stub = make_scheduler(enable_all=False)
+    assert OpsiScheduling._get_enabled_coin_tasks(stub) == ['OpsiMeowfficerFarming']
 
 
 # ---- 任务选择：TaskPriority 与 Enable ----

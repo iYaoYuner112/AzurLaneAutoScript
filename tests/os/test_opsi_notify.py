@@ -42,7 +42,13 @@ class StubConfig:
         self.OpsiScheduling_OperationCoinsPreserve = 20000
         self.OpsiScheduling_OperationCoinsReturnThreshold = 60000
         self.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
-        self.values = {}
+        self.values = {
+            # 配置默认只开耄耋相接；推送用例按四个补币任务全开的一份配置来跑
+            'OpsiScheduling.OpsiScheduling.EnableStronghold': True,
+            'OpsiScheduling.OpsiScheduling.EnableObscure': True,
+            'OpsiScheduling.OpsiScheduling.EnableAbyssal': True,
+            'OpsiScheduling.OpsiScheduling.EnableMeowfficerFarming': True,
+        }
         self.delays = []
 
     def cross_get(self, keys, default=None):

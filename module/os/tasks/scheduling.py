@@ -36,6 +36,7 @@ from module.os.opsi_notify import (
     notify_coins_ap_insufficient,
 )
 from module.os.tasks.task_context import (
+    COIN_TASK_ENABLE_CONFIG,
     OpsiNoContent,
     OpsiStatus,
     OpsiTaskResult,
@@ -127,12 +128,6 @@ COIN_TASK_NAMES = (
 )
 DEFAULT_TASK_PRIORITY = ' > '.join(COIN_TASK_NAMES)
 
-COIN_TASK_ENABLE_KEYS = {
-    TASK_NAME_STRONGHOLD: 'EnableStronghold',
-    TASK_NAME_OBSCURE: 'EnableObscure',
-    TASK_NAME_ABYSSAL: 'EnableAbyssal',
-    TASK_NAME_MEOWFFICER_FARMING: 'EnableMeowfficerFarming',
-}
 COIN_TASK_POSTPONE_KEYS = {
     TASK_NAME_STRONGHOLD: STATE_KEY_STRONGHOLD_NEXT_CHECK,
     TASK_NAME_OBSCURE: STATE_KEY_OBSCURE_NEXT_CHECK,
@@ -203,11 +198,12 @@ class OpsiScheduling(OSMap):
         return order
 
     def _is_coin_task_enabled(self, task_name) -> bool:
-        key = COIN_TASK_ENABLE_KEYS.get(task_name)
-        if key is None:
+        enable = COIN_TASK_ENABLE_CONFIG.get(task_name)
+        if enable is None:
             return False
+        key, default = enable
         return bool(self.config.cross_get(
-            f'OpsiScheduling.OpsiScheduling.{key}', default=True))
+            f'OpsiScheduling.OpsiScheduling.{key}', default=default))
 
     def _is_hazard1_enabled(self) -> bool:
         return bool(self.config.cross_get(

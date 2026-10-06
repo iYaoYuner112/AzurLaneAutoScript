@@ -198,11 +198,14 @@ def opsi_no_content(config, task_name, reason='', *, server_update=True, minute=
     config.task_stop()
 
 
+# 补币任务的启用开关，值形如 (配置项名, 缺键时的兜底)。兜底必须等于 argument.yaml 里的
+# 生成默认，否则老配置缺键时行为会和新建实例不一致：默认只有耄耋相接开，
+# 要塞/隐秘/深渊关（练度不够时打不赢还会反复重试，白耗行动力）。
 COIN_TASK_ENABLE_CONFIG = {
-    'OpsiStronghold': 'EnableStronghold',
-    'OpsiObscure': 'EnableObscure',
-    'OpsiAbyssal': 'EnableAbyssal',
-    'OpsiMeowfficerFarming': 'EnableMeowfficerFarming',
+    'OpsiStronghold': ('EnableStronghold', False),
+    'OpsiObscure': ('EnableObscure', False),
+    'OpsiAbyssal': ('EnableAbyssal', False),
+    'OpsiMeowfficerFarming': ('EnableMeowfficerFarming', True),
 }
 
 
@@ -216,10 +219,11 @@ def should_hand_over_to_scheduling(config, task_name, smart_scheduling_enabled) 
     """
     if not smart_scheduling_enabled or is_running_opsi_proxy(config):
         return False
-    key = COIN_TASK_ENABLE_CONFIG.get(task_name)
-    if key is None:
+    enable = COIN_TASK_ENABLE_CONFIG.get(task_name)
+    if enable is None:
         return False
-    return bool(config.cross_get(f'OpsiScheduling.OpsiScheduling.{key}', default=True))
+    key, default = enable
+    return bool(config.cross_get(f'OpsiScheduling.OpsiScheduling.{key}', default=default))
 
 
 class OpsiNoContent(Exception):

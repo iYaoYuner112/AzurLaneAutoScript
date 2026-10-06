@@ -9304,15 +9304,15 @@
       },
       "EnableObscure": {
         "type": "checkbox",
-        "value": true
+        "value": false
       },
       "EnableAbyssal": {
         "type": "checkbox",
-        "value": true
+        "value": false
       },
       "EnableStronghold": {
         "type": "checkbox",
-        "value": true
+        "value": false
       },
       "TaskPriority": {
         "type": "input",

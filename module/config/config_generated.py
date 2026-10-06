@@ -472,9 +472,9 @@ class GeneratedConfig:
     OpsiScheduling_OperationCoinsReturnThreshold = 60000
     OpsiScheduling_EnableMeowfficerFarming = True
     OpsiScheduling_EnableHazard1Leveling = True
-    OpsiScheduling_EnableObscure = True
-    OpsiScheduling_EnableAbyssal = True
-    OpsiScheduling_EnableStronghold = True
+    OpsiScheduling_EnableObscure = False
+    OpsiScheduling_EnableAbyssal = False
+    OpsiScheduling_EnableStronghold = False
     OpsiScheduling_TaskPriority = 'OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming'
 
     # Group `IslandProduction`

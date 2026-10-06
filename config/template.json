@@ -1908,9 +1908,9 @@
       "OperationCoinsReturnThreshold": 60000,
       "EnableMeowfficerFarming": true,
       "EnableHazard1Leveling": true,
-      "EnableObscure": true,
-      "EnableAbyssal": true,
-      "EnableStronghold": true,
+      "EnableObscure": false,
+      "EnableAbyssal": false,
+      "EnableStronghold": false,
       "TaskPriority": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming"
     },
     "Storage": {

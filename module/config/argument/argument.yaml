@@ -797,9 +797,12 @@ OpsiScheduling:
   OperationCoinsReturnThreshold: 60000
   EnableMeowfficerFarming: true
   EnableHazard1Leveling: true
-  EnableObscure: true
-  EnableAbyssal: true
-  EnableStronghold: true
+  # 这三项默认关（与 AzurPilot 一致）：要塞/隐秘/深渊都要先做一轮全球图搜索，
+  # 练度不够时打不赢还会反复重试，行动力全空耗在补不到黄币的战斗上。
+  # 想要更高的黄币上限再自行打开；TaskPriority 里的顺序决定它们被优先尝试的次序。
+  EnableObscure: false
+  EnableAbyssal: false
+  EnableStronghold: false
   TaskPriority:
     value: 'OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming'
 
