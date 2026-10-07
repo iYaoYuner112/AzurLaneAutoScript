@@ -1013,8 +1013,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         try:
             for fleet in [primary] + [index for index in (1, 2, 3, 4) if index != primary]:
                 logger.info(f'[FIXED PATROL][L0] Check Fleet {fleet}')
-                if not self._set_fixed_patrol_fleet(fleet):
-                    continue
+                self._set_fixed_patrol_fleet(fleet)
 
                 self.device.screenshot()
                 question = self.radar.predict_question(
@@ -1071,14 +1070,19 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.action_point_quit()
 
     def _set_fixed_patrol_fleet(self, fleet):
+        """切到指定舰队，并回读确认一次——**确认不上只告警，不跳过这支舰队**。
+
+        `fleet_set()` 内部的 `ensure_to_be()` 已经保证"要么切成、要么卡死报错"，
+        这里再读一次 `fleet_selector.get()` 用的是上一帧画面，切队动画或信息栏还没
+        消失时会读成旧队号/0。曾经据此 `continue` 跳过整支舰队，等于那支队的雷达
+        根本没读——现象就是"看到问号后像切到下一轮去了"。AzurPilot 普通路径不做
+        这个校验（只在月末补扫校验并 raise），这里对齐它：留告警、不跳队。
+        """
         self.fleet_set(fleet)
         current = self.fleet_selector.get()
         if current != fleet:
             logger.warning(
-                f'Fixed patrol expected fleet {fleet}, but current fleet is {current}; skip it'
-            )
-            return False
-        return True
+                f'Fixed patrol expected fleet {fleet}, but current fleet is {current}')
 
     def _fixed_patrol_candidate_grids(self, target_loc, occupied_locations=None):
         """
@@ -1323,8 +1327,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         logger.hr(
             f'Fixed patrol: move fleet {fleet} to {location2node(target_grid.location)}', level=2)
-        if not self._set_fixed_patrol_fleet(fleet):
-            return False
+        self._set_fixed_patrol_fleet(fleet)
 
         # Reset the camera to a known corner first, so that the following
         # focus_to() does not start from a stale camera position.
@@ -1424,8 +1427,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # Radar pre-check: if the current fleet can solve an event nearby,
                 # do it now instead of moving this fleet.
                 logger.info(f'[FIXED PATROL][L2] Fleet {fleet} radar pre-check')
-                if not self._set_fixed_patrol_fleet(fleet):
-                    continue
+                self._set_fixed_patrol_fleet(fleet)
                 self._solved_map_event = set()
                 self._solved_fleet_mechanism = False
                 self.clear_question(drop=None)

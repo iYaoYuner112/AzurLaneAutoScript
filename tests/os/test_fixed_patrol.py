@@ -959,3 +959,33 @@ def test_app_restart_passes_request_human_takeover_up():
     except RequestHumanTakeover:
         raised = True
     assert raised
+
+
+class L0StubRealFleetCheck(L0Stub):
+    """改用真实的 `_set_fixed_patrol_fleet`，并让回读故意读不到刚切过去的舰队。"""
+
+    _set_fixed_patrol_fleet = OSMap._set_fixed_patrol_fleet
+
+    def __init__(self, questions, read_back=lambda fleet: 0, **kwargs):
+        super().__init__(questions, **kwargs)
+        self._read_back = read_back
+
+    @property
+    def fleet_selector(self):
+        return SimpleNamespace(get=lambda: self._read_back(self.current))
+
+
+def test_l0_still_reads_a_fleet_whose_switch_cannot_be_confirmed():
+    """回读确认不上（读的是上一帧）时照样读这支舰队的雷达，不跳队（对齐 AP）。"""
+    stub = L0StubRealFleetCheck({1: None, 2: (4, 0), 3: None, 4: None})
+    assert OSMap.clear_question_any_fleet(stub) is False
+    assert stub.events.count('set2') == 1
+    assert stub.events.count('clear2') == 1
+    assert stub.events.count('rescan') == 1
+
+
+def test_l0_reads_every_fleet_even_when_no_read_back_matches():
+    """四支舰队的回读全都对不上，雷达也一支都不能漏。"""
+    stub = L0StubRealFleetCheck({})
+    assert OSMap.clear_question_any_fleet(stub) is False
+    assert stub.events.count('screenshot') == 4
