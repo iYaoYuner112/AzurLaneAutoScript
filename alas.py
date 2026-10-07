@@ -109,10 +109,16 @@ class AzurLaneAutoScript:
             logger.critical('This is likely to be a mistake of developers, but sometimes just random issues')
             self._notify_crashed(command, '脚本执行出错，已停止运行', error=e)
             exit(1)
-        except RequestHumanTakeover as e:
-            logger.critical('Request human takeover')
-            self._notify_crashed(command, '需要人工介入，已停止运行', error=e)
-            exit(1)
+        except RequestHumanTakeover:
+            # 对齐 AzurPilot（alas.py:1282-1303）：绝大多数"需要人工介入"靠重启游戏就能
+            # 恢复，不再直接终止进程。治不好的情况由 run_loop 的"同一任务连败 3 次"兜底
+            # 停下来等人工，所以这里不会无限重试。
+            logger.critical('Request human takeover, trying to recover by restarting the game')
+            logger.warning('If you are playing by hand, please stop Alas')
+            self.save_error_log()
+            self.config.task_call('Restart')
+            self._notify_recoverable('需要人工介入 - 正在尝试自动重启恢复')
+            return False
         except Exception as e:
             logger.exception(e)
             self.save_error_log()
@@ -125,10 +131,15 @@ class AzurLaneAutoScript:
         return ' '.join(str(error).split())[:200]
 
     def _notify_crashed(self, command, message, error=None):
-        """致命错误的推送：中文说明 + 任务名，异常只留一行摘要供排查。"""
+        """致命错误的推送：中文说明 + 任务名，异常有内容才带一行摘要。
+
+        `RequestHumanTakeover` 这类异常是裸抛的，`str(e)` 为空，不能留一行空的「原因:」。
+        """
         content = f"<{self.config_name}> {message}\n任务: {inflection.camelize(command)}"
         if error is not None:
-            content += f"\n原因: {self._error_summary(error)}"
+            summary = self._error_summary(error)
+            if summary:
+                content += f"\n原因: {summary}"
         handle_notify(
             self.config.Error_OnePushConfig,
             title=f"Alas <{self.config_name}> 已停止",
