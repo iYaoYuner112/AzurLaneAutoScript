@@ -23,14 +23,15 @@ class TaskEnd(Exception):
 
 # Cross-storage flag marking the Operation Siren map state as stale. It is set
 # when an Opsi task is interrupted by another task (see `task_switched()`), and
-# cleared by the resume barrier in `OSMap.os_init()` after a full map rescan.
+# consumed by the resume barrier in `OSMap.ensure_map_state_current()`, which
+# drops the cached scan state without rescanning (AzurPilot has no rescan here).
 OS_MAP_STALE_KEY = 'Alas.Storage.Storage.OpsiMapStale'
 
 # One-shot cross-storage flag marking that OpsiScheduling itself was preempted
-# by another task (see `task_switched()`). Consumed by the resume barrier in
-# `OSMap.ensure_map_state_current()` when OpsiScheduling is resumed: instead of
-# rescanning unconditionally, it first tries one auto search probe and only
-# falls back to a full map rescan when the probe has no effect.
+# by another task (see `task_switched()`). Consumed by the same resume barrier
+# so its logging says which task resumed, and so the barrier can never repeat
+# for the same preemption. It does NOT make the resume run an auto search probe
+# or a full map rescan -- both were removed, see `handle_first_auto_search()`.
 OS_RESUME_RECOVERY_KEY = 'Alas.Storage.Storage.OpsiSchedulingResumeRecovery'
 
 
@@ -638,13 +639,13 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         else:
             logger.info(f"Switch task `{prev}` to `{new}`")
             # When an Operation Siren task is interrupted by another task, mark
-            # its map state stale so the next Opsi entry runs a full rescan
-            # instead of trusting the pre-interruption map data.
+            # its map state stale so the next Opsi entry drops the cached scan
+            # state instead of trusting the pre-interruption map data.
             if str(getattr(prev, 'command', '')).startswith('Opsi'):
                 self.cross_set(OS_MAP_STALE_KEY, True)
-                # When OpsiScheduling itself is preempted, leave the one-shot
-                # resume-recovery flag so its resume path first probes with one
-                # auto search instead of rescanning unconditionally.
+                # Also leave a one-shot flag when OpsiScheduling itself was
+                # preempted, so the resume barrier knows which task resumed and
+                # never repeats for the same preemption.
                 if str(getattr(prev, 'command', '')) == 'OpsiScheduling':
                     self.cross_set(OS_RESUME_RECOVERY_KEY, True)
             return True

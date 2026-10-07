@@ -166,11 +166,12 @@ def test_os_map_was_interrupted_reads_flag():
     assert OSMap._os_map_was_interrupted(make_resume_stub(False)) is False
 
 
-def test_ensure_map_state_current_does_full_rescan_and_invalidates():
+def test_ensure_map_state_current_invalidates_without_rescanning():
+    """被打断后只作废缓存的扫描状态，不重扫整图（对齐 AzurPilot：AP 没有这一步）。"""
     stub = make_resume_stub(True)
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
     OSMap.ensure_map_state_current(stub)
-    assert stub.rescan_calls == [{'rescan_mode': 'full'}]
+    assert stub.rescan_calls == []
     assert stub._solved_map_event == set()
     assert stub._solved_fleet_mechanism is False
 
@@ -183,13 +184,16 @@ def test_ensure_map_state_current_clears_stale_flag():
 
 
 def test_resume_barrier_runs_once_per_interruption():
-    """恢复屏障只做一次：清了标记后，后续进入不会再触发 rescan。"""
+    """恢复屏障只做一次：清了标记后，后续进入不会再作废缓存。"""
     stub = make_resume_stub(True)
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
     OSMap.ensure_map_state_current(stub)
-    assert len(stub.rescan_calls) == 1
-    # 标记已清除，第二次进入不会再次 FULL RESCAN
+    assert stub.config.stale is False
     assert OSMap._os_map_was_interrupted(stub) is False
+    # 第二次进入直接返回，不会把新一轮的扫描结果再清掉
+    stub._solved_map_event = {'is_akashi'}
+    OSMap.ensure_map_state_current(stub)
+    assert stub._solved_map_event == {'is_akashi'}
 
 
 # ---- 智能调度恢复：不重扫、不跑自律寻敌，交给子任务流程重建 ----
@@ -233,22 +237,24 @@ def test_scheduling_resume_applies_to_every_zone():
 
 
 def test_ensure_ignores_recovery_flag_for_other_tasks():
-    """恢复标志只在 OpsiScheduling 上生效；其他任务恢复走原有全图重扫。"""
+    """恢复标志只在 OpsiScheduling 上消费；其他任务恢复同样不重扫。"""
     stub = make_scheduling_stub(stale=True, recovery=True, command='OpsiDaily')
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
     OSMap.ensure_map_state_current(stub)
-    assert stub.rescan_calls == [{'rescan_mode': 'full'}]
+    assert stub.rescan_calls == []
     assert stub.config.stale is False
     # 非智能调度恢复不消费 recovery 标志
     assert stub.config.recovery is True
 
 
-def test_ensure_full_rescan_without_recovery_flag():
-    """普通 Opsi 抢占恢复（无 recovery 标志）：维持原有无条件重扫。"""
+def test_ensure_other_opsi_resume_does_not_rescan():
+    """普通 Opsi 抢占恢复（无 recovery 标志）：也只作废缓存，不重扫整图。"""
     stub = make_scheduling_stub(stale=True, recovery=False)
     stub.map_rescan = lambda **kw: stub.rescan_calls.append(kw)
     OSMap.ensure_map_state_current(stub)
-    assert stub.rescan_calls == [{'rescan_mode': 'full'}]
+    assert stub.rescan_calls == []
+    assert stub.auto_search_calls == []
+    assert stub.config.stale is False
 
 
 def test_recovery_available_requires_scheduling_command():

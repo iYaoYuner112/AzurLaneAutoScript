@@ -88,28 +88,16 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     def ensure_map_state_current(self):
         """
-        Resume barrier: if the map state is stale, re-establish it before any
-        Opsi operation. Runs once per invalidation, not on every loop.
+        Resume barrier: after an Opsi task was preempted by another task, drop the
+        cached scan state before the task flow continues. Runs once per interruption.
 
-        The regular re-sync does: invalidate stale scan caches -> FULL MAP RESCAN
-        -> rebuild targets (done later by the target selector). Fleet positions
-        are re-read by the fixed patrol / radar check when they are needed.
-        Smart scheduling resume takes a different path, see below.
-
-        Smart scheduling resume: when OpsiScheduling itself was preempted by
-        another task (OS_RESUME_RECOVERY_KEY set), the barrier does NOT rescan
-        and does NOT run a first auto search either. AzurPilot does the same:
-        the smart scheduling sub-tasks rebuild the map on their own
-        (侵蚀1练级 runs its own battle plan followed by clear_question() and
-        map_rescan(); coin tasks navigate to their own zones), so the barrier
-        only invalidates the cached scan state and lets the sub-task flow do
-        the rebuild.
-
-        Running a first auto search here used to be the resume probe. It had to
-        be dropped: that auto search cleared the zone before the sub-task's own
-        battle plan, so the battle plan had nothing to fight and the map events
-        were never picked up by `map_rescan()`, i.e. events were silently
-        missed right after a resume (see `handle_first_auto_search()`).
+        It deliberately does NOT rescan the whole map. AzurPilot has no such barrier
+        at all: every Opsi task entry rebuilds what it needs through `os_init()` ->
+        `zone_init()`, and each flow does its own map work (侵蚀1 打计划作战、补币任务
+        导航进自己的海域), so a full rescan here costs ~12s and repeats what the
+        sub-task is about to do anyway. Same for a first auto search: it would clear
+        the zone before the sub-task's battle plan, so map events never get picked up
+        by `map_rescan()` (see `handle_first_auto_search()`).
         """
         if not self._os_map_was_interrupted():
             logger.info('[OS RESUME] Continue without interruption')
@@ -119,39 +107,20 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         # If a Siren device interaction was in progress when the task was
         # interrupted, do NOT replay any stale click. Re-observe the UI instead:
-        # either the rescan below or the smart scheduling sub-task flow
-        # re-detects the device and re-decides from the real state.
+        # the task flow re-detects the device and re-decides from the real state.
         if self._device_state in DEVICE_INTERRUPTIBLE_STATES:
             logger.info(f'[OS][DEVICE] interruption detected during state={self._device_state}')
             logger.info('[OS][DEVICE] recovery: re-observing current UI (no stale click)')
 
-        # Invalidate stale scan caches before re-observing the map.
+        # Invalidate stale scan caches; the task flow re-derives them.
         self._solved_map_event = set()
         self._solved_fleet_mechanism = False
 
-        # Smart scheduling resume: OpsiScheduling was preempted by another task.
-        # One-shot: consume the recovery flag immediately so a later resume can
-        # never repeat this barrier.
+        # One-shot: consume the smart scheduling resume flag so this barrier can
+        # never repeat for the same preemption.
         if self._os_resume_recovery_available():
             self.config.cross_set(OS_RESUME_RECOVERY_KEY, False)
             logger.info('[OS][RESUME] OpsiScheduling resumed after external task interruption')
-            logger.info('[OS][RESUME] Map state marked stale')
-            logger.info('[OS][RESUME] Handing the map rebuild over to the smart scheduling sub-tasks')
-            # No auto search / rescan here (AzurPilot aligns): the sub-task flow
-            # rebuilds the map itself and its own battle plan + map_rescan() is
-            # the only chance for map events to be resolved. Clearing the stale
-            # flag keeps this barrier one-shot.
-            self.config.cross_set(OS_MAP_STALE_KEY, False)
-            logger.info('[OS][MAP] Map state resynced')
-            return
-
-        logger.info('[OS RESUME] Running FULL MAP RESCAN after interruption')
-        try:
-            self.map_rescan(rescan_mode='full')
-        except UNSWALLOWABLE_ERRORS:
-            raise
-        except Exception as e:
-            logger.warning(f'[OS RESUME] full rescan failed, continue: {e}')
         # The barrier runs once per interruption.
         self.config.cross_set(OS_MAP_STALE_KEY, False)
         logger.info('[OS][MAP] Map state resynced')

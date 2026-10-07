@@ -1,7 +1,7 @@
 """本轮可靠性增强的纯逻辑单测：stale 接口、塞壬装置状态机。
 
 覆盖：
-- invalidate_map_state -> ensure_map_state_current 做 FULL RESCAN 并清 stale；
+- invalidate_map_state -> ensure_map_state_current 作废缓存扫描状态并清 stale（不重扫，对齐 AzurPilot）；
 - 装置子状态 + 中断恢复时重新观察 UI（不 replay stale click）；
 """
 
@@ -60,8 +60,12 @@ def test_invalidate_map_state_sets_flag():
 
 def test_ensure_map_state_current_resyncs_and_clears_flag():
     stub = make_map_stub({OS_MAP_STALE_KEY: True})
+    stub._solved_map_event = {'is_akashi'}
+    stub._solved_fleet_mechanism = True
     OSMap.ensure_map_state_current(stub)
-    assert stub.rescan_calls == [{'rescan_mode': 'full'}]
+    assert stub.rescan_calls == []
+    assert stub._solved_map_event == set()
+    assert stub._solved_fleet_mechanism is False
     assert stub.config.values[OS_MAP_STALE_KEY] is False
 
 
@@ -89,8 +93,10 @@ def test_interruptible_device_states():
 
 
 def test_ensure_map_state_current_reexamines_interrupted_device():
-    """弹窗打开时被抢占 -> 恢复时 FULL RESCAN（重新观察 UI），而非回放过期点击。"""
+    """弹窗打开时被抢占 -> 恢复时不重扫也不回放过期点击，只清标记交给流程重新观察。"""
     stub = make_map_stub({OS_MAP_STALE_KEY: True, DEVICE_STATE_KEY: DEVICE_DIALOG_OPEN})
     OSMap.ensure_map_state_current(stub)
-    assert stub.rescan_calls == [{'rescan_mode': 'full'}]
+    assert stub.rescan_calls == []
     assert stub.config.values[OS_MAP_STALE_KEY] is False
+    # 装置状态不被恢复屏障改写：由后续流程重新检测再决定
+    assert stub.config.values[DEVICE_STATE_KEY] == DEVICE_DIALOG_OPEN
