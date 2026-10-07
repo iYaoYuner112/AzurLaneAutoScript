@@ -1674,7 +1674,8 @@
       "RepairThreshold": 0.4,
       "DoRandomMapEvent": true,
       "AkashiShopFilter": "ActionPoint > PurpleCoins",
-      "NotifyOpsiMail": true
+      "NotifyOpsiMail": true,
+      "SkipStrategicSearchCheck": false
     },
     "Storage": {
       "Storage": {}

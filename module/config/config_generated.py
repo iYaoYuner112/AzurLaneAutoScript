@@ -400,6 +400,7 @@ class GeneratedConfig:
     OpsiGeneral_DoRandomMapEvent = True
     OpsiGeneral_AkashiShopFilter = 'ActionPoint > PurpleCoins'
     OpsiGeneral_NotifyOpsiMail = True
+    OpsiGeneral_SkipStrategicSearchCheck = False
 
     # Group `OpsiAshBeacon`
     OpsiAshBeacon_AttackMode = 'current'  # current, current_dossier

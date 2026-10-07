@@ -2473,6 +2473,10 @@
     "NotifyOpsiMail": {
       "name": "Push Operation Siren notifications",
       "help": "Send notifications about Corrosion 1 and Meowfficer farming through OnePush. May be noisy due to high message volume."
+    },
+    "SkipStrategicSearchCheck": {
+      "name": "Skip plan battle option checks",
+      "help": "When looping a single zone (Corrosion 1 leveling / Meowfficer farming), open the plan battle panel and confirm directly without scroll-checking every option. The panel options must already be configured in-game (zone mode: repeat, stop on merchant/device, auto-submit missions); let the task run once normally, or configure them manually first."
     }
   },
   "OpsiAshBeacon": {

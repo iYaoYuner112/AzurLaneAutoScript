@@ -145,12 +145,18 @@ class StrategicSearchHandler(MapEventHandler):
             out: IN_MAP, with strategic search running
         """
         logger.hr('Strategic search start')
+        # 面板会保留上一次的选项配置：循环刷取同一海域时，每次重新滑动检查各选项
+        # 属于重复动作，开启「跳过计划作战滑动检查」后直接确认开始。
+        skip_check = self.config.OpsiGeneral_SkipStrategicSearchCheck
+        if skip_check:
+            logger.info('[大世界-策略] 已开启快速模式，跳过计划作战面板选项检查')
         for _ in range(3):
             self.strategy_search_enter()
             self.strategic_search_set_tab()
-            success = self.strategic_search_set_option()
-            if not success:
-                continue
+            if not skip_check:
+                success = self.strategic_search_set_option()
+                if not success:
+                    continue
             self.strategic_search_confirm()
             return True
 

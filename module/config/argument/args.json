@@ -8521,6 +8521,10 @@
       "NotifyOpsiMail": {
         "type": "checkbox",
         "value": true
+      },
+      "SkipStrategicSearchCheck": {
+        "type": "checkbox",
+        "value": false
       }
     },
     "Storage": {

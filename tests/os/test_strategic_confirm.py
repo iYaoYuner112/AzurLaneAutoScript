@@ -115,3 +115,46 @@ def test_button_name_is_restored_after_the_click():
     stub.handle_popup_confirm(name='STRATEGIC_SEARCH', threshold=20)
     stub.handle_popup_confirm(name='GOTO_GLOBE', threshold=20)
     assert stub.clicks == ['POPUP_CONFIRM_STRATEGIC_SEARCH', 'POPUP_CONFIRM_GOTO_GLOBE']
+
+
+class StartStub:
+    """替身只记录调用顺序，用来看「跳过计划作战滑动检查」到底跳掉了哪一步。"""
+
+    strategic_search_start = StrategicSearchHandler.strategic_search_start
+
+    def __init__(self, skip_check, option_ok=True):
+        self.config = SimpleNamespace(OpsiGeneral_SkipStrategicSearchCheck=skip_check)
+        self.option_ok = option_ok
+        self.calls = []
+
+    def strategy_search_enter(self):
+        self.calls.append('enter')
+
+    def strategic_search_set_tab(self):
+        self.calls.append('tab')
+
+    def strategic_search_set_option(self):
+        self.calls.append('option')
+        return self.option_ok
+
+    def strategic_search_confirm(self):
+        self.calls.append('confirm')
+
+
+def test_option_check_runs_when_switch_is_off():
+    stub = StartStub(skip_check=False)
+    assert stub.strategic_search_start() is True
+    assert stub.calls == ['enter', 'tab', 'option', 'confirm']
+
+
+def test_quick_mode_skips_the_scroll_check_entirely():
+    stub = StartStub(skip_check=True)
+    assert stub.strategic_search_start() is True
+    assert stub.calls == ['enter', 'tab', 'confirm']
+
+
+def test_failed_option_check_still_retries_only_while_checking():
+    """关掉快速模式时，选项检查失败仍按原逻辑重试三次后判启动失败。"""
+    stub = StartStub(skip_check=False, option_ok=False)
+    assert stub.strategic_search_start() is False
+    assert stub.calls == ['enter', 'tab', 'option'] * 3
