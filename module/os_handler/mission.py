@@ -222,10 +222,15 @@ class MissionHandler(GlobeOperation, ZoneManager):
                 success = True
                 break
             if self.info_bar_count():
-                logger.info('Unable to accept missions, because reached the maximum number of missions')
+                # 塞壬研究任务同名可重复存在，接取后我们永远不做它，槽位会被它占满。
+                # 开着跳过时这是预期状态，按 AzurPilot 的口径算"接取成功"，
+                # 否则 os_daily 的 `if success: break` 不成立，会一圈一圈重接个没完。
                 if skip_siren_mission:
                     logger.info('Unable to accept missions: multiple siren research missions with the same name')
-                success = False
+                    success = True
+                else:
+                    logger.info('Unable to accept missions, because reached the maximum number of missions')
+                    success = False
                 break
 
             if self.handle_manjuu():
