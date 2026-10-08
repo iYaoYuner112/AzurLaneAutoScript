@@ -228,12 +228,12 @@ class OpsiScheduling(OSMap):
         return max(int(self.config.OpsiScheduling_MeowfficerActionPointPreserve), 0)
 
     def _get_scheduled_meow_ap_preserve(self) -> int:
-        """This round's coin-task AP line, still lowered by the month-end limit."""
-        return min(
-            self.get_action_point_limit(),
-            self._get_coin_task_action_point_preserve(),
-            2000,
-        )
+        """This round's coin-task AP line, exactly as configured.
+
+        AzurPilot neither caps this line nor lowers it at month end (it has no
+        `get_action_point_limit()` at all), so the reserve is used as-is.
+        """
+        return self._get_coin_task_action_point_preserve()
 
     def _get_coin_replenish_target(self) -> int:
         """本轮补黄币的目标值：目标模式按 保留值 + 回补阈值，否则就是保留值。"""

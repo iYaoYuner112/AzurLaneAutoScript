@@ -29,19 +29,15 @@ from module.os.tasks.scheduling import (
 
 
 class PreserveStub:
-    """只提供 _meow_preserve_value 需要的配置与月末保留。"""
+    """只提供 _meow_preserve_value 需要的配置。"""
 
-    def __init__(self, month_end_limit=2000, smart_scheduling=True,
+    def __init__(self, smart_scheduling=True,
                  scheduling_meow=1000, task_meow=1000):
         self.config = SimpleNamespace(
             OpsiScheduling_MeowfficerActionPointPreserve=scheduling_meow,
             OpsiMeowfficerFarming_ActionPointPreserve=task_meow,
         )
         self.is_smart_scheduling_enabled = smart_scheduling
-        self._month_end_limit = month_end_limit
-
-    def get_action_point_limit(self):
-        return self._month_end_limit
 
 
 class TestMeowPreserveValue(unittest.TestCase):
@@ -49,17 +45,12 @@ class TestMeowPreserveValue(unittest.TestCase):
         """代跑：保留线来自调度层，不再是短猫自己那个 1000。"""
         self.assertEqual(OpsiMeowfficerFarming._meow_preserve_value(PreserveStub(), 200), 200)
 
-    def test_scheduler_line_still_drops_at_month_end(self):
-        """月末动态保留仍要叠加，能吃干剩余行动力的那层保护不能丢。"""
+    def test_scheduler_line_is_not_lowered_or_capped(self):
+        """对齐 AzurPilot：不叠月末动态保留，也不封顶，配置多少就按多少停手。"""
         self.assertEqual(
-            OpsiMeowfficerFarming._meow_preserve_value(PreserveStub(month_end_limit=0), 200), 0)
+            OpsiMeowfficerFarming._meow_preserve_value(PreserveStub(), 100000), 100000)
         self.assertEqual(
-            OpsiMeowfficerFarming._meow_preserve_value(PreserveStub(month_end_limit=300), 1000), 300)
-
-    def test_proxied_line_is_capped_at_2000(self):
-        self.assertEqual(
-            OpsiMeowfficerFarming._meow_preserve_value(
-                PreserveStub(month_end_limit=2000), 100000), 2000)
+            OpsiMeowfficerFarming._meow_preserve_value(PreserveStub(), 0), 0)
 
     def test_standalone_round_keeps_its_own_setting(self):
         """独立跑短猫（智能调度关着）：仍按短猫任务自己的保留值。"""
@@ -186,7 +177,7 @@ class TestCoinTaskThresholdHandoff(unittest.TestCase):
         self.assertEqual(stub.delayed, [{'server_update': True}])
 
     def test_zero_line_never_counts_as_a_graceful_stop(self):
-        """月末阈值本就是 0：preserve=0 的 ActionPointLimit 不能当成正常收尾。"""
+        """开工线配成 0：preserve=0 的 ActionPointLimit 不能当成正常收尾。"""
         def meow_once(**kwargs):
             raise ActionPointLimit(current=0, total=0, preserve=0)
 

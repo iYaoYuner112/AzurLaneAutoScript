@@ -2754,7 +2754,7 @@
     },
     "MeowfficerActionPointPreserve": {
       "name": "Meowfficer Farming: preserve X action points",
-      "help": "Fallback reserve used when \"Coin replenishment: preserve X action points\" is set to 0. Default 1000, capped at 2000. Near the Operation Siren reset it is lowered to 300 or 0 automatically so remaining action points get spent."
+      "help": "Fallback reserve used when \"Coin replenishment: preserve X action points\" is set to 0. Default 1000, used as configured (no cap, no month-end reduction)."
     },
     "OperationCoinsReturnThreshold": {
       "name": "Coin refill amount",

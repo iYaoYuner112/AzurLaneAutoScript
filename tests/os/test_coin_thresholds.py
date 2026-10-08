@@ -76,24 +76,20 @@ def test_ap_band_between_the_two_lines_now_replenishes_coins():
 
 
 class CoinGateStub:
-    """只提供补黄币开工线计算所需的 config 与月末保留。
+    """只提供补黄币开工线计算所需的 config。
 
-    两个计算函数直接借用生产实现：这条线由「调度保留线 → 回退短猫保留线 →
-    月末动态保留」三步组成，只测其中一步会漏掉它们之间的叠加关系。
+    两个计算函数直接借用生产实现：这条线由「调度保留线 → 回退短猫保留线」两步
+    组成，只测其中一步会漏掉它们之间的衔接。AzurPilot 不封顶也不做月末降线。
     """
 
     _get_coin_task_action_point_preserve = OpsiScheduling._get_coin_task_action_point_preserve
     _get_scheduled_meow_ap_preserve = OpsiScheduling._get_scheduled_meow_ap_preserve
 
-    def __init__(self, ap_preserve, meow_preserve, month_end_limit=2000):
+    def __init__(self, ap_preserve, meow_preserve):
         self.config = SimpleNamespace(
             OpsiScheduling_ActionPointPreserve=ap_preserve,
             OpsiScheduling_MeowfficerActionPointPreserve=meow_preserve,
         )
-        self._month_end_limit = month_end_limit
-
-    def get_action_point_limit(self):
-        return self._month_end_limit
 
 
 def test_coin_task_start_line_follows_the_scheduler_reserve():
@@ -104,14 +100,12 @@ def test_coin_task_start_line_falls_back_to_the_meowfficer_reserve():
     assert OpsiScheduling._get_coin_task_action_point_preserve(CoinGateStub(0, 1000)) == 1000
 
 
-def test_coin_task_start_line_is_clamped_by_2000_and_by_month_end():
-    # 线画得再高也不超过 2000。
-    assert OpsiScheduling._get_scheduled_meow_ap_preserve(CoinGateStub(100000, 1000)) == 2000
-    # 大世界重置当天按跨月设置降到 0/300，仍要跟着吃干剩余行动力。
-    assert OpsiScheduling._get_scheduled_meow_ap_preserve(
-        CoinGateStub(200, 1000, month_end_limit=0)) == 0
-    assert OpsiScheduling._get_scheduled_meow_ap_preserve(
-        CoinGateStub(200, 1000, month_end_limit=300)) == 200
+def test_coin_task_start_line_is_used_as_configured():
+    # 对齐 AzurPilot：线画多高就用多高，不截到 2000。
+    assert OpsiScheduling._get_scheduled_meow_ap_preserve(CoinGateStub(100000, 1000)) == 100000
+    # 也没有月末降线那一层，配置值原样传下去。
+    assert OpsiScheduling._get_scheduled_meow_ap_preserve(CoinGateStub(200, 1000)) == 200
+    assert OpsiScheduling._get_scheduled_meow_ap_preserve(CoinGateStub(0, 0)) == 0
 
 
 class FakeResourceConfig:

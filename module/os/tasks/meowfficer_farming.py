@@ -57,7 +57,8 @@ class OpsiMeowfficerFarming(OSMap):
         """本轮短猫的行动力保留线（总行动力低于或等于它就停手）。
 
         代跑时阈值由调度层给（对齐 AzurPilot 的 `ap_preserve` 传递），独立运行时
-        仍按配置读；两种情况都再套一层月末动态保留，让月底能把剩余行动力吃干。
+        仍按配置读。不再叠加月末动态保留、也不封顶：AzurPilot 没有官源的
+        `get_action_point_limit()`，配置填多少就按多少停手。
 
         Args:
             ap_preserve (int | None): 智能调度本轮的补黄币开工线。
@@ -66,14 +67,10 @@ class OpsiMeowfficerFarming(OSMap):
             int: 本轮生效的行动力保留值。
         """
         if ap_preserve is not None:
-            action_point_preserve = int(ap_preserve)
-        else:
-            action_point_preserve = (
-                self.config.OpsiScheduling_MeowfficerActionPointPreserve
-                if self.is_smart_scheduling_enabled
-                else self.config.OpsiMeowfficerFarming_ActionPointPreserve
-            )
-        return min(self.get_action_point_limit(), action_point_preserve, 2000)
+            return int(ap_preserve)
+        if self.is_smart_scheduling_enabled:
+            return int(self.config.OpsiScheduling_MeowfficerActionPointPreserve)
+        return int(self.config.OpsiMeowfficerFarming_ActionPointPreserve)
 
     def _run_meowfficer_farming(self, fresh_ap=None, ap_checked=False, ap_preserve=None):
         """耄耋相接主流程：准备配置，然后按轮派发。行动力面板由调用方收尾。
@@ -83,10 +80,13 @@ class OpsiMeowfficerFarming(OSMap):
             ap_checked (bool): 本轮是否已完成行动力检查。
             ap_preserve (int | None): 智能调度本轮的补黄币开工线。
         """
-        if self.is_cl1_mode_enabled and not self.is_smart_scheduling_enabled \
-            and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
-            logger.info('With CL1 leveling enabled, set action point preserve to 1000')
-            self.config.OpsiMeowfficerFarming_ActionPointPreserve = 1000
+        # 500, not upstream's 1000, and keyed on "no line handed in by the scheduler"
+        # rather than on the scheduling switch (AzurPilot's condition): a standalone
+        # round still needs the CL1 profit floor.
+        if ap_preserve is None and self.is_cl1_mode_enabled \
+            and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 500:
+            logger.info('With CL1 leveling enabled, set action point preserve to 500')
+            self.config.OpsiMeowfficerFarming_ActionPointPreserve = 500
         preserve = self._meow_preserve_value(ap_preserve=ap_preserve)
         if preserve == 0:
             self.config.override(OpsiFleet_Submarine=False)
