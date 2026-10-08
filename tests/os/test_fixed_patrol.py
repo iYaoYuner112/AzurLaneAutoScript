@@ -548,6 +548,9 @@ class _FakeGrid:
 
 
 class ClearQuestionStub:
+    _should_skip_siren_research = OSMap._should_skip_siren_research
+    _is_siren_research_enabled = OSMap._is_siren_research_enabled
+
     def __init__(self, predictions, walk_results=None, convert_error=False, fleet_visible=True,
                  confirmed_on_walk=False, siren_device_mode=None):
         self.config = SimpleNamespace(

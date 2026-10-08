@@ -863,6 +863,54 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         return finished_combat
 
+    @property
+    def _is_siren_research_enabled(self):
+        """
+        Whether the siren research device may be used at all.
+
+        The `OpsiSirenBug` group lives under both leveling tasks; any other task
+        (e.g. a proxied run whose context still points elsewhere) falls back to
+        `OpsiHazard1Leveling`, which is what AzurPilot does.
+
+        `default=True` matches the generated default: a config migrated from
+        before the group existed must keep the feature *on*, otherwise the fleet
+        walks to every device for nothing.
+
+        Returns:
+            bool: True if the device may be used.
+        """
+        task = self.config.task.command
+        if task not in ('OpsiHazard1Leveling', 'OpsiMeowfficerFarming'):
+            task = 'OpsiHazard1Leveling'
+        return bool(self.config.cross_get(
+            keys=f'{task}.OpsiSirenBug.SirenResearch_Enable', default=True))
+
+    def _should_skip_siren_research(self, grid):
+        """
+        Whether this grid is a siren research device that must not be touched.
+
+        Called before any click, because with the feature switched off "leave the
+        device alone" is the whole request. Doing it after the dialog instead has
+        two costs: the fleet still walks over and opens the dialog, and picking
+        "leave" still sets `is_siren_device_confirmed`, so the caller counts the
+        grid as handled and runs one more auto search -- the opposite of what the
+        switch asks for. AzurPilot gates in both `clear_question` (map.py:1331)
+        and `map_rescan_current` (map.py:1746) for the same reason.
+
+        Args:
+            grid: Grid to check.
+
+        Returns:
+            bool: True if the device must be skipped.
+        """
+        if not getattr(grid, 'is_scanning_device', False):
+            return False
+        if self._is_siren_research_enabled:
+            return False
+        logger.info(f'Siren research device on {grid} is switched off, '
+                    f'leave it alone without walking over')
+        return True
+
     def clear_question(self, drop=None):
         """
         Clear nearly (and 3 grids from above) question marks on radar.
@@ -912,6 +960,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 else:
                     logger.warning('Question mark is outside the local view, skip this grid')
                 continue
+            if self._should_skip_siren_research(grid):
+                # Marked solved so the outer rescan stops treating the grid as a
+                # pending event; nothing below runs, so the fleet never walks over.
+                self._solved_map_event.add('is_scanning_device')
+                return True
             self.is_siren_device_confirmed = False
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
@@ -2153,6 +2206,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         grids = self.view.select(is_scanning_device=True)
         if 'is_scanning_device' not in self._solved_map_event and grids and grids[0].is_scanning_device:
             grid = grids[0]
+            if self._should_skip_siren_research(grid):
+                # Same gate as clear_question: off means "do not touch it", so the
+                # fleet never walks over and the dialog is never opened.
+                self._solved_map_event.add('is_scanning_device')
+                return True
             if location2node(grid.location) in self._unreachable_event_nodes:
                 logger.info(f'Siren device on {grid} was already judged unreachable this round, skip')
                 return False

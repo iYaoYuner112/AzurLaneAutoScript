@@ -48,6 +48,8 @@ class DeviceStub:
     map_rescan_current = OSMap.map_rescan_current
     _mark_event_unreachable = OSMap._mark_event_unreachable
     _siren_device_search_plan = OSMap._siren_device_search_plan
+    _should_skip_siren_research = OSMap._should_skip_siren_research
+    _is_siren_research_enabled = OSMap._is_siren_research_enabled
 
     is_in_task_explore = False
 

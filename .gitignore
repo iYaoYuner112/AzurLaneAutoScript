@@ -12,6 +12,9 @@ config/tmp*
 dev_tools/debug_tools
 .idea
 /screenshots
+# Agent 工作日志与项目记忆：含本机路径、调试过程，不进公开仓库。
+# 已跟踪的历史文件不受影响；要临时强制加入某一份：git add -f .workbuddy/memory/<文件>
+.workbuddy/
 /campaign/test/
 /toolkit
 *.lock
