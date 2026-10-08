@@ -2750,7 +2750,7 @@
     },
     "ActionPointPreserve": {
       "name": "Coin replenishment: preserve X action points",
-      "help": "Stop coin replenishment when total AP reaches X. Total AP includes AP in boxes. Set to 0 to use the Meowfficer Farming AP reserve."
+      "help": "Stop coin replenishment when total AP reaches X. Total AP includes AP in boxes. Set to 0 to use the Meowfficer Farming AP reserve. This is also the overall Operation Siren start line: at or below it, corrosion 1 leveling does not start this round either."
     },
     "MeowfficerActionPointPreserve": {
       "name": "Meowfficer Farming: preserve X action points",
