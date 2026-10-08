@@ -542,7 +542,9 @@
     },
     "LowPushMode": {
       "name": "Low Push Mode",
-      "help": "Only push errors that require manual intervention. Recoverable errors such as the game not running or the game being stuck are only logged, not pushed"
+      "help": "Only push errors that require manual intervention. Recoverable errors such as the game not running or the game being stuck are only logged, not pushed",
+      "True": "Enabled",
+      "False": "Disabled"
     },
     "ScreenshotLength": {
       "name": "Record Screenshot(s)",
@@ -2596,16 +2598,16 @@
       "help": "Use all tuning samples and quality tuning samples"
     },
     "SkipSirenResearchMission": {
-      "name": "Skip Siren Research",
-      "help": "Skip Siren Research I/II missions to avoid exchanging yellow coins for purple coins."
+      "name": "Skip Siren Research missions",
+      "help": "When enabled, \"Siren Research I\" and \"Siren Research II\" missions will be skipped.\nSiren Research missions exchange yellow coins for purple coins."
     },
     "KeepMissionZone": {
-      "name": "Keep Mission Zones",
-      "help": "Exit zones after daily missions without clearing them; auto-clear on the last day of the month."
+      "name": "Keep sea zone without clearing",
+      "help": "Exit the sea zone after completing the daily. Next time a mission appears in the same zone, no AP is needed to enter.\nAll uncleaned zones will be cleaned on the last day of every month."
     },
     "MissionZones": {
-      "name": "Mission Zones",
-      "help": "Internally saved uncleared zones (auto-managed, do not edit)"
+      "name": "Sea zones to be cleaned at month end",
+      "help": "This value is automatically recorded and generally does not need to be modified."
     }
   },
   "OpsiObscure": {

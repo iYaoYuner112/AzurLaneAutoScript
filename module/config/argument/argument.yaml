@@ -88,7 +88,10 @@ Error:
     type: textarea
     mode: yaml
     value: 'provider: null'
-  LowPushMode: false
+  LowPushMode:
+    type: checkbox
+    value: false
+    option: [true, false]
   ScreenshotLength: 1
 Optimization:
   ScreenshotInterval: 0.3

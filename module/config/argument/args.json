@@ -195,7 +195,11 @@
       },
       "LowPushMode": {
         "type": "checkbox",
-        "value": false
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
       },
       "ScreenshotLength": {
         "type": "input",

@@ -35,7 +35,7 @@ class GeneratedConfig:
     Error_HandleError = True
     Error_SaveError = True
     Error_OnePushConfig = 'provider: null'
-    Error_LowPushMode = False
+    Error_LowPushMode = False  # True, False
     Error_ScreenshotLength = 1
 
     # Group `Optimization`
