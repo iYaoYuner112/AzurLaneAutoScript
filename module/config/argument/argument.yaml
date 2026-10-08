@@ -798,19 +798,37 @@ OpsiSirenBug:
     value: 0
     option: [ 0, 1, 2, 3, 4 ]
 OpsiScheduling:
-  UseSmartSchedulingOperationCoinsPreserve: true
+  UseSmartSchedulingOperationCoinsPreserve:
+    type: checkbox
+    value: true
+    option: [true, false]
   OperationCoinsPreserve: 20000
   ActionPointPreserve: 200
   MeowfficerActionPointPreserve: 1000
   OperationCoinsReturnThreshold: 60000
-  EnableMeowfficerFarming: true
-  EnableHazard1Leveling: true
+  EnableMeowfficerFarming:
+    type: checkbox
+    value: true
+    option: [true, false]
+  EnableHazard1Leveling:
+    type: checkbox
+    value: true
+    option: [true, false]
   # 这三项默认关（与 AzurPilot 一致）：要塞/隐秘/深渊都要先做一轮全球图搜索，
   # 练度不够时打不赢还会反复重试，行动力全空耗在补不到黄币的战斗上。
   # 想要更高的黄币上限再自行打开；TaskPriority 里的顺序决定它们被优先尝试的次序。
-  EnableObscure: false
-  EnableAbyssal: false
-  EnableStronghold: false
+  EnableObscure:
+    type: checkbox
+    value: false
+    option: [true, false]
+  EnableAbyssal:
+    type: checkbox
+    value: false
+    option: [true, false]
+  EnableStronghold:
+    type: checkbox
+    value: false
+    option: [true, false]
   TaskPriority:
     value: 'OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming'
 

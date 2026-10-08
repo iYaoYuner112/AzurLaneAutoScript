@@ -2735,52 +2735,64 @@
   },
   "OpsiScheduling": {
     "_info": {
-      "name": "Smart Scheduling",
-      "help": "Coordinate CL1 leveling and meowfficer farming from current yellow coins and total action points. Coin target mode replenishes below the reserve and returns to CL1 at reserve plus the return threshold."
+      "name": "Smart scheduling",
+      "help": "Smart scheduling related settings"
     },
     "UseSmartSchedulingOperationCoinsPreserve": {
-      "name": "Enable coin scheduling",
-      "help": "On: coin scheduling — replenish coins until reaching \"CL1 coin preserve + replenish X coins\", then return to CL1. Off: action-point scheduling — replenish only while coins are below the CL1 coin preserve."
+      "name": "Coin target scheduling",
+      "help": "When enabled, replenish coins to the coin reserve plus the refill amount before returning to corrosion 1 leveling. When disabled, use AP scheduling and replenish coins until AP reaches its reserve. Both modes use Smart Scheduling's own coin reserve.",
+      "True": "Enabled",
+      "False": "Disabled"
     },
     "OperationCoinsPreserve": {
-      "name": "CL1 Yellow Coin Reserve",
-      "help": "Pause CL1 and replenish coins below this amount. Default: 20000."
+      "name": "Smart Scheduling: preserve X combat supply vouchers",
+      "help": "When Combat Supply Vouchers are lower than X, run yellow coin replenishment task. Not recommended to modify."
     },
     "ActionPointPreserve": {
-      "name": "CL1 Action Point Reserve",
-      "help": "The single action point line for OpSi farming: CL1 pauses at or below it, and coin replenishment tasks (meowfficer farming, obscure, abyssal, stronghold) no longer start at or below it. Default: 200. Set it to 0 and coin replenishment falls back to the Meowfficer Farming reserve. Near the OpSi reset the coin line is also lowered to 300 or 0 by Cross Month Daily so the remaining action points get spent."
+      "name": "Coin replenishment: preserve X action points",
+      "help": "Stop coin replenishment when total AP reaches X. Total AP includes AP in boxes. Set to 0 to use the Meowfficer Farming AP reserve."
     },
     "MeowfficerActionPointPreserve": {
-      "name": "Meowfficer Farming Action Point Reserve",
-      "help": "Fallback coin line: only used when the CL1 Action Point Reserve is set to 0, otherwise the scheduler uses that reserve and this setting does not gate anything. Default: 1000, capped at 2000. On the OpSi reset day the effective line is still lowered to 300 or 0 according to Cross Month Daily, so remaining action points can be spent. Running meowfficer farming on its own (smart scheduling off) uses that task's own reserve setting."
+      "name": "Meowfficer Farming: preserve X action points",
+      "help": "Fallback reserve used when \"Coin replenishment: preserve X action points\" is set to 0. Default 1000, capped at 2000. Near the Operation Siren reset it is lowered to 300 or 0 automatically so remaining action points get spent."
     },
     "OperationCoinsReturnThreshold": {
-      "name": "Replenish X coins",
-      "help": "In coin-target mode, gain this many coins (net increase) before returning to CL1. Default 60000, so the default return target is 80000."
+      "name": "Coin refill amount",
+      "help": "In coin target scheduling, replenish coins to the coin reserve plus X before returning to corrosion 1 leveling. AP scheduling does not use this amount."
     },
     "EnableMeowfficerFarming": {
-      "name": "Allow Meowfficer Farming",
-      "help": "Allow meowfficer farming to replenish yellow coins."
+      "name": "Enable meowfficer farming",
+      "help": "Whether to enable Meowfficer Farming task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
     },
     "EnableHazard1Leveling": {
-      "name": "Allow CL1 Leveling",
-      "help": "Allow CL1 leveling after yellow coins reach the return target."
+      "name": "Enable corrosion 1 leveling",
+      "help": "Whether to enable Corrosion 1 Leveling task in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
     },
     "EnableObscure": {
-      "name": "Allow Obscure to replenish coins",
-      "help": "Allow the scheduler to proxy Obscure to replenish coins when coins are low."
+      "name": "Enable obscured zone",
+      "help": "Whether to enable Obscured Zone task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
     },
     "EnableAbyssal": {
-      "name": "Allow Abyssal to replenish coins",
-      "help": "Allow the scheduler to proxy Abyssal to replenish coins when coins are low."
+      "name": "Enable abyssal zone",
+      "help": "Whether to enable Abyssal Zone task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
     },
     "EnableStronghold": {
-      "name": "Allow Stronghold to replenish coins",
-      "help": "Allow the scheduler to proxy Stronghold to replenish coins when coins are low."
+      "name": "Enable Siren stronghold",
+      "help": "Whether to enable Siren Stronghold task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
     },
     "TaskPriority": {
-      "name": "Coin task priority",
-      "help": "Order in which coin replenish tasks are tried when coins are low, separated by >. The first candidate with content is proxied for exactly one round, then the scheduler re-evaluates."
+      "name": "Replenishment task priority",
+      "help": "The priority order of tasks for yellow coin replenishment when they are insufficient. Separated by >."
     }
   },
   "IslandProduction": {

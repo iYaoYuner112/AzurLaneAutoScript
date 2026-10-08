@@ -9284,7 +9284,11 @@
     "OpsiScheduling": {
       "UseSmartSchedulingOperationCoinsPreserve": {
         "type": "checkbox",
-        "value": true
+        "value": true,
+        "option": [
+          true,
+          false
+        ]
       },
       "OperationCoinsPreserve": {
         "type": "input",
@@ -9304,23 +9308,43 @@
       },
       "EnableMeowfficerFarming": {
         "type": "checkbox",
-        "value": true
+        "value": true,
+        "option": [
+          true,
+          false
+        ]
       },
       "EnableHazard1Leveling": {
         "type": "checkbox",
-        "value": true
+        "value": true,
+        "option": [
+          true,
+          false
+        ]
       },
       "EnableObscure": {
         "type": "checkbox",
-        "value": false
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
       },
       "EnableAbyssal": {
         "type": "checkbox",
-        "value": false
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
       },
       "EnableStronghold": {
         "type": "checkbox",
-        "value": false
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
       },
       "TaskPriority": {
         "type": "input",

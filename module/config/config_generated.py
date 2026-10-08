@@ -466,16 +466,16 @@ class GeneratedConfig:
     OpsiSirenBug_Siren_Fleet = 0  # 0, 1, 2, 3, 4
 
     # Group `OpsiScheduling`
-    OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
+    OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True  # True, False
     OpsiScheduling_OperationCoinsPreserve = 20000
     OpsiScheduling_ActionPointPreserve = 200
     OpsiScheduling_MeowfficerActionPointPreserve = 1000
     OpsiScheduling_OperationCoinsReturnThreshold = 60000
-    OpsiScheduling_EnableMeowfficerFarming = True
-    OpsiScheduling_EnableHazard1Leveling = True
-    OpsiScheduling_EnableObscure = False
-    OpsiScheduling_EnableAbyssal = False
-    OpsiScheduling_EnableStronghold = False
+    OpsiScheduling_EnableMeowfficerFarming = True  # True, False
+    OpsiScheduling_EnableHazard1Leveling = True  # True, False
+    OpsiScheduling_EnableObscure = False  # True, False
+    OpsiScheduling_EnableAbyssal = False  # True, False
+    OpsiScheduling_EnableStronghold = False  # True, False
     OpsiScheduling_TaskPriority = 'OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming'
 
     # Group `IslandProduction`
