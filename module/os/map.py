@@ -915,8 +915,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.is_siren_device_confirmed = False
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
+                # 3s, not upstream's 1.5s (AzurPilot wess09 2026-03-10; same change for the
+                # device / tower walks since 2026-03-14): 1.5s called the walk "nothing met"
+                # while the event was still coming, so the click was lost.
                 result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
             if 'akashi' in result:
                 self._solved_map_event.add('is_akashi')
                 return True
@@ -2164,8 +2167,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.device.click(grid)
             self._set_device_state(DEVICE_DIALOG_OPEN)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
+                # 3s like AzurPilot (wess09 2026-03-14, "使用吊机有时漏点击"): the 1.5s
+                # window gave up before the dialog arrived, and the click was lost.
                 self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
             # Not `'event' in result`: an enemy, a container or a pillar met on the way also
             # answers 'event', and then the search rounds below would run on a device that was
             # never used. AzurPilot judges by the same flag (map_rescan_current / its
@@ -2228,8 +2233,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.device.click(grid)
             self._set_device_state(DEVICE_DIALOG_OPEN)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
+                # 3s like AzurPilot (same 漏点击 fix as the device walk above).
                 result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
             if 'event' in result:
                 self._solved_map_event.add('is_logging_tower')
                 self._set_device_state(DEVICE_COMPLETED)

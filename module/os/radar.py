@@ -343,7 +343,18 @@ class Radar:
         """
         self.predict(image)
         self.show()
-        for location in [(0, 1), (-1, 0), (1, 0), (0, -1), (0, -2), (0, -3)]:
+        # Near first: the 4 neighbours, the 4 diagonals, then 2 and 3 above, then
+        # 2 to the left/right, 2 below and 3 to the left/right (AzurPilot's order).
+        # Everything stays inside the 10x7 local view (the fleet sits at (5, 4)), so
+        # each hit can be converted into a clickable grid. 3+ below is left out for
+        # that reason: there the conversion fails and only burns retries.
+        for location in [
+            (0, 1), (-1, 0), (1, 0), (0, -1),
+            (1, 1), (-1, 1), (1, -1), (-1, -1),
+            (0, -2), (0, -3),
+            (-2, 0), (2, 0), (0, 2),
+            (-3, 0), (3, 0),
+        ]:
             grid = self[location]
             if in_port:
                 if grid.is_question and not grid.is_port:
