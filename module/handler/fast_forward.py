@@ -308,15 +308,72 @@ class FastForwardHandler(AutoSearchHandler):
         # if not self.map_is_clear_mode:
         #     return False
 
-        if not AUTO_SEARCH.appear(main=self):
+        current = AUTO_SEARCH.get(main=self)
+        logger.attr('Auto search', current)
+        if current == 'unknown':
             logger.info('No auto search option.')
+            # `handle_fast_forward()` derived this flag from the config and the campaign
+            # tasks pick their play style from it, so a map without the option must not
+            # keep claiming auto search.
             self.map_is_auto_search = False
             return False
 
-        state = 'on' if self.map_is_auto_search else 'off'
-        changed = AUTO_SEARCH.set(state, main=self)
+        if self.config.Campaign_UseAutoSearch and not self.map_is_auto_search:
+            logger.warning('Auto search is enabled by config but clear mode is unconfirmed, keep it enabled')
+            self.map_is_auto_search = True
 
-        return changed
+        state = 'on' if self.map_is_auto_search else 'off'
+        return self._auto_search_set(state, current=current)
+
+    def _auto_search_set(self, state, current='unknown', skip_first_screenshot=True):
+        """
+        Set the auto search switch, but only while its current state is read correctly.
+
+        AUTO_SEARCH_ON and AUTO_SEARCH_OFF share the same click area, so clicking the ON
+        area while the switch is already on turns it off. A frame that fails to tell the
+        state apart must therefore not be turned into a click.
+
+        Args:
+            state (str): Target state, 'on' or 'off'.
+            current (str): Current state, 'unknown' to read it from the screen first.
+            skip_first_screenshot (bool): Set False when the current image is stale.
+
+        Returns:
+            bool: If the switch was clicked.
+        """
+        logger.info(f'Auto search set to {state}')
+        timeout = Timer(2, count=4).start()
+        click_timer = Timer(1, count=2).clear()
+        changed = False
+
+        while 1:
+            if current == 'unknown':
+                if skip_first_screenshot:
+                    skip_first_screenshot = False
+                else:
+                    self.device.screenshot()
+                current = AUTO_SEARCH.get(main=self)
+
+            logger.attr('Auto search', current)
+
+            if current == state:
+                return changed
+
+            if current == 'unknown':
+                if timeout.reached():
+                    logger.warning('Auto search state unknown, keep it as it is')
+                    return changed
+                continue
+            else:
+                timeout.reset()
+
+            if click_timer.reached():
+                AUTO_SEARCH.click(current, main=self)
+                changed = True
+                click_timer.reset()
+
+            self.device.screenshot()
+            current = AUTO_SEARCH.get(main=self)
 
     def handle_auto_search_setting(self):
         """

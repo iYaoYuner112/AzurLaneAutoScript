@@ -1,3 +1,5 @@
+import time
+
 from module.base.timer import Timer
 from module.base.utils import *
 from module.logger import logger
@@ -276,8 +278,28 @@ class GlobeOperation(ActionPointHandler):
             in: is_in_globe
             out: is_in_map
         """
-        return self.ui_click(GLOBE_GOTO_MAP, check_button=self.is_in_map, offset=(20, 20),
-                             retry_wait=3, skip_first_screenshot=skip_first_screenshot)
+        # Clicking around the globe can open a port by accident. Loop until the map is
+        # really reached, and back out of the port instead of failing to find the button
+        # again and again (AzurPilot does the same).
+        for _ in self.loop():
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+
+            if self.is_in_map():
+                time.sleep(1)
+                break
+
+            if self.appear(PORT_CHECK, offset=(20, 20), interval=3):
+                logger.info('Entered a port by accident, going back')
+                self.device.click(BACK_ARROW)
+                self.interval_reset(GLOBE_GOTO_MAP)
+                continue
+            if self.appear_then_click(GLOBE_GOTO_MAP, offset=(20, 20), interval=3):
+                continue
+
+        return True
 
     def os_map_goto_globe(self, unpin=True):
         """

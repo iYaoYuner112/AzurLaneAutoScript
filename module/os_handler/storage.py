@@ -1,3 +1,5 @@
+import time
+
 from module.base.timer import Timer
 from module.base.utils import rgb2gray
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
@@ -19,15 +21,37 @@ class StorageHandler(GlobeOperation, ZoneManager):
 
     def storage_enter(self):
         """
+        Enter the storage from the OpSi map.
+
+        Clicking around can land on the order overview or the globe instead of the map,
+        so both are recovered from here; without that the loop keeps looking for the
+        storage button on a screen that cannot have it (AzurPilot does the same).
+
         Pages:
             in: is_in_map, STORAGE_ENTER
             out: STORAGE_CHECK
         """
         logger.info('Storage enter')
+        wait_seconds = 0
         for _ in self.loop():
             # End
             if self.is_in_storage():
                 break
+
+            if self.appear(MISSION_CHECK, offset=(20, 20)):
+                logger.warning('Entered the mission list by accident, quitting it')
+                self.ui_click(MISSION_QUIT, check_button=self.is_in_map, offset=(20, 20),
+                              skip_first_screenshot=True)
+                wait_seconds += 1
+                time.sleep(wait_seconds)
+                continue
+
+            if self.is_in_globe():
+                logger.info('Entered the globe by accident, going back to the map')
+                self.os_globe_goto_map()
+                wait_seconds += 1
+                time.sleep(wait_seconds)
+                continue
 
             if self.appear_then_click(STORAGE_ENTER, offset=(200, 5), interval=3):
                 continue

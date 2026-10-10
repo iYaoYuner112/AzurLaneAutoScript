@@ -3,6 +3,7 @@ from module.logger import logger
 from module.os_handler.assets import *
 from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.os_shop.shop import OSShop
+from module.ui.assets import BACK_ARROW
 
 # Azur Lane ports have PORT_GOTO_MISSION, PORT_GOTO_SUPPLY, PORT_GOTO_DOCK.
 # Red axis ports have PORT_GOTO_SUPPLY.
@@ -96,13 +97,64 @@ class PortHandler(OSShop):
         self.device.sleep(0.5)
         self.device.screenshot()
 
-    def port_shop_quit(self):
+    def port_shop_quit(self, skip_first_screenshot=True):
         """
+        Leave the port supply shop and get back to the port page.
+
+        Backing out can land on the OpSi order overview instead of the port, and backing
+        out of that can land on the map, so the plain back button alone is not enough.
+        Loop with a timeout and recover from both (AzurPilot does the same).
+
+        Args:
+            skip_first_screenshot (bool):
+
         Pages:
             in: PORT_SUPPLY_CHECK
             out: PORT_CHECK
         """
-        self.ui_back(appear_button=PORT_SUPPLY_CHECK, check_button=PORT_CHECK, skip_first_screenshot=True)
+        logger.info('Port shop quit')
+        self.interval_clear([PORT_SUPPLY_CHECK, PORT_CHECK, ORDER_CHECK])
+
+        timeout = Timer(10, count=30).start()
+        order_quit_used = False
+        while 1:
+            if timeout.reached():
+                logger.warning('Port shop quit timed out, fall back to the back button')
+                self.ui_back(appear_button=PORT_SUPPLY_CHECK, check_button=PORT_CHECK,
+                             skip_first_screenshot=True)
+                break
+
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+
+            # End
+            if self.appear(PORT_CHECK, offset=(20, 20)):
+                break
+
+            # Accidentally entered the order overview, close it with its own quit button.
+            if self.appear(ORDER_CHECK, offset=(20, 20)):
+                logger.warning('Entered the order overview by accident, quitting it')
+                self.order_quit()
+                order_quit_used = True
+                self.interval_clear([PORT_SUPPLY_CHECK, PORT_CHECK, ORDER_CHECK])
+                timeout.reset()
+                continue
+
+            # Leaving the order overview can drop us on the map, so enter the port again.
+            if order_quit_used and self.is_in_map():
+                logger.info('Dropped on the map after leaving the order overview, entering the port again')
+                self.port_enter()
+                order_quit_used = False
+                self.interval_reset(PORT_CHECK)
+                continue
+
+            # Click
+            if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20), interval=3):
+                self.device.click(BACK_ARROW)
+                self.interval_reset(PORT_SUPPLY_CHECK)
+                continue
 
     def port_dock_repair(self):
         """

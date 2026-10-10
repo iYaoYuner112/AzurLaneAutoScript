@@ -135,6 +135,16 @@ class MapEventHandler(EnemySearchingHandler):
         Returns:
             str: Event that handled
         """
+        # The ash beacon popup has POPUP_CONFIRM and POPUP_CANCEL as well, so it has to be
+        # matched before the generic confirm below: confirming it drops us into the META
+        # page, where the auto search loop no longer recognises the screen.
+        if self.handle_ash_popup():
+            return 'ash_popup'
+        # Confirmation of leaving the zone while the meowfficer is still searching. It
+        # blocks every other interaction, so it goes before everything else and would
+        # otherwise stall the auto search (AzurPilot issue #100).
+        if self.handle_popup_confirm('DEPART_CONFIRM'):
+            return 'depart_confirm'
         if self.handle_map_get_items(drop=drop):
             return 'map_get_items'
         if self.handle_os_game_tips():
@@ -143,8 +153,6 @@ class MapEventHandler(EnemySearchingHandler):
             return 'map_archives'
         if self.handle_guild_popup_cancel():
             return 'guild_popup_cancel'
-        if self.handle_ash_popup():
-            return 'ash_popup'
         if self.handle_urgent_commission(drop=drop):
             return 'urgent_commission'
         if self.handle_story_skip():
