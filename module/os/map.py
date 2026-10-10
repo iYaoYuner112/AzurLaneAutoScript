@@ -2,7 +2,6 @@ import time
 from contextlib import suppress
 
 import inflection
-import numpy as np
 
 from module.base.timer import Timer
 from module.config.config import OS_MAP_STALE_KEY, OS_RESUME_RECOVERY_KEY, TaskEnd
@@ -1920,30 +1919,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     _solved_map_event = set()
     _solved_fleet_mechanism = 0
-    # State of the rescan swipe probe, see _probe_events_after_swipe() and map_rescan_once().
-    _rescan_probe_on = False
-    _rescan_probe_busy = False
-    _rescan_probe_drop = None
-    _rescan_probe_solved = False
-    # The OpSi map is surrounded by fixed UI: fleet bar on the left, resource bar on top,
-    # radar and button column on the right, button row at the bottom. A grid whose click
-    # area touches them is not clicked by the probe, because mid-pan the camera is not
-    # centered; the planned camera position re-centers it and clicks there instead.
-    PROBE_CLICK_SAFE_MARGIN = (170, 140, 250, 110)  # left, top, right, bottom, in 1280x720
-    # Same order as the branches of map_rescan_current(), so the probe and the walk agree on
-    # which grid would be handled. Fleet mechanisms are left out on purpose: they need the
-    # second fleet, which is set up by map_rescan() before it calls the walk.
-    PROBE_EVENT_FLAGS = ('is_exploration_container', 'is_exploration_reward', 'is_akashi',
-                         'is_scanning_device', 'is_logging_tower')
-    # The frame that brings an event into sight is often still sliding: `Camera._map_swipe()`
-    # only waits 0.35s for the map to reach a grid center, while a 5-row pan kept easing for
-    # 2.3s in the 2026-10-05 21:00 run. A tap sent then is swallowed by the game, and the
-    # recovery (switch fleet, click again, switch back) cost 17s there. So the probe reads the
-    # view until two consecutive reads agree within this many pixels -- the same tolerance
-    # `wait_until_camera_stable()` uses -- and gives up after that many reads, leaving the
-    # event to the planned camera position.
-    PROBE_STABLE_PX = 3
-    PROBE_SETTLE_ROUNDS = 3
 
     def run_strategic_search(self):
         """Run strategic search, then scan the map for events.
@@ -2012,114 +1987,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         except (TypeError, ValueError):
             fleet = 0
         return rounds, fleet
-
-    def _probe_grid_clickable(self, grid):
-        """
-        Args:
-            grid: A grid detected in the current view.
-
-        Returns:
-            bool: False when its click area touches the fixed UI around the map, or when the
-                screen size is unavailable, in which case nothing is clicked from the probe.
-        """
-        try:
-            x1, y1, x2, y2 = grid.button
-            height, width = self.device.image.shape[:2]
-        except (AttributeError, TypeError, ValueError):
-            return False
-        left, top, right, bottom = self.PROBE_CLICK_SAFE_MARGIN
-        return (x1 >= left and y1 >= top
-                and x2 <= width - right and y2 <= height - bottom)
-
-    def _probe_settle_view(self):
-        """
-        Let the map stop easing, and end up with a view read from a still frame.
-
-        `Camera._map_swipe()` waits only 0.35s for the map to reach a grid center, so the
-        frame that brings an event into sight is usually still sliding. Clicking from it is
-        what the probe must not do. `self.update()` re-reads the whole view, so the grid keeps
-        both a correct name and a correct click area.
-
-        Returns:
-            bool: False when the map was still moving after PROBE_SETTLE_ROUNDS reads, in
-                which case the event is left to the planned camera position.
-        """
-        prev = None
-        for _ in range(self.PROBE_SETTLE_ROUNDS):
-            self.update()
-            current = self.view.backend.homo_loca
-            if current is None:
-                return False
-            if prev is not None \
-                    and np.linalg.norm(np.subtract(current, prev)) < self.PROBE_STABLE_PX:
-                return True
-            prev = current
-        return False
-
-    def _probe_events_after_swipe(self):
-        """
-        Handle a map event the moment a camera move brings it into sight.
-
-        A full rescan first pans to a map corner to calibrate the camera, then walks from one
-        planned camera position to the next, and it only looks for events at those positions.
-        The swiping in between never looks, so an event that is already on screen still waits
-        for the walk to come back to it: in the 2026-10-05 run a siren logging tower was on
-        screen after the first pan swipe but only got clicked 4.2 seconds later, after three
-        more swipes.
-
-        This hook is installed only while a rescan owns the camera (map_rescan_once), so no
-        other map operation changes behaviour. The view is already detected and predicted by
-        the swipe that triggered it, so finding nothing costs no screenshot and no waiting.
-
-        Returns:
-            bool: True when something was handled, which tells the camera loop to stop.
-        """
-        if not self._rescan_probe_on or self._rescan_probe_busy:
-            return False
-
-        for flag in self.PROBE_EVENT_FLAGS:
-            if flag in self._solved_map_event:
-                continue
-            grids = self.view.select(**{flag: True})
-            if not grids or not getattr(grids[0], flag, False):
-                continue
-            if not self._probe_grid_clickable(grids[0]):
-                # Leave it to the planned camera position, which centers the grid first.
-                logger.info(f'Rescan probe: {grids[0]} is too close to the screen edge, '
-                            f'leave it to the camera walk')
-                return False
-
-            logger.info(f'Rescan probe: a map event came into sight during a camera move, '
-                        f'handle it now')
-            # Guard against recursion: the handler below can move the camera itself
-            # (unreachable Akashi / siren device run the fixed patrol, which pans and would
-            # re-enter this probe), and the rescan is not allowed to nest.
-            self._rescan_probe_busy = True
-            try:
-                if not self._probe_settle_view():
-                    logger.info('Rescan probe: the map has not stopped easing, '
-                                'leave this event to the camera walk')
-                    return False
-                grids = self.view.select(**{flag: True})
-                if not grids or not getattr(grids[0], flag, False) \
-                        or not self._probe_grid_clickable(grids[0]):
-                    # The settled view is shifted by the fraction of a grid the map eased
-                    # through, so the grid can be gone or have moved under the fixed UI.
-                    logger.info('Rescan probe: not clickable in the settled view, '
-                                'leave this event to the camera walk')
-                    return False
-                if self.map_rescan_current(drop=self._rescan_probe_drop):
-                    self._rescan_probe_solved = True
-                    return True
-            except UNSWALLOWABLE_ERRORS:
-                raise
-            except Exception as e:
-                logger.warning(f'Rescan probe failed, continue the camera move: {e}')
-            finally:
-                self._rescan_probe_busy = False
-            return False
-
-        return False
 
     def map_rescan_current(self, drop=None):
         """
@@ -2351,45 +2218,18 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         if rescan_mode == 'full':
             logger.hr('Map rescan full', level=2)
-            # Let every frame the camera produces count as a look for events, not only the
-            # planned camera positions. See _probe_events_after_swipe().
-            # Save the whole probe state, not just the hook: handling an event found this way
-            # can nest a complete rescan (an unreachable Akashi or device runs the fixed
-            # patrol, which rescans), and that inner round has to hand the outer one back
-            # exactly what it had, instead of switching the probe off for its remaining
-            # camera positions and dropping its drop record.
-            outer = (self._swipe_probe, self._rescan_probe_on,
-                     self._rescan_probe_drop, self._rescan_probe_solved)
-            self._rescan_probe_drop = drop
-            self._rescan_probe_solved = False
-            self._rescan_probe_on = True
-            self._swipe_probe = self._probe_events_after_swipe
-            try:
-                self.map_init(map_=None)
-                if self._rescan_probe_solved:
-                    logger.info('Map rescan once end, handled an event seen while panning '
-                                'to the map edge')
-                    return True
+            self.map_init(map_=None)
+            queue = self.map.camera_data
+            while len(queue) > 0:
+                logger.hr(f'Map rescan {queue[0]}')
+                queue = queue.sort_by_camera_distance(self.camera)
+                self.focus_to(queue[0], swipe_limit=(6, 5))
+                self.focus_to_grid_center(0.3)
 
-                queue = self.map.camera_data
-                while len(queue) > 0:
-                    logger.hr(f'Map rescan {queue[0]}')
-                    queue = queue.sort_by_camera_distance(self.camera)
-                    self.focus_to(queue[0], swipe_limit=(6, 5))
-                    if self._rescan_probe_solved:
-                        logger.info('Map rescan once end, handled an event seen while focusing '
-                                    'the camera')
-                        result = True
-                        break
-                    self.focus_to_grid_center(0.3)
-
-                    if self.map_rescan_current(drop=drop):
-                        result = True
-                        break
-                    queue = queue[1:]
-            finally:
-                (self._swipe_probe, self._rescan_probe_on,
-                 self._rescan_probe_drop, self._rescan_probe_solved) = outer
+                if self.map_rescan_current(drop=drop):
+                    result = True
+                    break
+                queue = queue[1:]
 
         logger.info(f'Map rescan once end, result={result}')
         return result

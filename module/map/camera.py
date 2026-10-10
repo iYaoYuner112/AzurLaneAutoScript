@@ -28,11 +28,6 @@ class Camera(MapOperation):
     grid_class = Grid
     _prev_view = None
     _prev_swipe = None
-    # Callable installed by the OpSi map rescan (module/os/map.py), so that a camera move
-    # can handle a map event the moment it comes into sight instead of waiting for the
-    # planned camera position. None everywhere else, which leaves campaign maps and every
-    # other caller of ensure_edge_insight() / focus_to() exactly as they were.
-    _swipe_probe = None
     # A swipe that scrolls the map by less than this fraction of a grid counts as "the game
     # refused to scroll". Measured on a real 2026-10-05 run: swipes that did scroll the map
     # moved the anchor by 9-19 pixels, i.e. about 0.1 grid, so a threshold anywhere near half
@@ -357,17 +352,6 @@ class Camera(MapOperation):
     def show_camera(self):
         logger.attr_align('Camera', location2node(self.camera))
 
-    def _probe_after_swipe(self):
-        """
-        Ask the optional rescan probe whether it handled something on this frame.
-
-        Returns:
-            bool: True means the caller must stop swiping immediately.
-        """
-        if self._swipe_probe is None:
-            return False
-        return bool(self._swipe_probe())
-
     def _swipe_moved_grids(self, prev_homo):
         """
         How far the detected map actually moved during the last swipe, in grids.
@@ -469,10 +453,6 @@ class Camera(MapOperation):
                 if back and not (self.view.upper_edge or self.view.lower_edge):
                     self.camera = (self.camera[0], self.camera[1] - back)
 
-                if self._probe_after_swipe():
-                    record.append((x, y))
-                    break
-
             record.append((x, y))
 
             if x == 0 and y == 0:
@@ -507,11 +487,6 @@ class Camera(MapOperation):
             has_swiped = self.map_swipe(swipe)
 
             if not has_swiped:
-                break
-
-            # The grid worth clicking is often on screen one swipe before the camera
-            # reaches its planned position; the rescan probe ends the approach early then.
-            if self._probe_after_swipe():
                 break
 
     def full_scan(self, queue=None, must_scan=None, battle_count=0, mystery_count=0, siren_count=0, carrier_count=0,
