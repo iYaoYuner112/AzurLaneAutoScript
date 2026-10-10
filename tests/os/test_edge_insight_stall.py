@@ -1,14 +1,18 @@
-"""大世界爬角时的滑动发散保护（`Camera.ensure_edge_insight`）。
+"""大世界爬角时的滑动发散保护（`Camera.ensure_edge_insight`），对齐 AzurPilot 9c0a086a3。
 
-计划作战停下来之后要做整图重扫：先爬到地图角落标定镜头。旧代码有个洞——
+问题：计划作战停下来之后要做整图重扫，先爬到地图角落标定镜头。视野里还没有边缘时，相机坐标
+是**纯推算**（OS 里 `MAP_SWIPE_PREDICT=False`，没有主图那种反推真实滑动量的兜底），而游戏到边
+就不再滚图、边界在暗处时边缘检测又报不出来 → 坐标一路白滑、永远不满足「两条边缘都在视野内」
+→ 无限滑。
 
-滑动过程只判断"到没到边"，从不判断"画面有没有真的滚"。游戏到边就不再滚图，而边界又是
-暗的时候边缘检测报不出来，相机坐标却每轮照滑动量累加，于是一路白滑（OS 里
-`MAP_SWIPE_PREDICT=False`，没有主图那种反推真实滑动量的兜底）。现在连续两帧画面不动才
-停轴并退回虚增坐标；单帧不算，因为锚点是按一格取模的相位，正好滚完整数格时位移也是 0。
-另有滑动次数硬上限。
+AP 的对策（提交 `9c0a086a3 fix(map/camera): 修复地图滑动后相机坐标持续发散的问题`，2026-09-06）：
+滑动后锚点位移**不足半格**（`base / 2`）就认为该轴已经到边，停掉这条轴并撤销这一滑虚增的
+相机坐标。**单帧判定**，没有连续帧确认，也没有滑动次数上限。
 
-（原文件还覆盖过"滑动后顺手处理路过事件"的重扫探针，那套已按对齐 AP 的要求删除。）
+⚠️ **已知代价**（第 4 个用例专门锁住，别顺手"修正"）：`homo_loca` 在
+`homography.load()` 里被 `%= HOMO_TILE`（140 像素）取模，所以一次**合法**滑动留下的正好是
+那个小数残差（2026-10-05 实测 9~19 像素 ≈ 0.1 格）。相位没跨过 140 时它也 < 70 像素
+→ **同样会被判成「到头」**，提前停掉该轴。这是对齐 AP 的代价；改阈值又会和 AP 不一致。
 """
 
 import numpy as np
@@ -30,14 +34,8 @@ class PanStub:
     """`Camera.ensure_edge_insight()` 需要的最小对象。
 
     `map_swipe()` 按剧本改写边缘与同位锚点，并像真实现那样把滑动量累加进相机坐标。
+    判据本身就在被测方法里，所以这里不再借真实现的任何判据函数。
     """
-
-    SWIPE_STALL_RATIO = Camera.SWIPE_STALL_RATIO
-    SWIPE_STALL_FRAMES = Camera.SWIPE_STALL_FRAMES
-    EDGE_INSIGHT_SWIPE_LIMIT = Camera.EDGE_INSIGHT_SWIPE_LIMIT
-    # 借用真实现的两个小工具，免得测试和代码各写一份判据
-    _swipe_moved_grids = Camera._swipe_moved_grids
-    _swipe_stall_check = Camera._swipe_stall_check
 
     def __init__(self, frames=(), corner='bottom-right', inplace=False):
         self.config = SimpleNamespace(MAP_ENSURE_EDGE_INSIGHT_CORNER=corner)
@@ -88,7 +86,7 @@ def run_pan(stub, **kwargs):
 
 
 def test_normal_pan_is_untouched():
-    """画面每帧都在滚、边缘正常报出来：一帧都不许多滑，也不退回坐标。"""
+    """画面每帧都在滚（位移远超半格）、边缘报出来：一帧都不许多停，也不退回坐标。"""
     stub = PanStub([frame(), frame(edges=(False, True, True, False))])
     record = run_pan(stub)
     assert stub.gestures == [(3, 2), (3, 2)], stub.gestures
@@ -96,65 +94,41 @@ def test_normal_pan_is_untouched():
     assert record[-1] == (0, 0)
 
 
-def test_stalled_axis_stops_and_gives_phantom_camera_back():
-    """连续两帧画面不动 → 停掉这条轴，并把两帧虚增的相机坐标退回。"""
-    stub = PanStub([frame(), frame(move=(0.0, 0.0)), frame(move=(0.0, 0.0))])
-    run_pan(stub)
-    # 只有第一滑真的滚了图，后两滑是游戏到边不再滚、而检测又没报出边缘
-    assert stub.gestures == [(3, 2)] * 3, stub.gestures
-    assert stub.camera == (6, 5), stub.camera
-
-
-def test_single_stalled_frame_is_not_enough():
-    """单帧位移为 0 不能算到头：正好滚完整数格时锚点位移也是 0。"""
-    stub = PanStub([
-        frame(), frame(move=(0.0, 0.0)), frame(), frame(move=(0.0, 0.0)),
-        frame(edges=(True, False, True, False)),
-    ])
-    run_pan(stub)
-    # 两帧 0 位移不相邻，所以一次都不该停轴、一次都不该退坐标
-    assert stub.gestures == [(3, 2)] * 5, stub.gestures
-    assert stub.camera == (18, 13), stub.camera
-
-
-def test_sub_tile_residual_is_not_mistaken_for_a_stall():
-    """实测合法滑动的锚点残差只有约 0.1 格（9~19 像素），不能被判成"画面没滚"。
-
-    判据设在半格的话，正常爬角两三跳就会被误判到头，还会把真实移动从相机坐标里退掉，
-    所以这里锁一个"合法但很小"的位移必须照常继续滑、一帧都不许退回坐标。
-    """
-    stub = PanStub([
-        frame(move=(0.11, 0.13)), frame(move=(0.11, 0.13)), frame(move=(0.11, 0.13)),
-        frame(edges=ALL_EDGE, move=(0.11, 0.13)),
-    ])
-    run_pan(stub)
-    # 四跳都被认成"真的滚了"：既没提前停轴，也没退回任何相机坐标
-    # （旧阈值半格时第二跳就会停轴并把坐标减掉）
-    assert stub.gestures == [(3, 2)] * 4, stub.gestures
-    assert stub.camera == (15, 11), stub.camera
-
-
-def test_in_place_anchor_update_does_not_fool_the_guard():
-    """锚点数组被原地改写时也不能误判：滑动前必须先拷一份。"""
-    stub = PanStub([
-        frame(), frame(), frame(edges=(False, True, False, True)),
-    ], inplace=True)
-    run_pan(stub)
-    assert stub.gestures == [(3, 2)] * 3, stub.gestures
-    assert stub.camera == (12, 9), stub.camera
-
-
-def test_unreadable_anchor_does_not_stop_the_pan():
-    """锚点读不到（None）时按"画面正常"处理，不能停轴也不能退坐标。"""
-    stub = PanStub([frame(move=None), frame(move=None), frame(edges=ALL_EDGE)])
-    run_pan(stub)
-    assert stub.gestures == [(3, 2)] * 3, stub.gestures
-    assert stub.camera == (12, 9), stub.camera
-
-
-def test_pan_has_a_hard_swipe_cap():
-    """画面一直在滚但边缘永远报不出来：靠次数上限退出，不能无限滑。"""
-    stub = PanStub([frame() for _ in range(30)])
+def test_one_stalled_swipe_is_enough_to_stop_that_axis():
+    """AP 是单帧判据：一滑没滚图就停轴 + 撤销**这一滑**虚增的坐标（不需要连续两帧）。"""
+    stub = PanStub([frame(), frame(move=(0.0, 0.0))])
     record = run_pan(stub)
-    assert len(stub.gestures) <= Camera.EDGE_INSIGHT_SWIPE_LIMIT + 1, stub.gestures
-    assert len(record) <= Camera.EDGE_INSIGHT_SWIPE_LIMIT + 2, record
+    # 第一滑正常滚图 → 相机 (6, 5)；第二滑画面没动 → 两条轴一起停掉，
+    # 并把这一滑虚增的 (3, 2) 退回去（所以相机停在 6, 5，而不是继续漂到 9, 7）
+    assert stub.gestures == [(3, 2), (3, 2)], stub.gestures
+    assert stub.camera == (6, 5), stub.camera
+    # 停轴后下一轮 x == y == 0，循环收工
+    assert record[-1] == (0, 0), record
+
+
+def test_stalled_axis_does_not_stop_the_other():
+    """横向停在原地、纵向还在滚：只停横向并只退横向那一滑的坐标，纵向照常继续。"""
+    stub = PanStub([
+        frame(move=(0.0, 2.0)),
+        frame(edges=(False, True, True, False), move=(0.0, 2.0)),
+    ])
+    run_pan(stub)
+    # 第一滑只有 x 被停掉（相机 x 从 6 退回 3），y 继续累加
+    assert stub.gestures == [(3, 2), (0, 2)], stub.gestures
+    assert stub.camera == (3, 7), stub.camera
+
+
+def test_sub_tile_residual_counts_as_the_edge():
+    """⚠️ 对齐 AP 的已知代价：合法滑动留下的小残差也会被判成「到头」。
+
+    `homo_loca` 取模到 140 像素，一次合法滑动（3 格 + 一点点）留下的正好是那一点点
+    （2026-10-05 实测 9~19 像素）。AP 的阈值是半格 = 70 像素，所以这点残差同样命中 →
+    提前停轴，并把这一滑的坐标退回去（这里 0.1 格 ≈ 14 像素，实测残差量级）。
+    AP 只有这一条判据（没有连续帧确认、没有次数上限），所以这里如实锁住该行为；
+    不要为了"更准"去改阈值，否则又和 AP 不一致。
+    """
+    stub = PanStub([frame(move=(0.1, 0.1))])
+    run_pan(stub)
+    # 只有第一滑真的发生；它被当成「到头」，两条轴一起停，坐标退回到起点
+    assert stub.gestures == [(3, 2)], stub.gestures
+    assert stub.camera == (3, 3), stub.camera
