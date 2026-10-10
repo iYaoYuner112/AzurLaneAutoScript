@@ -159,11 +159,18 @@ class StorageHandler(GlobeOperation, ZoneManager):
                     break
         logger.info('All samples in storage have been used')
 
-    def tuning_sample_use(self):
+    def tuning_sample_use(self, quit=True):
+        """
+        Args:
+            quit (bool): Whether to leave the storage after using the samples.
+                Set False when the caller still has work in the storage, so the
+                storage is only entered and left once.
+        """
         logger.hr('Turning sample use')
         self.storage_enter()
         self.storage_sample_use_all()
-        self.storage_quit()
+        if quit:
+            self.storage_quit()
 
     def _storage_coordinate_checkout(self, button, types=('OBSCURE',)):
         """

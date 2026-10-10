@@ -29,6 +29,19 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         """
         return self.appear(MEOWFFICER_SEARCHING, offset=(10, 10))
 
+    def no_meowfficer_searching(self):
+        """
+        Returns:
+            bool: True when no meowfficer is searching and the auto search
+                reward popup is gone. AzurPilot uses this in the keep-mission-zone
+                interrupt check, so the auto search is not cut short before the
+                reward of the finished mission is claimed.
+
+        Page:
+            in: IN_MAP
+        """
+        return not self.appear(AUTO_SEARCH_REWARD, offset=(50, 50)) and not self.is_meowfficer_searching()
+
     def get_meowfficer_searching_percentage(self):
         """
         Returns:

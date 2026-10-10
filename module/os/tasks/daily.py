@@ -15,6 +15,13 @@ from module.ui.page import page_os
 
 
 class OpsiDaily(OSMap):
+    # Rounds a port mission may make no progress in before the whole round is given up.
+    OS_DAILY_STUCK_PORT_RETRY = 3
+
+    # Set by `os_finish_daily_mission()` when a round ends without finishing anything and
+    # retrying would repeat the very same missions (an unenterable zone, a stuck port).
+    _os_daily_mission_unavailable = False
+
     def os_port_mission(self):
         """
         Visit all ports and do the daily mission in it.
@@ -49,7 +56,7 @@ class OpsiDaily(OSMap):
         if not self._os_mission_complete and self._os_daily_mission_complete_check():
             self._os_mission_complete = True
 
-        if self._os_mission_complete and not self.is_meowfficer_searching():
+        if self._os_mission_complete and self.no_meowfficer_searching():
             return True
         return False
 
@@ -98,9 +105,11 @@ class OpsiDaily(OSMap):
                 continue
             except OSExploreError:
                 # A locked zone must not poison the rest of the list: it is still in the
-                # config, so the next run picks it up again (AzurPilot 5979fc1cb defers it
-                # until the daily reset; we just skip it for now).
+                # config, so the next run picks it up again. Mark it deferred as well, so
+                # the daily mission flow of this run does not keep retrying its mission
+                # (AzurPilot defers it to the next daily reset in `_os_defer_mission_zone()`).
                 logger.warning(f'[OS DAILY] Uncleared sector {zone.zone_id} is not enterable, skip it')
+                self._os_defer_mission_zone(zone)
                 self._os_return_from_unavailable_mission()
                 continue
             self.fleet_set(self.config.OpsiFleet_Fleet)
@@ -167,6 +176,12 @@ class OpsiDaily(OSMap):
         Finish all daily mission in Operation Siren.
         Suggest to run os_port_daily to accept missions first.
 
+        A mission whose zone cannot be entered is deferred and the flow carries on
+        with the other missions, instead of giving the whole round up: a locked zone
+        stays in the mission list, so retrying it is the only real failure mode.
+        A port mission that auto search cannot finish stops the round after
+        `OS_DAILY_STUCK_PORT_RETRY` no-progress rounds and returns 0.
+
         Args:
             skip_siren_mission (bool): Skip siren research missions.
             keep_mission_zone (bool): Keep the mission zone, interrupt auto search
@@ -179,38 +194,55 @@ class OpsiDaily(OSMap):
         """
         logger.hr('OS finish daily mission', level=1)
         # Only the daily mission flow drops an unenterable mission zone and carries on with the
-        # rest; archive and month-end runs must still see the failure (AzurPilot 5979fc1cb
-        # gates it on the running task the same way).
+        # rest; archive and month-end runs must still see the failure (AzurPilot gates it on the
+        # running task the same way).
         skip_unavailable = self._is_daily_mission_task()
         count = 0
-        unavailable = 0
+        mission_index = 0
+        self._os_daily_mission_unavailable = False
+        # A port mission that auto search cannot finish (a dialogue, a pickup, a shop
+        # interaction) keeps handing the very same zone back, so this loop would refresh it
+        # forever. Count the no-progress rounds on one port and stop the round.
+        stuck_port_zone_id = None
+        stuck_port_retry = 0
+        abort_due_to_stuck_port = False
         while True:
-            try:
+            if skip_unavailable:
+                # The deferred mission stays in the list, so hand the index over to let
+                # `_os_find_checkout_offset_skip_monthly_boss()` scroll past it.
+                result = self.os_get_next_mission(skip_siren_mission=skip_siren_mission,
+                                                  skip_unavailable=True,
+                                                  mission_index=mission_index)
+                mission_index = self._os_mission_index
+            else:
                 result = self.os_get_next_mission(skip_siren_mission=skip_siren_mission)
-                if not result:
-                    break
-
-                if result != 'pinned_at_archive_zone':
-                    # The name of archive zone is "archive zone", which is not an existing zone.
-                    # After archive zone, it go back to previous zone automatically.
-                    self.zone_init()
-                if result == 'already_at_mission_zone':
-                    self.globe_goto(self.zone, refresh=True)
-            except OSExploreError:
-                if not skip_unavailable:
-                    raise
-                # The zone is locked (a neighbour is still unexplored) but it stays in the
-                # mission list, so retrying the same mission forever is the real failure mode.
-                unavailable += 1
-                logger.warning(f'[OS DAILY] Mission zone is not enterable, skipped '
-                               f'({unavailable} in a row)')
-                self._os_return_from_unavailable_mission()
-                if unavailable >= self.OS_DAILY_UNAVAILABLE_ZONE_LIMIT:
-                    logger.warning('[OS DAILY] Too many mission zones cannot be entered, '
-                                   'leave the rest to the next run')
-                    break
+            if not result:
+                break
+            if result == 'mission_zone_unavailable':
+                self._os_daily_mission_unavailable = True
+                mission_index += 1
                 continue
-            unavailable = 0
+
+            if result != 'pinned_at_archive_zone':
+                # The name of archive zone is "archive zone", which is not an existing zone.
+                # After archive zone, it go back to previous zone automatically.
+                self.zone_init()
+            if result == 'already_at_mission_zone':
+                zone = self.zone
+                if skip_unavailable and zone.zone_id in self._os_deferred_mission_zones():
+                    self._os_daily_mission_unavailable = True
+                    mission_index += 1
+                    continue
+                try:
+                    self.globe_goto(zone, refresh=True)
+                except OSExploreError:
+                    if not skip_unavailable:
+                        raise
+                    self._os_defer_mission_zone(zone)
+                    self._os_return_from_unavailable_mission()
+                    self._os_daily_mission_unavailable = True
+                    mission_index += 1
+                    continue
             self.fleet_set(self.config.OpsiFleet_Fleet)
             self.os_order_execute(
                 recon_scan=False,
@@ -221,15 +253,48 @@ class OpsiDaily(OSMap):
             else:
                 interrupt = None
             try:
-                self.run_auto_search(question, rescan, interrupt=interrupt)
+                finished_combat = self.run_auto_search(question, rescan, interrupt=interrupt)
                 self.handle_after_auto_search()
             except TaskEnd:
                 self.ui_ensure(page_os)
                 if keep_mission_zone:
                     self.os_daily_set_keep_mission_zone()
+                finished_combat = 0
+
+            # At a port `finished_combat` is 0 for every mission, so the zone id alone does
+            # not mean anything: it has to be the same port, over and over, with no battle.
+            if self.zone.is_port and finished_combat == 0 and result in (
+                    'already_at_mission_zone', 'pinned_at_mission_zone'):
+                zone_id = self.zone.zone_id
+                if stuck_port_zone_id == zone_id:
+                    stuck_port_retry += 1
+                else:
+                    stuck_port_zone_id = zone_id
+                    stuck_port_retry = 1
+
+                if stuck_port_retry >= self.OS_DAILY_STUCK_PORT_RETRY:
+                    logger.warning(f'[OS DAILY] Mission seems stuck in port zone {zone_id} '
+                                   f'({self.zone}): auto search made no progress in '
+                                   f'{stuck_port_retry} rounds, stop this round to avoid '
+                                   f'refreshing the zone forever')
+                    abort_due_to_stuck_port = True
+                    # AzurPilot only returns 0 here, but the outer OpsiDaily loop re-accepts
+                    # missions and calls this method again, which walks the very same
+                    # no-progress rounds a second time. Mark the round unproductive so that
+                    # loop gives up instead.
+                    self._os_daily_mission_unavailable = True
+                    break
+            else:
+                stuck_port_zone_id = None
+                stuck_port_retry = 0
+
             count += 1
             if not keep_mission_zone:
                 self.config.check_task_switch()
+
+        if abort_due_to_stuck_port:
+            # Return 0 so the outer OpsiDaily flow exits this round cleanly.
+            return 0
 
         return count
 
@@ -240,7 +305,11 @@ class OpsiDaily(OSMap):
 
         # Clear tuning samples daily
         if self.config.OpsiDaily_UseTuningSample:
-            self.tuning_sample_use()
+            # Both jobs live in the storage, so keep it open when the logger is used as well
+            # and enter/leave it only once (AzurPilot does the same).
+            self.tuning_sample_use(quit=not self.config.OpsiGeneral_UseLogger)
+        if self.config.OpsiGeneral_UseLogger:
+            self.logger_use()
 
         # Siren research skip and keep mission zone are only supported on CN server.
         if self.config.OpsiDaily_SkipSirenResearchMission and self.config.SERVER not in ['cn']:
@@ -251,6 +320,7 @@ class OpsiDaily(OSMap):
             self.config.OpsiDaily_KeepMissionZone = False
 
         skip_siren_mission = self.config.OpsiDaily_SkipSirenResearchMission
+        self._os_daily_mission_unavailable = False
         while True:
             # If unable to receive more dailies, finish them and try again.
             success = self.os_mission_overview_accept(skip_siren_mission=skip_siren_mission)
@@ -259,14 +329,18 @@ class OpsiDaily(OSMap):
             # need to confirm that the animation has ended,
             # or it will click on MAP_GOTO_GLOBE
             self.zone_init()
-            if self.os_finish_daily_mission(
-                    skip_siren_mission=skip_siren_mission,
-                    keep_mission_zone=self.config.OpsiDaily_KeepMissionZone) and skip_siren_mission:
+            finished = self.os_finish_daily_mission(
+                skip_siren_mission=skip_siren_mission,
+                keep_mission_zone=self.config.OpsiDaily_KeepMissionZone)
+            if finished and skip_siren_mission:
                 continue
             if self.is_in_opsi_explore():
                 self.os_port_mission()
                 break
-            if success:
+            # Nothing was finished: either every mission left sits in a zone that cannot be
+            # entered, or a port mission made no progress at all. Re-accepting would only
+            # walk over the very same missions again.
+            if success or (not finished and self._os_daily_mission_unavailable):
                 break
 
         if self.config.OpsiDaily_KeepMissionZone:

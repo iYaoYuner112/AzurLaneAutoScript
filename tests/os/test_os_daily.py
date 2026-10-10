@@ -113,3 +113,38 @@ def test_slots_full_still_counts_as_failure_without_the_skip():
 def test_empty_overview_accepts_cleanly():
     assert OverviewAcceptStub(info_bar=0, empty=True).os_mission_overview_accept(
         skip_siren_mission=True) is True
+
+
+# ---- 开工：效能样本和坐标记录仪都在仓库里，只进出一次 ----
+
+from module.os_handler.storage import StorageHandler
+
+
+class StorageStub:
+    tuning_sample_use = StorageHandler.tuning_sample_use
+
+    def __init__(self):
+        self.enters = 0
+        self.quits = 0
+
+    def storage_enter(self):
+        self.enters += 1
+
+    def storage_sample_use_all(self):
+        pass
+
+    def storage_quit(self):
+        self.quits += 1
+
+
+def test_tuning_sample_use_leaves_the_storage_open_when_asked():
+    """开着「使用坐标记录仪」时不要先退出仓库，否则紧接着又要再进一次。"""
+    stub = StorageStub()
+    stub.tuning_sample_use(quit=False)
+    assert (stub.enters, stub.quits) == (1, 0)
+
+
+def test_tuning_sample_use_quits_by_default():
+    stub = StorageStub()
+    stub.tuning_sample_use()
+    assert (stub.enters, stub.quits) == (1, 1)

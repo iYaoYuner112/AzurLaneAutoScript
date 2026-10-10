@@ -1,4 +1,4 @@
-"""补票：AP 早就改掉、我们还在跑旧行为的四处大世界逻辑。
+"""补票：AP 早就改掉、我们还在跑旧行为的五处大世界逻辑。
 
 1. `nearest_task_cooling_down`：已过期的任务不能算"冷却中"（AP d43a1361e「修复大世界可能在
    某个任务死循环的问题」）。旧判据只有上界，把过去的 next_run 传给 `task_delay(target=…)`
@@ -6,12 +6,15 @@
 2. `os_map_goto_globe`：到了全球地图、但**没有可取消置顶的海域**时也要收工（AP edb9c11f1
    「修复全球地图等待卡死」）。旧写法要求至少取消成功过一次，否则 break 永不触发，只能撑到
    设备卡死检测重启游戏。
-3. `OpsiDaily`：进不去的委托海域跳过并继续别的（AP 5979fc1cb）。旧写法只兜 `ActionPointLimit`，
-   一个被锁住的海域能把整个每日任务打死；现在加了连续上限，避免同一格被无限重挑。
+3. `OpsiDaily`：进不去的委托海域逐条延期并继续别的（AP 5979fc1cb）。延期记录留在内存里，
+   到本轮结束就丢，不留配置项；连续撞上多少个都不会整轮放弃。
 4. 短猫随机海域：没有可用海域时优雅收工（AP 30b5a2b7d），不再 `zones[0]` 报 IndexError。
 5. 重扫点明石：`wait_until_walk_stable` 的稳定窗口按路程算（AP `1.5 + 0.6 * distance`，
    `count=4`）。固定 0.8 秒在远处的明石上会在舰队还在走的时候就说"没到"，接着白换一队
    再点、再换回来。
+6. 港口委托卡死：连续无进展就中断本轮（AP 2458cb2af）。同一个港口连续 3 轮拿到委托却 0 战斗
+   → 返回 0 收工；比 AP 多做一步：把 `_os_daily_mission_unavailable` 也置上，否则外层
+   `os_daily` 会重新接委托再走一遍同样的三轮。
 """
 
 from datetime import datetime, timedelta
@@ -121,19 +124,28 @@ def test_globe_return_without_unpin_keeps_old_exit():
 
 
 class DailyStub:
-    """`os_finish_daily_mission`：脚本控制每次取委托是报错、成功还是没委托了。"""
+    """`os_finish_daily_mission`：脚本控制每次取委托是踢回、成功还是没委托了。
+
+    `os_get_next_mission` 只按契约返回值：`skip_unavailable` 时把进不去的委托变成
+    `mission_zone_unavailable`（真实实现里这一步已经记下延期并退出海域），否则原样
+    上抛 OSExploreError。
+    """
 
     os_finish_daily_mission = OpsiDaily.os_finish_daily_mission
     _is_daily_mission_task = OpsiDaily._is_daily_mission_task
     _os_return_from_unavailable_mission = MissionHandler._os_return_from_unavailable_mission
-    OS_DAILY_UNAVAILABLE_ZONE_LIMIT = MissionHandler.OS_DAILY_UNAVAILABLE_ZONE_LIMIT
+    _os_deferred_mission_zones = MissionHandler._os_deferred_mission_zones
+    _os_defer_mission_zone = MissionHandler._os_defer_mission_zone
 
     def __init__(self, script, daily_task=True):
         self.script = list(script)
         self.daily_task = daily_task
         self.picks = 0
+        self.indexes = []
         self.returns = 0
         self.searches = 0
+        self._os_deferred_zones = None
+        self._os_mission_index = 0
         self.zone = SimpleNamespace(is_port=False, zone_id=44)
         self.config = SimpleNamespace(
             task=SimpleNamespace(command='OpsiDaily' if daily_task else 'OpsiStronghold'),
@@ -143,11 +155,19 @@ class DailyStub:
             check_task_switch=lambda: None,
         )
 
-    def os_get_next_mission(self, skip_siren_mission=False):
+    def os_get_next_mission(self, skip_siren_mission=False, skip_unavailable=False, mission_index=0):
         self.picks += 1
-        item = self.script[min(self.picks - 1, len(self.script) - 1)]
+        self.indexes.append(mission_index)
+        self._os_mission_index = mission_index
+        if self.picks > len(self.script):
+            return False
+        item = self.script[self.picks - 1]
         if item == 'error':
-            raise OSExploreError
+            if not skip_unavailable:
+                raise OSExploreError
+            self._os_defer_mission_zone(self.zone)
+            self._os_return_from_unavailable_mission()
+            return 'mission_zone_unavailable'
         return item
 
     def zone_init(self):
@@ -180,20 +200,27 @@ def test_unenterable_mission_zone_is_skipped_and_the_flow_continues():
     assert stub.os_finish_daily_mission() == 1
     assert stub.searches == 1, stub.searches
     assert stub.returns == 1, stub.returns
+    assert stub._os_deferred_zones == {44}
+    # 延期之后下标只增不减，不会回头重挑同一个海域
+    assert stub.indexes == [0, 1, 1], stub.indexes
 
 
-def test_same_bad_zone_cannot_loop_forever():
-    """海域仍在委托列表里，必须靠连续上限收工，不能无限重挑。"""
+def test_deferred_zone_does_not_take_the_whole_round_down():
+    """旧写法连续 3 个进不去就整轮放弃；现在一路走到列表尽头才收工。"""
     stub = DailyStub(['error'] * 10)
     assert stub.os_finish_daily_mission() == 0
-    assert stub.picks == MissionHandler.OS_DAILY_UNAVAILABLE_ZONE_LIMIT, stub.picks
-    assert stub.returns == MissionHandler.OS_DAILY_UNAVAILABLE_ZONE_LIMIT, stub.returns
+    assert stub.picks == 11, stub.picks
+    assert stub.returns == 10, stub.returns
+    # 每轮下标 +1，不会退回去重挑同一个海域
+    assert stub.indexes == list(range(11))
+    assert stub._os_daily_mission_unavailable is True
 
 
-def test_counter_resets_after_a_good_zone():
-    stub = DailyStub(['error', 'pinned_at_mission_zone', 'error', 'error', False])
+def test_a_good_zone_after_a_bad_one_still_runs():
+    stub = DailyStub(['error', 'pinned_at_mission_zone', 'error', False])
     assert stub.os_finish_daily_mission() == 1
-    assert stub.picks == 5, stub.picks
+    assert stub.searches == 1
+    assert stub.picks == 4, stub.picks
 
 
 def test_other_tasks_still_see_the_error():
@@ -206,6 +233,101 @@ def test_other_tasks_still_see_the_error():
         raised = True
     assert raised
     assert stub.returns == 0
+
+
+class PortStuckStub:
+    """`os_finish_daily_mission` 的港口分支：每轮都拿到同一个港口、又没有战斗。
+
+    港口里 `finished_combat` 恒为 0（没有战斗），所以只有"同一个港口反复出现"才算卡死。
+    """
+
+    os_finish_daily_mission = OpsiDaily.os_finish_daily_mission
+    _is_daily_mission_task = OpsiDaily._is_daily_mission_task
+    _os_return_from_unavailable_mission = MissionHandler._os_return_from_unavailable_mission
+    _os_deferred_mission_zones = MissionHandler._os_deferred_mission_zones
+    _os_defer_mission_zone = MissionHandler._os_defer_mission_zone
+    OS_DAILY_STUCK_PORT_RETRY = OpsiDaily.OS_DAILY_STUCK_PORT_RETRY
+
+    def __init__(self, zone_ids, combat=0, is_port=True):
+        self.zone_ids = list(zone_ids)
+        self.combat = list(combat) if isinstance(combat, (list, tuple)) else None
+        self.combat_default = 0 if self.combat is not None else combat
+        self.picks = 0
+        self.searches = 0
+        self._os_deferred_zones = None
+        self._os_mission_index = 0
+        self._os_daily_mission_unavailable = False
+        self.zone = SimpleNamespace(is_port=is_port, zone_id=self.zone_ids[0])
+        self.config = SimpleNamespace(
+            task=SimpleNamespace(command='OpsiDaily'),
+            _opsi_context=SimpleNamespace(current_task='OpsiDaily'),
+            OpsiFleet_Fleet=1,
+            OpsiFleet_Submarine=False,
+            check_task_switch=lambda: None,
+        )
+
+    def os_get_next_mission(self, skip_siren_mission=False, skip_unavailable=False, mission_index=0):
+        if self.picks >= len(self.zone_ids):
+            return False
+        self.zone.zone_id = self.zone_ids[self.picks]
+        self.picks += 1
+        self._os_mission_index = mission_index
+        return 'pinned_at_mission_zone'
+
+    def run_auto_search(self, question=True, rescan=None, interrupt=None):
+        self.searches += 1
+        if self.combat is None:
+            return self.combat_default
+        return self.combat[min(self.searches - 1, len(self.combat) - 1)]
+
+    def zone_init(self):
+        pass
+
+    def globe_goto(self, zone, types=None, refresh=False):
+        pass
+
+    def fleet_set(self, index=1):
+        pass
+
+    def os_order_execute(self, recon_scan=True, submarine_call=True):
+        pass
+
+    def handle_after_auto_search(self):
+        pass
+
+    def ensure_no_zone_pinned(self):
+        pass
+
+    def os_globe_goto_map(self, skip_first_screenshot=True):
+        pass
+
+
+def test_same_port_without_progress_aborts_the_round():
+    stub = PortStuckStub([44] * 4)
+    assert stub.os_finish_daily_mission() == 0
+    assert stub.picks == OpsiDaily.OS_DAILY_STUCK_PORT_RETRY, stub.picks
+    assert stub.searches == OpsiDaily.OS_DAILY_STUCK_PORT_RETRY, stub.searches
+    # 比 AP 多这一步：否则外层 os_daily 会重新接委托，再走一遍同样的三轮
+    assert stub._os_daily_mission_unavailable is True
+
+
+def test_a_different_port_resets_the_counter():
+    stub = PortStuckStub([44, 44, 45])
+    assert stub.os_finish_daily_mission() == 3, stub.picks
+    assert stub._os_daily_mission_unavailable is False
+
+
+def test_a_battle_in_between_resets_the_counter():
+    stub = PortStuckStub([44, 44, 44], combat=[0, 1, 0])
+    assert stub.os_finish_daily_mission() == 3, stub.picks
+    assert stub._os_daily_mission_unavailable is False
+
+
+def test_a_normal_zone_is_never_stuck():
+    """普通海域没有战斗也可能是在推进，不看港口就不做这个判断。"""
+    stub = PortStuckStub([44] * 5, is_port=False)
+    assert stub.os_finish_daily_mission() == 5
+    assert stub._os_daily_mission_unavailable is False
 
 
 def test_daily_identity_recognises_the_proxy():
