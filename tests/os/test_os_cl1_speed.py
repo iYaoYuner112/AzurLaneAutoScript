@@ -2,7 +2,7 @@
 
 覆盖：
 - `InfoHandler.story_skip(click_interval, prefer_skip)` 的快速路径与旧路径等价性；
-- `MapEventHandler.story_skip()` 覆写为 1.2 秒（云环境保守档）并强制 prefer_skip；
+- `MapEventHandler.story_skip()` 覆写为折中的 0.8 秒并强制 prefer_skip；
 - `handle_os_auto_search_map_option()` 对侵蚀 1 / 短猫使用 1.0 秒点击间隔，
   其它任务保持 3 秒；
 - `_os_auto_search_enable_click()` 的 45 秒预算：预算内连续重试不被防连点
@@ -149,7 +149,7 @@ class SpeedTestBase(unittest.TestCase):
 
 class TestFastStorySkip(SpeedTestBase):
     def test_fast_path_clicks_skip_without_global_config(self):
-        """大世界覆写：0.5 秒间隔 + prefer_skip，STORY_ALLOW_SKIP=False 也点右上角跳过。"""
+        """大世界覆写：折中的 0.8 秒间隔 + prefer_skip，STORY_ALLOW_SKIP=False 也点右上角跳过。"""
         handler = MapEventStub()
         self.assertFalse(handler.config.STORY_ALLOW_SKIP)
         with patch.object(STORY_SKIP_3, 'match', return_value=True), \
@@ -159,8 +159,8 @@ class TestFastStorySkip(SpeedTestBase):
             self.assertTrue(handler.story_skip())
         self.assertEqual(handler.device.count_of('STORY_SKIP'), 1)
         self.assertEqual(handler.device.count_of('CLICK_SAFE_AREA'), 0)
-        # 覆写把选项计时器换成实例级的保守档计时器（云环境 1.2 秒）
-        self.assertEqual(handler._story_option_timer.limit, 1.2)
+        # 覆写把选项计时器换成实例级的折中档计时器（0.8 秒）
+        self.assertEqual(handler._story_option_timer.limit, 0.8)
 
     def test_default_interval_keeps_legacy_behaviour(self):
         """基类默认参数（click_interval=2）行为不变：走原分支点空白区。"""
@@ -168,7 +168,7 @@ class TestFastStorySkip(SpeedTestBase):
         handler._story_confirm = Timer(0.5, count=1).start()
         with patch.object(STORY_SKIP_3, 'match', return_value=True), \
                 patch.object(STORY_CLOSE, 'match', return_value=False):
-            # 直接调基类实现，绕开 MapEventHandler 的 0.5 秒覆写
+            # 直接调基类实现，绕开 MapEventHandler 的 0.8 秒覆写
             InfoHandler.story_skip(handler, click_interval=2)
             self.clock.advance(2.5)
             self.assertTrue(InfoHandler.story_skip(handler, click_interval=2))
@@ -191,7 +191,7 @@ class TestFastStorySkip(SpeedTestBase):
         with patch.object(STORY_SKIP_3, 'match', return_value=True), \
                 patch.object(STORY_CLOSE, 'match', return_value=False):
             for _ in range(clicks * 2 + 1):
-                # 步长要大于保守档的选项冷却（1.2 秒）
+                # 步长要大于折中档的选项冷却（0.8 秒）
                 self.clock.advance(1.5)
                 handler.story_skip()
 
@@ -224,18 +224,18 @@ class TestAutoSearchEnableRetry(SpeedTestBase):
                 patch.object(AUTO_SEARCH_REWARD, 'match', return_value=False):
             return handler.handle_os_auto_search_map_option()
 
-    def test_fast_farming_uses_one_second_interval(self):
+    def test_fast_farming_uses_half_second_interval(self):
         handler = MapEventStub(command='OpsiHazard1Leveling')
         handler.template_result[OPTION_OFF_NAME] = True
         self.assertTrue(self._run_enable(handler))
-        self.assertIn((OPTION_OFF_NAME, 1.0), handler.match_calls)
+        self.assertIn((OPTION_OFF_NAME, 0.5), handler.match_calls)
         self.assertEqual(handler.device.count_of(OPTION_OFF_NAME), 1)
 
     def test_meowfficer_farming_is_also_fast(self):
         handler = MapEventStub(command='OpsiMeowfficerFarming')
         handler.template_result[OPTION_OFF_NAME] = True
         self._run_enable(handler)
-        self.assertIn((OPTION_OFF_NAME, 1.0), handler.match_calls)
+        self.assertIn((OPTION_OFF_NAME, 0.5), handler.match_calls)
 
     def test_other_tasks_keep_three_second_interval(self):
         handler = MapEventStub(command='OpsiDaily')

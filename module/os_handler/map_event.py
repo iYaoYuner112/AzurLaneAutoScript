@@ -27,11 +27,13 @@ fleet_lock.add_state('off', check_button=OS_FLEET_UNLOCKED)
 class MapEventHandler(EnemySearchingHandler):
     ash_popup_canceled = False
 
-    # 大世界剧情推进间隔（秒）。基类默认 2 秒是通用页面的保守值。
-    # AP 上游用 0.5 秒；考虑云服务器 + 云手机的截图与指令延迟，这里取 1.2 秒：
-    # 仍小于 2 秒，走同一条快速路径，但留给画面刷新的余量更大。
+    # 大世界剧情推进间隔（秒）。基类默认 2 秒是通用页面的保守值，AP 上游用 0.5 秒。
+    # 这里取折中的 0.8 秒：仍远小于 2 秒、走同一条快速路径，又比 AP 的 0.5 多一点余量。
+    # 2026-10-10 实测（10-08 日志，2.18 小时）：相邻剧情点击间隔 16 对里 13 对 >2 秒，
+    # 由游戏自身动画决定；落在 0.9~1.35 秒的 0 对 —— 这个值在实测里根本不是瓶颈，
+    # 所以 0.8 与 0.5 的实际速度一样，取大一点的只是给慢帧（p90 1.4 秒）留余量。
     # 想恢复 AP 原速直接改成 0.5；想退回旧行为改成 >= 2 即可。
-    _os_story_click_interval = 1.2
+    _os_story_click_interval = 0.8
 
     def story_skip(self, drop=None):
         """大世界按新截图快速点击右上角跳过，重要选项仍优先处理。
@@ -319,9 +321,12 @@ class MapEventHandler(EnemySearchingHandler):
         if enable is None:
             pass
         elif enable:
-            # AP 上游对侵蚀 1 / 耄耋相接用 0.5 秒；云环境留余量取 1.0 秒，
-            # 其它任务保持 3 秒的保守间隔。45 秒预算兜底不受该值影响。
-            click_interval = 1.0 if fast_farming else 3
+            # 对齐 AP：侵蚀 1 / 耄耋相接用 0.5 秒，其它任务保持 3 秒的保守间隔。
+            # 45 秒预算兜底不受该值影响。实测（10-08 日志）这个值确实在限制
+            # 「自律开启失败后重试」的节奏：连发内部间隔精确 1.00 秒、被卡住 22 对，
+            # 改 0.5 秒后整段日志约省 11 秒（≈5 秒/小时）。重试目标是**已经在屏幕上的
+            # 按钮**，所以重试更快只会让它在 45 秒预算内更容易试成功。
+            click_interval = 0.5 if fast_farming else 3
             if fast_farming:
                 # 剧情可能透出地图按钮，先处理剧情；回到地图后才重试开启自律。
                 if self.appear(STORY_SKIP_3, offset=(20, 20)):
