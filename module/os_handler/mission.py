@@ -208,13 +208,13 @@ class MissionHandler(GlobeOperation, ZoneManager):
             # End
             if self.is_in_os_mission() \
                     and not self.appear(MISSION_FINISH, offset=checkout_offset) \
-                    and not self.match_template_color(MISSION_CHECKOUT, offset=checkout_offset):
+                    and not self.match_template_color(MISSION_CHECKOUT, offset=checkout_offset, similarity=0.78):
                 # No mission found, wait to confirm. Missions might not be loaded so fast.
                 if confirm_timer.reached():
                     logger.info('No OS mission found.')
                     break
             elif self.is_in_os_mission() \
-                    and self.match_template_color(MISSION_CHECKOUT, offset=checkout_offset):
+                    and self.match_template_color(MISSION_CHECKOUT, offset=checkout_offset, similarity=0.78):
                 # Found one mission.
                 logger.info('Found at least one OS missions.')
                 break
