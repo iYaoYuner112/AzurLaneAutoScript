@@ -20,7 +20,6 @@
 from datetime import datetime, timedelta
 from time import sleep
 from types import SimpleNamespace
-from unittest.mock import Mock
 
 from module.map.map_base import location2node
 from module.os.globe_operation import GlobeOperation, OSExploreError
@@ -476,39 +475,17 @@ class AkashiStub:
     """跑真实的 `map_rescan_current` 明石分支，把 confirm_timer 收下来看给它多长窗口。"""
 
     map_rescan_current = OSMap.map_rescan_current
-    _visit_akashi = OSMap._visit_akashi
-    _try_akashi_grid = OSMap._try_akashi_grid
-    _akashi_global_location = OSMap._akashi_global_location
-    _akashi_local_grid = OSMap._akashi_local_grid
-    _prepare_akashi_click = OSMap._prepare_akashi_click
-    _remember_pending_akashi = OSMap._remember_pending_akashi
-    _finish_pending_akashi = OSMap._finish_pending_akashi
-    _get_pending_akashi = OSMap._get_pending_akashi
 
     def __init__(self, view, radar_fleet=(5, 5)):
         self.view = view
         self._radar_fleet = Point(radar_fleet)
         self._solved_map_event = set()
         self._unreachable_event_nodes = set()
-        self.config = SimpleNamespace(
-            temporary=lambda **kwargs: TempContext(),
-            task=SimpleNamespace(command='OpsiDaily'),
-        )
+        self.config = SimpleNamespace(temporary=lambda **kwargs: TempContext())
         self.device = SimpleNamespace(click=lambda grid: None, screenshot=lambda: None)
-        self.camera = (0, 0)
         self.confirms = []
         self.buys = 0
         self.recovered = []
-        # 2026-10-19 起 map_rescan_current 的明石分支统一走 `_visit_akashi`，
-        # 这几个钩子是它依赖的外围，按测试需要给假实现。
-        self._akashi_global_location = lambda grid: grid.location
-        self._akashi_local_grid = Mock(return_value=None)
-        self._prepare_akashi_click = Mock(return_value=SimpleNamespace(name='AKASHI_PREP'))
-        self._remember_pending_akashi = Mock()
-        self._finish_pending_akashi = Mock()
-        self._get_pending_akashi = Mock(return_value=None)
-        self.update = Mock()
-        self.map_swipe = Mock()
 
     def convert_radar_to_local(self, location):
         return self._radar_fleet
@@ -518,9 +495,7 @@ class AkashiStub:
         return 'timeout'
 
     def handle_akashi_supply_buy(self, grid):
-        # `handle_akashi_supply_buy()` 现在会返回是否真买成；失败时调用方不能把事件记为已处理。
         self.buys += 1
-        return True
 
     def _recover_unreachable_akashi(self, drop, node):
         self.recovered.append(node)

@@ -1958,8 +1958,7 @@
     },
     "OpsiHazard1Leveling": {
       "TargetZone": 0,
-      "ExecuteFixedPatrolScan": false,
-      "PendingAkashiRecovery": null
+      "ExecuteFixedPatrolScan": false
     },
     "OpsiSirenBug": {
       "SirenResearch_Enable": true,

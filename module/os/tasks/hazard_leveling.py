@@ -1,4 +1,3 @@
-from module.exception import GameStuckError
 from module.logger import logger
 from module.os.map import OSMap
 from module.os.opsi_notify import notify_action_point_change
@@ -95,11 +94,6 @@ class OpsiHazard1Leveling(OSMap):
             if self._forced_move_enabled():
                 if not self._solved_map_event:
                     self.execute_fixed_patrol_scan()
-
-            # 战后明石仍未完成：保留续查记录，主动崩给调度器重启，
-            # 重启后的 os_init 会以 CL1 身份优先续查（对齐 AzurPilot）。
-            if self._get_pending_akashi() is not None:
-                raise GameStuckError('战后明石仍未完成，保留续查记录，禁止刷新海域')
 
             self.handle_after_auto_search()
             self.config.check_task_switch()

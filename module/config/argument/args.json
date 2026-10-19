@@ -9780,11 +9780,6 @@
       "ExecuteFixedPatrolScan": {
         "type": "checkbox",
         "value": false
-      },
-      "PendingAkashiRecovery": {
-        "type": "stored",
-        "value": null,
-        "display": "hide"
       }
     },
     "OpsiSirenBug": {

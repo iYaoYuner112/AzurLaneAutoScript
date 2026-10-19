@@ -1,10 +1,8 @@
-from module.base.button import Button
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
 from module.config.utils import get_os_reset_remain
 from module.exception import GameStuckError, ScriptError
 from module.logger import logger
-from module.os.assets import FLEET_CHOOSE
 from module.os_shop.akashi_shop import AkashiShop
 from module.os_shop.assets import PORT_SUPPLY_CHECK, SHOP_BUY_CONFIRM
 from module.os_shop.port_shop import PortShop
@@ -260,115 +258,19 @@ class OSShop(PortShop, AkashiShop):
         logger.info(f'Bought {f"{count} items" if count else "nothing"} in port.')
         return True
 
-    # The OpSi map is surrounded by fixed UI: fleet bar and its choose button at the
-    # bottom left, resource bar on top, radar and the button column on the right, button
-    # row at the bottom. Akashi often stands right on top of them, so a click at the grid
-    # hits that button instead: the dock / the fleet bar / the voucher shop opens and the
-    # shop itself never does -- the event then looks "handled" while it was missed.
-    AKASHI_CLICK_SAFE_AREA = (239, 128, 993, 628)  # left, top, right, bottom, in 1280x720
-    AKASHI_CLICK_MIN_SIZE = 6
-
-    @staticmethod
-    def _akashi_safe_click_button(grid):
-        """将点击限制在地图安全范围内，避免格子下沿落入固定操作栏。"""
-        try:
-            x1, y1, x2, y2 = grid.button
-        except (AttributeError, TypeError, ValueError):
-            return None
-        left, top, right, bottom = OSShop.AKASHI_CLICK_SAFE_AREA
-        area = (max(left, x1), max(top, y1), min(right, x2), min(bottom, y2))
-        if area[2] - area[0] < OSShop.AKASHI_CLICK_MIN_SIZE \
-                or area[3] - area[1] < OSShop.AKASHI_CLICK_MIN_SIZE:
-            return None
-        return Button(area=area, color=(), button=area, name=f'AKASHI_{grid}')
-
-    def _recover_akashi_page(self):
-        """只处理正向识别到的误入页面；操作后由父循环获取新截图。"""
-        for check, leave in (
-                ('is_in_globe', 'os_globe_goto_map'),
-                ('is_in_storage', 'storage_quit'),
-                ('is_in_os_mission', 'os_mission_quit'),
-                ('is_in_map_order', 'order_quit')):
-            if hasattr(self, check) and getattr(self, check)():
-                logger.info(f'[大世界-明石] 误入页面 {check}，返回地图后重新定位')
-                getattr(self, leave)()
-                return True
-        if self.is_in_map() and hasattr(self, 'fleet_selector') \
-                and self.fleet_selector.bar_opened():
-            return self.appear_then_click(FLEET_CHOOSE, offset=(20, 20), interval=2)
-        return False
-
-    def handle_akashi_supply_buy(self, grid) -> bool:
-        """打开明石商店、购买并返回地图。
-
-        入口点击夹进地图安全区并避让固定按钮；预算用尽仍没进店时返回 False，
-        调用方不得把失败记为已处理，否则这只明石就永久漏了。
-
+    def handle_akashi_supply_buy(self, grid):
+        """
         Args:
-            grid: Grid where akashi stands, or any button when the walk already opened
-                the shop (`PORT_SUPPLY_CHECK` is on screen).
-
-        Returns:
-            bool: 是否确认进入商店、完成购买流程并返回地图。
+            grid: Grid where akashi stands.
 
         Pages:
-            in: is_in_map 或 PORT_SUPPLY_CHECK
-            out: 成功为 is_in_map；入口失败时保留当前画面，交由调用方恢复。
+            in: is_in_map
+            out: is_in_map
         """
-        remember = getattr(self, '_remember_pending_akashi', None)
-        if remember is not None:
-            remember(grid)
-        locate = getattr(self, '_akashi_global_location', None)
-        target = locate(grid) if locate is not None else None
-        no_progress = Timer(12).start()
-        click_timer = Timer(2)
-        clicks = 0
-        page_recoveries = 0
-        camera_budget = [2]
-        for _ in self.loop():
-            if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
-                break
-            if no_progress.reached():
-                logger.warning(f'[大世界-明石] 入口无进展，已点击 {clicks}/3 次')
-                return False
-            if self.handle_story_skip():
-                no_progress.reset()
-                continue
-            if self._recover_akashi_page():
-                page_recoveries += 1
-                if page_recoveries > 4:
-                    logger.warning('[大世界-明石] 入口反复误入其他页面，交回地图恢复')
-                    return False
-                continue
-            # 下拉菜单的关闭按钮有冷却，等待期间不能穿过菜单继续点格子。
-            if hasattr(self, 'fleet_selector') and self.fleet_selector.bar_opened():
-                continue
-            if self.is_in_map() and clicks < 3 and click_timer.reached():
-                if target is not None:
-                    button = self._prepare_akashi_click(target, camera_budget=camera_budget)
-                else:
-                    button = self._akashi_safe_click_button(grid)
-                # 定位期间的新截图可能已经确认进入商店，不能再盲点原目标。
-                if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
-                    break
-                if button is None:
-                    logger.warning('[大世界-明石] 无可用安全点击区域，交回地图恢复')
-                    return False
-                if no_progress.reached():
-                    return False
-                self.device.click(button)
-                clicks += 1
-                click_timer.reset()
+        self.ui_click(grid, appear_button=self.is_in_map, check_button=PORT_SUPPLY_CHECK,
+                      additional=self.handle_story_skip, skip_first_screenshot=True)
         self.os_shop_buy(select_func=self.os_shop_get_item_to_buy_in_akashi)
-        self.ui_back(appear_button=PORT_SUPPLY_CHECK, check_button=self.is_in_map,
-                     skip_first_screenshot=True)
-        if not self.is_in_map():
-            logger.warning('[大世界-明石] 购买结束但没回到地图，本次明石记为未完成')
-            return False
-        finish = getattr(self, '_finish_pending_akashi', None)
-        if finish is not None:
-            finish()
-        return True
+        self.ui_back(appear_button=PORT_SUPPLY_CHECK, check_button=self.is_in_map, skip_first_screenshot=True)
 
     def get_currency_coins(self, item):
         if item.cost == 'YellowCoins':
