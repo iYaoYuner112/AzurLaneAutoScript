@@ -32,6 +32,8 @@ class Cl1RoundStub:
 
     _cl1_resource_check = OpsiHazard1Leveling._cl1_resource_check
     os_hazard1_leveling = OpsiHazard1Leveling.os_hazard1_leveling
+    # 本测试不涉及明石续查（2026-10-19 新增的战后检查）：固定无待续记录。
+    _get_pending_akashi = lambda self: None
 
     def __init__(self, proxy, smart=True, yellow_coins=999999):
         self.is_smart_scheduling_enabled = smart

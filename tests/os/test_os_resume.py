@@ -282,6 +282,8 @@ def make_os_init_stub(zone_id=10, command='OpsiScheduling', smart=True, recovery
     """带完整 os_init 依赖的 stub，按调用顺序记录发生了什么。"""
     stub = make_scheduling_stub(
         stale=True, recovery=recovery, command=command, zone_id=zone_id)
+    # 本测试不涉及明石重启续查（2026-10-19 新增）：固定无待续记录。
+    stub._resume_pending_akashi = lambda *a, **kw: None
     sequence = []
     stub.map_rescan = lambda **kw: sequence.append('full_rescan')
     stub.ensure_map_state_current = lambda: OSMap.ensure_map_state_current(stub)

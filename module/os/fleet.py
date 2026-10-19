@@ -381,7 +381,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             # Akashi shop
             if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
                 self.interval_clear(PORT_SUPPLY_CHECK)
-                self.handle_akashi_supply_buy(CLICK_SAFE_AREA)
+                bought = self.handle_akashi_supply_buy(CLICK_SAFE_AREA)
+                if bought:
+                    result.add('akashi')
+                else:
+                    # Do not report the event as handled: a failed purchase has to stay
+                    # pending so the rescan can come back to it.
+                    logger.warning('[大世界-明石] 购买流程没走完，这个明石留作未完成')
                 if fast_farming:
                     # 商店退出已确认返回地图，原先按路程计算的到达时间不再适用。
                     confirm_timer = Timer(0.8, count=2).start()
@@ -389,7 +395,6 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 else:
                     confirm_timer.reset()
                 stuck_timer.reset()
-                result.add('akashi')
                 continue
 
             # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups

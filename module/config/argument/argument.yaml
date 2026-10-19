@@ -789,6 +789,10 @@ OpsiHazard1Leveling:
     value: 0
     option: [ 0, 44, 22 ]
   ExecuteFixedPatrolScan: false
+  PendingAkashiRecovery:
+    type: stored
+    value: null
+    display: hide
 OpsiSirenBug:
   SirenResearch_Enable: true
   Siren_Mode:

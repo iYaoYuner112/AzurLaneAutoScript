@@ -14,6 +14,7 @@ from module.handler.login import LoginHandler, MAINTENANCE_ANNOUNCE
 from module.logger import logger
 from module.map.map import Map
 from module.map.map_base import location2node
+from module.os.akashi import AkashiRecovery
 from module.os.assets import FLEET_EMP_DEBUFF, MAP_GOTO_GLOBE_FOG
 from module.os.fixed_patrol import (
     DEVICE_COMPLETED,
@@ -58,7 +59,7 @@ UNSWALLOWABLE_ERRORS = (
 )
 
 
-class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
+class OSMap(AkashiRecovery, OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     _FIXED_PATROL_L2_AP = 7
 
     def _os_map_was_interrupted(self):
@@ -192,6 +193,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         # Init
         self.zone_init()
+
+        # 重启后先处理原海域的已知明石，修船、换图和新自律都可能刷新现场。
+        self._resume_pending_akashi()
 
         # self.map_init()
         self.hp_reset()
@@ -964,6 +968,22 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # pending event; nothing below runs, so the fleet never walks over.
                 self._solved_map_event.add('is_scanning_device')
                 return True
+            if (getattr(grid, 'is_akashi', False)
+                    and self.config.task.command == 'OpsiHazard1Leveling'):
+                # 雷达定位只更新局部视图；先保存已确认身份，再校准全局相机。
+                self._remember_pending_akashi()
+                if not hasattr(self, 'map'):
+                    self.map_init(map_=None)
+                self.update()
+                akashi = self.view.select(is_akashi=True)
+                if akashi and self._visit_akashi(akashi[0], drop=drop):
+                    return True
+                if (not akashi and not getattr(self, '_akashi_recovery_active', False)
+                        and not getattr(self, '_in_forced_recovery', False)):
+                    return self._recover_confirmed_akashi(drop=drop)
+                self._question_unreachable = True
+                return False
+
             self.is_siren_device_confirmed = False
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
@@ -1604,9 +1624,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # clicked and walked to instead of being opened as a shop.
                 if grid.is_akashi and fleet_loc.distance_to(grid) <= 1:
                     logger.info(f'Akashi ({grid}) is near fleet {fleet} ({fleet_loc}), buy directly')
-                    self.handle_akashi_supply_buy(grid)
-                    self._solved_map_event.add('is_akashi')
-                    return True
+                    if self.handle_akashi_supply_buy(grid):
+                        self._solved_map_event.add('is_akashi')
+                        return True
+                    logger.info('Direct buy from the adjacent Akashi failed, next fleet')
+                    continue
                 logger.info(f'Fleet {fleet} clicks Akashi ({grid}) and tries to walk there')
                 self.device.click(grid)
                 with self.config.temporary(STORY_ALLOW_SKIP=False):
@@ -1768,7 +1790,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     _in_forced_recovery = False
 
-    def execute_fixed_patrol_scan(self):
+    def execute_fixed_patrol_scan(self, akashi_recovery=False):
         """
         Run fixed patrol and rescan the map.
 
@@ -1790,13 +1812,19 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                    on the UI is above `_FIXED_PATROL_L2_AP`, otherwise leave it to
                    the next farming round.
 
+        Args:
+            akashi_recovery (bool): 仅为已确认且未完成的侵蚀一明石临时启用 L2，
+                绕过强制移动开关、无事件扫描与行动力门槛（对齐 AzurPilot）。
+
         Returns:
             bool: True if an event was found and solved.
         """
-        if not self._forced_move_enabled():
+        emergency = (akashi_recovery and self.config.task.command == 'OpsiHazard1Leveling'
+                     and self._get_pending_akashi() is not None)
+        if not emergency and not self._forced_move_enabled():
             logger.info('Fixed patrol: switch is off, skipped')
             return False
-        if self._is_meowfficer_task():
+        if not emergency and self._is_meowfficer_task():
             # 短猫相接不走这套共享强制移动（与 AP master 一致）：L2 把舰队挪到的
             # C1/D1/E1/F1 是照侵蚀1 那张图定的，短猫跑的海域各不相同，挪了没意义
             # 还可能把舰队挪到不该去的地方。短猫的强制移动只有换队扫雷达。
@@ -1816,6 +1844,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         self._in_forced_recovery = True
         try:
+            if emergency:
+                # 已逐队尝试过同一只明石，不能再被无事件扫描或行动力门槛挡住。
+                logger.hr('Fixed patrol: emergency L2 for the confirmed akashi')
+                self._move_fleets_and_rescan()
+                return bool(self._solved_map_event & ALREADY_SOLVED_MAP_EVENTS)
+
             # ---- L0/L1: switch fleets to read the radar, move nothing ----
             logger.hr('Fixed patrol: read radar with all fleets, without moving')
             self._solved_map_event = set()
@@ -2028,47 +2062,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if 'is_akashi' not in self._solved_map_event and grids and grids[0].is_akashi:
             grid = grids[0]
             logger.info(f'Found Akashi on {grid}')
-            # Only take the "already adjacent" shortcut when the current fleet is
-            # actually visible AND within one grid of Akashi. During a full rescan
-            # the camera is panned away from the fleet, so convert_radar_to_local()
-            # would fall back to "camera center is fleet" and wrongly trigger the
-            # shortcut, then click Akashi repeatedly while the fleet is far away.
-            fleets = self.view.select(is_current_fleet=True)
-            if fleets.count == 1 and fleets[0].distance_to(grid) <= 1:
-                logger.info(f'Akashi ({grid}) is near current fleet ({fleets[0]})')
-                self.handle_akashi_supply_buy(grid)
-                self._solved_map_event.add('is_akashi')
-                return True
-            # Fleet not in sight (or far away): click Akashi and walk to it;
-            # wait_until_walk_stable opens the shop once the fleet arrives.
-            self.device.click(grid)
-            with self.config.temporary(STORY_ALLOW_SKIP=False):
-                # Akashi has to be *seen* in the shop to count as reached, so the window that
-                # decides "nothing happened" is scaled with how far the fleet still has to
-                # walk (AzurPilot's formula): a fixed short one returns "cannot reach" while a
-                # distant Akashi is being walked to, and the recovery costs a fleet switch
-                # plus the fixed patrol. `convert_radar_to_local()` gives the fleet's grid when
-                # it is in sight, otherwise the camera center.
-                fleet = self.convert_radar_to_local((0, 0))
-                walk_time = 1.5 + 0.6 * grid.distance_to(fleet)
-                result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(walk_time, count=4))
-            if 'akashi' in result:
-                self._solved_map_event.add('is_akashi')
-                return True
-            # Cannot reach Akashi: try the other fleets first, and fall back to the
-            # fixed patrol (move the blocking fleet away) when none works.
-            grids = self.view.select(is_akashi=True)
-            if 'is_akashi' not in self._solved_map_event and grids and grids[0].is_akashi:
-                grid = grids[0]
-                logger.info('Unable to reach Akashi, try other fleets first')
-            else:
-                # Akashi "disappeared" from the view: it was clicked but no shop was
-                # opened, which means the current fleet cannot reach it. Its icon is
-                # hidden by the fleet model and the detection flickers, so a missing
-                # re-identification must not be treated as "nothing happened".
-                logger.info('Akashi was not identified again, try other fleets first')
-            return self._recover_unreachable_akashi(drop, location2node(grid.location))
+            return self._visit_akashi(grid, drop=drop)
 
         grids = self.view.select(is_scanning_device=True)
         if 'is_scanning_device' not in self._solved_map_event and grids and grids[0].is_scanning_device:
@@ -2265,7 +2259,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.fleet_set(self.config.OpsiFleet_Fleet)
             else:
                 self.fleet_set(self.get_second_fleet())
-            if not self.is_in_task_explore and len(self._solved_map_event):
+            if (not self.is_in_task_explore and self._solved_map_event
+                    and (not getattr(self, '_akashi_recovery_active', False)
+                         or 'is_akashi' in self._solved_map_event)):
                 logger.info('Solved a map event and not in OpsiExplore, stop rescan')
                 logger.attr('Solved_map_event', self._solved_map_event)
                 self.fleet_set(self.config.OpsiFleet_Fleet)
