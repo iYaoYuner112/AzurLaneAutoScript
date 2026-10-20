@@ -9780,6 +9780,11 @@
       "ExecuteFixedPatrolScan": {
         "type": "checkbox",
         "value": false
+      },
+      "PendingMapEvent": {
+        "type": "stored",
+        "value": null,
+        "display": "hide"
       }
     },
     "OpsiSirenBug": {

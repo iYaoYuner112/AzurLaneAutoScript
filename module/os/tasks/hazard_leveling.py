@@ -85,6 +85,10 @@ class OpsiHazard1Leveling(OSMap):
             if self.zone.zone_id != zone or not self.is_zone_name_hidden:
                 self.globe_goto(self.name_to_zone(zone), types='SAFE', refresh=True)
             self.fleet_set(self.config.OpsiFleet_Fleet)
+            # 续查上次看到却没处理完的地图事件（点击/自律途中卡死重启后）：
+            # 明石、塞壬装置在这里先补完，避免重开一局把这只猫/这个装置漏掉。
+            # 全图扫描与强制移动都没能看到事件时，续查会自行清记录继续下一轮。
+            self._resume_pending_map_event()
             if not self.run_strategic_search():
                 logger.warning('Strategic search was interrupted, scan the map anyway')
             # Fixed patrol: read the radars of all fleets without moving any of

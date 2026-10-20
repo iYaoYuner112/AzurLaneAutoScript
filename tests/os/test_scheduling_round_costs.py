@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from module.os.tasks.hazard_leveling import OpsiHazard1Leveling
 from module.os.tasks.meowfficer_farming import OpsiMeowfficerFarming
 from module.os.tasks.task_context import OpsiTaskContext
+from tests.os.pending_event_stub import PendingEventStub
 
 
 class TaskEnd(Exception):
@@ -27,7 +28,7 @@ class _NullContext:
         return False
 
 
-class Cl1RoundStub:
+class Cl1RoundStub(PendingEventStub):
     """跑完整一轮 `os_hazard1_leveling`，把每个界面操作记成一条事件。"""
 
     _cl1_resource_check = OpsiHazard1Leveling._cl1_resource_check

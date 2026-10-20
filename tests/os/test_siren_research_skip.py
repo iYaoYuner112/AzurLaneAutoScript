@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 from module.os.fixed_patrol import DEVICE_COMPLETED, DEVICE_DIALOG_OPEN, DEVICE_TARGETED
 from module.os.map import OSMap
+from tests.os.pending_event_stub import PendingEventStub, SirenRoundStub
 
 
 class _TempContext:
@@ -125,7 +126,7 @@ class DeviceView:
         return []
 
 
-class RescanStub:
+class RescanStub(PendingEventStub, SirenRoundStub):
     """跑真实的 `map_rescan_current`，只关心装置分支的闸门有没有早退。"""
 
     map_rescan_current = OSMap.map_rescan_current
@@ -227,7 +228,7 @@ class ClearView:
         return []
 
 
-class ClearStub:
+class ClearStub(PendingEventStub, SirenRoundStub):
     """跑真实的 `clear_question`；雷达上永远有一个问号。"""
 
     clear_question = OSMap.clear_question

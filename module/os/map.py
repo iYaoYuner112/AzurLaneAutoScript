@@ -4,6 +4,7 @@ from contextlib import suppress
 import inflection
 
 from module.base.timer import Timer
+from module.combat.assets import COMBAT_AUTO_SWITCH
 from module.config.config import OS_MAP_STALE_KEY, OS_RESUME_RECOVERY_KEY, TaskEnd
 from module.os.tasks.task_context import current_opsi_context
 from module.config.utils import get_os_reset_remain
@@ -25,6 +26,7 @@ from module.os.fixed_patrol import (
 from module.os.fleet import OSFleet
 from module.os.globe_camera import GlobeCamera
 from module.os.globe_operation import RewardUncollectedError
+from module.os.map_event_resume import MapEventResumeMixin
 from module.os_handler.assets import AUTO_SEARCH_OS_MAP_OPTION_OFF, AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, \
     AUTO_SEARCH_OS_MAP_OPTION_ON, AUTO_SEARCH_REWARD
 from module.os_handler.strategic import StrategicSearchHandler
@@ -58,7 +60,7 @@ UNSWALLOWABLE_ERRORS = (
 )
 
 
-class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
+class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     _FIXED_PATROL_L2_AP = 7
 
     def _os_map_was_interrupted(self):
@@ -986,25 +988,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.hr('Siren device solved via question', level=2)
                 siren_mode = getattr(self, 'siren_device_mode', None)
                 logger.attr('Siren device mode', siren_mode)
-                if siren_mode == 'enemy':
-                    task = self.config.task.command
-                    if task not in ('OpsiHazard1Leveling', 'OpsiMeowfficerFarming'):
-                        task = 'OpsiHazard1Leveling'
-                    siren_fleet = self.config.cross_get(
-                        keys=f'{task}.OpsiSirenBug.Siren_Fleet', default=0)
-                    current_fleet = self.fleet_selector.get()
-                    if siren_fleet > 0:
-                        self.fleet_set(siren_fleet)
-                    for _ in range(3):
-                        self.os_auto_search_run(drop=drop)
-                    if siren_fleet > 0:
-                        self.fleet_set(current_fleet)
-                elif siren_mode == 'collected':
-                    logger.info('Siren info collection device: dialog already completed, '
-                                'no auto search needed')
-                else:
-                    logger.info('Siren device standard handling, run auto search')
-                    self.os_auto_search_run(drop=drop)
+                node = location2node(grid.location)
+                # 先落盘再跑自律：装置对话已经确认，后续自律中途卡死重启时由续查补完。
+                self._save_pending_map_event('scanning_device', grid)
+                rounds, siren_fleet = self._siren_device_search_plan()
+                self._update_pending_map_event(
+                    mode=siren_mode, submitted=True, remaining=rounds)
+                # 轮数与清除流程和 map_rescan_current 共用同一份实现，避免两处再漂移。
+                self._run_siren_device_rounds(siren_mode, rounds, siren_fleet, drop=drop)
+                self._finish_pending_map_event('scanning_device', node=node)
                 self._solved_map_event.add('is_scanning_device')
                 return True
             else:
@@ -1604,9 +1596,17 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # clicked and walked to instead of being opened as a shop.
                 if grid.is_akashi and fleet_loc.distance_to(grid) <= 1:
                     logger.info(f'Akashi ({grid}) is near fleet {fleet} ({fleet_loc}), buy directly')
-                    self.handle_akashi_supply_buy(grid)
-                    self._solved_map_event.add('is_akashi')
-                    return True
+                    # 先落盘再动手：购买/行军中途卡死重启时，由续查流程重新找这只猫。
+                    self._save_pending_map_event('akashi', grid)
+                    if self.handle_akashi_supply_buy(grid):
+                        self._solved_map_event.add('is_akashi')
+                        self._finish_pending_map_event('akashi', node=location2node(grid.location))
+                        return True
+                    logger.info(f'Fleet {fleet} cannot buy from Akashi, next')
+                    continue
+                if grid.is_akashi:
+                    # 视图确认是明石才落盘：雷达问号兜底定位的格子可能是记录塔/装置。
+                    self._save_pending_map_event('akashi', grid)
                 logger.info(f'Fleet {fleet} clicks Akashi ({grid}) and tries to walk there')
                 self.device.click(grid)
                 with self.config.temporary(STORY_ALLOW_SKIP=False):
@@ -1618,6 +1618,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     )
                 if 'akashi' in result:
                     self._solved_map_event.add('is_akashi')
+                    self._finish_pending_map_event('akashi', node=location2node(grid.location))
                     return True
                 logger.info(f'Fleet {fleet} cannot reach Akashi either, next')
             return False
@@ -1768,7 +1769,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     _in_forced_recovery = False
 
-    def execute_fixed_patrol_scan(self):
+    def execute_fixed_patrol_scan(self, override=False):
         """
         Run fixed patrol and rescan the map.
 
@@ -1790,10 +1791,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                    on the UI is above `_FIXED_PATROL_L2_AP`, otherwise leave it to
                    the next farming round.
 
+        Args:
+            override (bool): Run even when the fixed patrol switch is off. Used by
+                the pending-event resume, where the event was already seen and
+                giving up on it just because the switch is off would lose it.
+
         Returns:
             bool: True if an event was found and solved.
         """
-        if not self._forced_move_enabled():
+        if not override and not self._forced_move_enabled():
             logger.info('Fixed patrol: switch is off, skipped')
             return False
         if self._is_meowfficer_task():
@@ -1988,6 +1994,103 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             fleet = 0
         return rounds, fleet
 
+    def _ensure_combat_auto_enabled(self):
+        """
+        Make sure combat auto is still on before the next device search round.
+
+        Enemy mode runs three rounds in a row and the game can pause auto between
+        them, so the later rounds would fight in manual mode. Only the read-only
+        judgement from module/combat/combat_auto.py is used here: the joystick
+        shows up when auto is off, and then the switch is clicked once.
+
+        Returns:
+            bool: True if the switch had to be clicked.
+        """
+        self.device.screenshot()
+        if not self.combat_joystick_appear():
+            return False
+        logger.info('Siren device: combat auto is off, switch it on again')
+        self.device.click(COMBAT_AUTO_SWITCH)
+        self.auto_click_interval_timer.reset()
+        self.auto_mode_switched = True
+        return True
+
+    def _clear_siren_settlement(self, drop=None, timeout=15):
+        """
+        Clear a settlement / get-items screen left behind by a device round.
+
+        Bounded on purpose: waiting for the map without a timeout turns a stuck
+        screen into a whole-round hang, and the round has to go on either way.
+
+        Args:
+            drop: Drop record.
+            timeout (int): Seconds to wait for the map.
+
+        Returns:
+            bool: True if the map is visible again.
+        """
+        timer = Timer(timeout, count=3).start()
+        while 1:
+            if self.handle_map_get_items(interval=1, drop=drop):
+                timer.reset()
+                self.device.screenshot()
+                continue
+            if self.handle_popup_confirm('SIREN_DEVICE_SETTLEMENT'):
+                timer.reset()
+                self.device.screenshot()
+                continue
+            if self.is_in_map():
+                return True
+            if timer.reached():
+                logger.warning(f'Siren device: settlement screen did not go away '
+                               f'in {timeout}s, continue anyway')
+                return False
+            self.device.screenshot()
+
+    def _run_siren_device_rounds(self, mode, rounds, fleet=0, drop=None):
+        """
+        Run the auto search rounds a siren device dialog is worth.
+
+        Shared by clear_question and map_rescan_current (the same device is
+        reachable from both), so the two paths cannot drift apart again. Each
+        round re-checks combat auto and clears a leftover settlement screen; the
+        remaining rounds are written into the pending-event record so a restart
+        resumes only what is left.
+
+        Args:
+            mode (str | None): Device mode, enemy/resource/collected/None.
+            rounds (int): Auto search rounds to run.
+            fleet (int): Fleet to run them with, 0 to keep the current one.
+            drop: Drop record.
+
+        Returns:
+            int: Rounds actually run.
+        """
+        if rounds <= 0:
+            if mode == 'collected':
+                logger.info('Siren info collection device: dialog already completed, '
+                            'no auto search needed')
+            return 0
+
+        current_fleet = self.fleet_selector.get()
+        switched = False
+        if fleet > 0 and fleet != current_fleet:
+            logger.info(f'Siren device: run the search rounds with fleet {fleet} '
+                        f'instead of {current_fleet}')
+            self.fleet_set(fleet)
+            switched = True
+        try:
+            for index in range(rounds):
+                logger.info(f'Siren device ({mode}): auto search {index + 1}/{rounds}')
+                self._ensure_combat_auto_enabled()
+                self.os_auto_search_run(drop=drop)
+                self._record_siren_followup_progress()
+                self._clear_siren_settlement(drop=drop)
+        finally:
+            if switched:
+                self.fleet_set(current_fleet)
+        return rounds
+
     def map_rescan_current(self, drop=None):
         """
 
@@ -2033,12 +2136,22 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             # the camera is panned away from the fleet, so convert_radar_to_local()
             # would fall back to "camera center is fleet" and wrongly trigger the
             # shortcut, then click Akashi repeatedly while the fleet is far away.
+            node = location2node(grid.location)
+            # 先落盘再动手：点击/购买/行军中途卡死重启时，由续查流程重新找这只猫。
+            self._save_pending_map_event('akashi', grid)
             fleets = self.view.select(is_current_fleet=True)
             if fleets.count == 1 and fleets[0].distance_to(grid) <= 1:
                 logger.info(f'Akashi ({grid}) is near current fleet ({fleets[0]})')
-                self.handle_akashi_supply_buy(grid)
-                self._solved_map_event.add('is_akashi')
-                return True
+                if self.handle_akashi_supply_buy(grid):
+                    self._solved_map_event.add('is_akashi')
+                    self._finish_pending_map_event('akashi', node=node)
+                    return True
+                # 点不进去 / 商店没买成：不能标已处理，按"够不着"走换队 + 强制移动。
+                logger.info('Akashi shop was not opened, try other fleets first')
+                result = self._recover_unreachable_akashi(drop, node)
+                if result:
+                    self._finish_pending_map_event('akashi', node=node)
+                return result
             # Fleet not in sight (or far away): click Akashi and walk to it;
             # wait_until_walk_stable opens the shop once the fleet arrives.
             self.device.click(grid)
@@ -2055,6 +2168,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     drop=drop, walk_out_of_step=False, confirm_timer=Timer(walk_time, count=4))
             if 'akashi' in result:
                 self._solved_map_event.add('is_akashi')
+                self._finish_pending_map_event('akashi', node=node)
                 return True
             # Cannot reach Akashi: try the other fleets first, and fall back to the
             # fixed patrol (move the blocking fleet away) when none works.
@@ -2068,7 +2182,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 # hidden by the fleet model and the detection flickers, so a missing
                 # re-identification must not be treated as "nothing happened".
                 logger.info('Akashi was not identified again, try other fleets first')
-            return self._recover_unreachable_akashi(drop, location2node(grid.location))
+            result = self._recover_unreachable_akashi(drop, node)
+            # 换队 + 强制移动都没买成时记录留着，下次进海域继续续查。
+            if result:
+                self._finish_pending_map_event('akashi', node=node)
+            return result
 
         grids = self.view.select(is_scanning_device=True)
         if 'is_scanning_device' not in self._solved_map_event and grids and grids[0].is_scanning_device:
@@ -2081,6 +2199,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             if location2node(grid.location) in self._unreachable_event_nodes:
                 logger.info(f'Siren device on {grid} was already judged unreachable this round, skip')
                 return False
+            node = location2node(grid.location)
+            # 先落盘再点：装置对话/后续自律中途卡死重启时，由续查流程补完剩下的自律。
+            self._save_pending_map_event('scanning_device', grid)
             logger.info(f'Found siren probe (scanning device) on {grid}, stop battle plan to handle it')
             # The probe is a special map event, not a normal battle target: click it,
             # wait for the operation popup, confirm it, then rescan. Never skip it to
@@ -2121,18 +2242,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             # way would overwrite the mode with 'collected' and eat the rounds).
             rounds, siren_fleet = self._siren_device_search_plan()
             mode = getattr(self, 'siren_device_mode', None)
-            current_fleet = self.fleet_selector.get()
-            switched = False
-            if rounds > 1 and siren_fleet > 0 and siren_fleet != current_fleet:
-                logger.info(f'Siren device: run the search rounds with fleet {siren_fleet} '
-                            f'instead of {current_fleet}')
-                self.fleet_set(siren_fleet)
-                switched = True
-            for index in range(rounds):
-                logger.info(f'Siren device ({mode}): auto search {index + 1}/{rounds}')
-                self.os_auto_search_run(drop=drop)
-            if switched:
-                self.fleet_set(current_fleet)
+            # 记下模式和剩余次数：敌人模式 3 次（自律可能被游戏暂停），资源模式 1 次。
+            self._update_pending_map_event(
+                mode=mode, submitted=True, remaining=rounds)
+            self._run_siren_device_rounds(mode, rounds, siren_fleet, drop=drop)
 
             # Mark it solved before the extra scan, so the second pass cannot re-enter
             # this branch for the same device. The extra scan matters: the device drops
@@ -2147,6 +2260,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.map_rescan_current(drop=drop)
             except MapDetectionError:
                 logger.warning('Siren device: current view is unreadable, skip the extra rescan')
+            self._finish_pending_map_event('scanning_device', node=node)
             self._set_device_state(DEVICE_COMPLETED)
             return True
 

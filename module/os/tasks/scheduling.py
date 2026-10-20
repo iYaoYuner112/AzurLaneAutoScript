@@ -552,7 +552,8 @@ class OpsiScheduling(OSMap):
         if self._delay_for_opsi_explore():
             return
 
-        yellow_coins = self.get_yellow_coins()
+        # 决策用的是"可信"读数：一次 OCR 可能读到旧值/0，不新鲜就再读一次。
+        yellow_coins = self.get_yellow_coins_for_decision()
         try:
             total_ap, current_ap = self._get_scheduling_action_point(keep_open=True)
             return self._run_opsi_scheduler_decision(yellow_coins, total_ap, current_ap)
@@ -596,6 +597,7 @@ class OpsiScheduling(OSMap):
             self._save_smart_state(state)
 
         logger.info(f'[大世界-调度] 当前模式={mode}')
+        logger.attr('黄币读数来源', self.yellow_coins_source)
         logger.info(
             f'[大世界-调度] 黄币={yellow_coins}, AP={total_ap}, '
             f'黄币保留={self.config.OpsiScheduling_OperationCoinsPreserve}, '

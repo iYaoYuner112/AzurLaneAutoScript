@@ -68,6 +68,8 @@ class StubConfig:
 class NotifyStub:
     """只提供推送模块用到的接口：config、调度状态字典、行动力读数。"""
 
+    yellow_coins_source = 'ocr'
+
     def __init__(self, ap=1500, push_config=PUSH_CHANNEL, notify_mail=True, scheduling=True):
         self.state = {}
         self._action_point_total = ap

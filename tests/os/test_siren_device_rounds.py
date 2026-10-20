@@ -10,10 +10,13 @@
 
 from types import SimpleNamespace
 
+from module.base.timer import Timer
+from module.combat.assets import COMBAT_AUTO_SWITCH
 from module.exception import MapDetectionError
 from module.map.map_base import location2node
 from module.os.fixed_patrol import DEVICE_COMPLETED, DEVICE_NONE
 from module.os.map import OSMap
+from tests.os.pending_event_stub import PendingEventStub
 
 
 class _TempContext:
@@ -42,7 +45,7 @@ class DeviceView:
         return []
 
 
-class DeviceStub:
+class DeviceStub(PendingEventStub):
     """跑真实的 `map_rescan_current` 装置分支（补扫走真递归，靠标记防重入）。"""
 
     map_rescan_current = OSMap.map_rescan_current
@@ -50,6 +53,10 @@ class DeviceStub:
     _siren_device_search_plan = OSMap._siren_device_search_plan
     _should_skip_siren_research = OSMap._should_skip_siren_research
     _is_siren_research_enabled = OSMap._is_siren_research_enabled
+    _run_siren_device_rounds = OSMap._run_siren_device_rounds
+    _ensure_combat_auto_enabled = OSMap._ensure_combat_auto_enabled
+    _clear_siren_settlement = OSMap._clear_siren_settlement
+    auto_click_interval_timer = Timer(5)
 
     is_in_task_explore = False
 
@@ -68,14 +75,38 @@ class DeviceStub:
         self._dialog = dialog
         self._update_fails = update_fails
         self.current = 1
+        self.in_map = True
+        self.auto_off_on_checks = set()
+        self.joystick_checks = 0
+        self.auto_switches = 0
+        self.grid_clicks = 0
         self.config = SimpleNamespace(
             task=SimpleNamespace(command=task),
             temporary=lambda **kwargs: _TempContext(),
             cross_get=lambda keys, default=None: (
                 siren_fleet if keys.endswith('Siren_Fleet') else default),
         )
-        self.device = SimpleNamespace(click=lambda grid: None, screenshot=lambda: None)
+        self.device = SimpleNamespace(click=self._click, screenshot=lambda: None)
         self.fleet_selector = SimpleNamespace(get=lambda: self.current)
+
+    def _click(self, button):
+        if button is COMBAT_AUTO_SWITCH:
+            self.auto_switches += 1
+        else:
+            self.grid_clicks += 1
+
+    def combat_joystick_appear(self):
+        self.joystick_checks += 1
+        return self.joystick_checks in self.auto_off_on_checks
+
+    def is_in_map(self):
+        return self.in_map
+
+    def handle_map_get_items(self, interval=2, drop=None):
+        return False
+
+    def handle_popup_confirm(self, name='', **kwargs):
+        return False
 
     def wait_until_walk_stable(self, **kwargs):
         # 真实现里剧情选项被认成装置剧情才置位（story_skip -> _identify_siren_device_option）
@@ -191,3 +222,28 @@ def test_extra_rescan_failure_does_not_break_the_round():
     assert stub.auto_searches == 1
     assert stub.view.device_seen == 1
     assert stub.states[-1] == DEVICE_COMPLETED
+
+
+
+def test_enemy_round_turns_combat_auto_back_on():
+    """敌人模式第 2 轮开始前游戏把自律关了：先点开再打，否则后面两轮是手动。"""
+    stub = DeviceStub(mode='enemy')
+    stub.auto_off_on_checks = {2}
+    assert stub.map_rescan_current() is True
+    assert stub.auto_searches == 3
+    assert stub.auto_switches == 1
+
+
+def test_device_rounds_report_progress_after_each_round():
+    """每跑完一轮就把剩余次数写回续查记录，卡死重启后只补没跑完的。"""
+    stub = DeviceStub(mode='enemy')
+    assert stub.map_rescan_current() is True
+    assert stub.pending_updates[-1]['remaining'] == 3
+    assert stub.progress_calls == 3
+
+
+def test_settlement_timeout_warns_and_does_not_raise():
+    """装置自律结束卡在结算界面：带超时退回，只告警，不把这一轮拖死。"""
+    stub = DeviceStub(mode='resource')
+    stub.in_map = False
+    assert stub._clear_siren_settlement(timeout=0) is False

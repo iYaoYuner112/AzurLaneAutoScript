@@ -1,5 +1,6 @@
 import typing as t
 from datetime import datetime, timedelta
+from time import monotonic
 
 from module.base.decorator import cached_property
 import module.config.server as server
@@ -25,6 +26,12 @@ OCR_OS_SHOP_PURPLE_COINS = Digit(OS_SHOP_PURPLE_COINS, letter=(255, 255, 255), n
 class OSStatus(UI):
     _shop_yellow_coins = 0
     _shop_purple_coins = 0
+    # 黄币读数的可信度。连续两次 OCR 一致才算"新鲜"；OCR 失败时沿用上次读数，
+    # 但过了 YELLOW_COINS_MAX_AGE（5 分钟）就作废，旧读数不能当成现在的余额。
+    YELLOW_COINS_MAX_AGE = 300
+    _yellow_coins_updated_at = 0.0
+    _yellow_coins_fresh = False
+    _yellow_coins_source = 'none'
 
     @property
     def is_in_task_explore(self) -> bool:
@@ -104,25 +111,116 @@ class OSStatus(UI):
         else:
             return 35000
 
-    def get_yellow_coins(self) -> int:
-        yellow_coins = 0
-        timeout = Timer(2, count=3).start()
+    @property
+    def yellow_coins_source(self):
+        """
+        Where the last yellow coin reading came from.
+
+        Returns:
+            str: ocr (two equal readings), ocr-once (not confirmed), reuse
+                (OCR failed, last reading reused), none (no usable reading).
+        """
+        return self._yellow_coins_source
+
+    def yellow_coins_fresh(self, max_age=None):
+        """
+        Whether the last yellow coin reading can be trusted for a decision.
+
+        Args:
+            max_age (int, optional): Seconds before a reading is too old.
+
+        Returns:
+            bool: True if two consecutive OCR readings agreed and it is not old.
+        """
+        if not self._yellow_coins_fresh or not self._yellow_coins_updated_at:
+            return False
+        if max_age is None:
+            max_age = self.YELLOW_COINS_MAX_AGE
+        return monotonic() - self._yellow_coins_updated_at <= max_age
+
+    def _record_yellow_coins(self, value, fresh, source):
+        """
+        Store a yellow coin reading together with its credibility.
+
+        Args:
+            value (int): Yellow coins.
+            fresh (bool): Two consecutive OCR readings agreed.
+            source (str): Where the reading came from.
+        """
+        self._shop_yellow_coins = int(value)
+        self._yellow_coins_updated_at = monotonic()
+        self._yellow_coins_fresh = bool(fresh)
+        self._yellow_coins_source = source
+        logger.attr('YellowCoins', f'{self._shop_yellow_coins} ({source})')
+
+    def get_yellow_coins(self, timeout=3) -> int:
+        """
+        Read yellow coins, with a credibility check.
+
+        黄币靠截图 OCR，慢设备或界面动画没走完时会读到旧值或 0。这里要求连续
+        两次读数一致才算新鲜；OCR 一直失败时沿用上次读数（带时间戳，过期作废），
+        不要把 0 当成真实余额交给调度。
+
+        Args:
+            timeout (int): Seconds to keep trying for a confirmation.
+
+        Returns:
+            int: Yellow coins.
+        """
+        timer = Timer(timeout, count=3).start()
+        previous = None
+        value = None
+        confirmed = False
         for _ in self.loop():
-            # End
-            yellow_coins = OCR_SHOP_YELLOW_COINS.ocr(self.device.image)
-            if timeout.reached():
+            value = OCR_SHOP_YELLOW_COINS.ocr(self.device.image)
+            if value >= 100:
+                if previous is not None and value == previous:
+                    confirmed = True
+                    break
+                previous = value
+            else:
+                # OCR may get 0 or 1 when the amount is not loaded yet
+                logger.info('Yellow coins less than 100, assuming it is an ocr error')
+                previous = None
+            if timer.reached():
                 logger.warning('Get yellow coins timeout')
                 break
 
-            if yellow_coins < 100:
-                # OCR may get 0 or 1 when amount is not immediately loaded
-                logger.info('Yellow coins less than 100, assuming it is an ocr error')
-                continue
-            else:
-                break
+        if confirmed:
+            self._record_yellow_coins(value, fresh=True, source='ocr')
+        elif value is not None and value >= 100:
+            # 只确认了一次（或每次都不一致）：能用，但不标记为新鲜
+            self._record_yellow_coins(value, fresh=False, source='ocr-once')
+        else:
+            age = monotonic() - self._yellow_coins_updated_at
+            if self._yellow_coins_updated_at and age <= self.YELLOW_COINS_MAX_AGE:
+                logger.info(f'Yellow coins OCR failed, reuse the reading {age:.0f}s ago: '
+                            f'{self._shop_yellow_coins}')
+                self._yellow_coins_source = 'reuse'
+                return self._shop_yellow_coins
+            logger.warning('Yellow coins OCR failed and no recent reading, assume 0')
+            self._yellow_coins_source = 'none'
+            self._shop_yellow_coins = 0
+            return 0
 
-        if yellow_coins >= 100:
-            record_dashboard_resource(self.config, 'YellowCoin', yellow_coins)
+        record_dashboard_resource(self.config, 'YellowCoin', self._shop_yellow_coins)
+        return self._shop_yellow_coins
+
+    def get_yellow_coins_for_decision(self):
+        """
+        Yellow coins for a scheduling decision: re-read once when not fresh.
+
+        Returns:
+            int: Yellow coins to decide with.
+        """
+        yellow_coins = self.get_yellow_coins()
+        if self.yellow_coins_fresh():
+            return yellow_coins
+        logger.info('[大世界-调度] 黄币读数不新鲜（未连续两次一致），决策前重读一次')
+        yellow_coins = self.get_yellow_coins()
+        if not self.yellow_coins_fresh():
+            logger.warning(f'[大世界-调度] 黄币读数仍不新鲜（来源={self.yellow_coins_source}），'
+                           f'按 {yellow_coins} 决策')
         return yellow_coins
 
     def get_purple_coins(self) -> int:

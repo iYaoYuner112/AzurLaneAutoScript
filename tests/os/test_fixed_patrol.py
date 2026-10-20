@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 from module.exception import GameStuckError, GameTooManyClickError, MapWalkError, RequestHumanTakeover
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
+from tests.os.pending_event_stub import PendingEventStub, SirenRoundStub
 
 
 class SwitchStub:
@@ -543,13 +544,15 @@ def test_device_rotation_needs_the_dialog_not_an_event():
 class _FakeGrid:
     def __init__(self):
         self.str = 'B4'
+        self.location = (1, 3)
         self.is_logging_tower = False
         self.is_scanning_device = False
 
 
-class ClearQuestionStub:
+class ClearQuestionStub(PendingEventStub, SirenRoundStub):
     _should_skip_siren_research = OSMap._should_skip_siren_research
     _is_siren_research_enabled = OSMap._is_siren_research_enabled
+    _siren_device_search_plan = OSMap._siren_device_search_plan
 
     def __init__(self, predictions, walk_results=None, convert_error=False, fleet_visible=True,
                  confirmed_on_walk=False, siren_device_mode=None):

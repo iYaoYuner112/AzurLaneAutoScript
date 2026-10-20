@@ -789,6 +789,12 @@ OpsiHazard1Leveling:
     value: 0
     option: [ 0, 44, 22 ]
   ExecuteFixedPatrolScan: false
+  # 程序自维护的续查记录：卡死重启后补完“已经看见、但没处理完”的地图事件。
+  # stored + hide 成对使用（同 OpsiDaily.MissionZones）。
+  PendingMapEvent:
+    type: stored
+    value: null
+    display: hide
 OpsiSirenBug:
   SirenResearch_Enable: true
   Siren_Mode:

@@ -23,6 +23,7 @@ from types import SimpleNamespace
 
 from module.map.map_base import location2node
 from module.os.globe_operation import GlobeOperation, OSExploreError
+from tests.os.pending_event_stub import PendingEventStub
 from module.os.map import OSMap
 from module.os.tasks.daily import OpsiDaily
 from module.os.tasks.meowfficer_farming import OpsiMeowfficerFarming
@@ -471,7 +472,7 @@ class AkashiView:
         return PointList([])
 
 
-class AkashiStub:
+class AkashiStub(PendingEventStub):
     """跑真实的 `map_rescan_current` 明石分支，把 confirm_timer 收下来看给它多长窗口。"""
 
     map_rescan_current = OSMap.map_rescan_current
@@ -496,6 +497,7 @@ class AkashiStub:
 
     def handle_akashi_supply_buy(self, grid):
         self.buys += 1
+        return True
 
     def _recover_unreachable_akashi(self, drop, node):
         self.recovered.append(node)
