@@ -337,3 +337,24 @@ class OpsiMeowfficerFarming(OSMap):
         self._meow_fixed_patrol_scan()
         self.handle_after_auto_search()
         self.config.check_task_switch()
+
+    def run_meowfficer_farming_once(self, ap_preserve=None, ap_checked=False,
+                                    prepared=False, fresh_ap=None):
+        """执行一轮耄耋相接（智能调度 / 防止行动力溢出共用入口）。
+
+        对齐 AzurPilot 的同名方法：保留值优先用调用方给的值，防溢出时传的是
+        下限，避免本轮被短猫自己的 1000 保留线拦住。
+
+        Args:
+            ap_preserve (int | None): 本轮行动力保留值；None 时沿用调度配置。
+            ap_checked (bool): 本轮前的行动力检查是否已完成。
+            prepared (bool): 运行环境是否已准备。
+            fresh_ap (tuple[int, int] | None): 调用方刚读到的
+
+        Returns:
+            OpsiTaskResult: 本轮结果。
+        """
+        if ap_preserve is None:
+            ap_preserve = self._get_scheduled_meow_ap_preserve()
+        return self._run_scheduled_coin_task_once(
+            'OpsiMeowfficerFarming', int(ap_preserve), fresh_ap=fresh_ap)

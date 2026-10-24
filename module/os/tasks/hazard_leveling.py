@@ -5,13 +5,15 @@ from module.os.tasks.task_context import is_running_opsi_proxy
 
 
 class OpsiHazard1Leveling(OSMap):
-    def os_hazard1_leveling(self, fresh_ap=None):
+    def os_hazard1_leveling(self, fresh_ap=None, ap_preserve=None):
         """侵蚀 1 练级入口。
 
         Args:
             fresh_ap (tuple[int, int] | None): 智能调度代理执行时传入的
                 (总行动力, 当前行动力) 首读；用于在同一个行动力面板里确认开工、
                 跳过重复的弹窗往返。独立运行时为 None。
+            ap_preserve (int | None): 调用方指定的行动力保留值，优先级最高。
+                防止行动力溢出传下限（要花光）；智能调度代跑传 None 走配置。
         """
         logger.hr('OS hazard 1 leveling', level=1)
         # Without these enabled, CL1 gains 0 profits
@@ -21,12 +23,17 @@ class OpsiHazard1Leveling(OSMap):
         )
         if not self.is_smart_scheduling_enabled and not self.config.is_task_enabled('OpsiMeowfficerFarming'):
             self.config.cross_set(keys='OpsiMeowfficerFarming.Scheduler.Enable', value=True)
+        if ap_preserve is not None:
+            logger.attr('侵蚀1行动力保留', int(ap_preserve))
         while True:
-            # Limited action point preserve of hazard 1 to 200
-            self.config.OS_ACTION_POINT_PRESERVE = (
-                self.config.OpsiScheduling_ActionPointPreserve
-                if self.is_smart_scheduling_enabled else 200
-            )
+            # 保留值优先级：调用方指定 > 智能调度配置 > 独立运行固定 200
+            if ap_preserve is not None:
+                self.config.OS_ACTION_POINT_PRESERVE = int(ap_preserve)
+            else:
+                self.config.OS_ACTION_POINT_PRESERVE = (
+                    self.config.OpsiScheduling_ActionPointPreserve
+                    if self.is_smart_scheduling_enabled else 200
+                )
             if self.config.is_task_enabled('OpsiAshBeacon') \
                     and not self._ash_fully_collected \
                     and self.config.cross_get("OpsiAshBeacon.OpsiAshBeacon.EnsureFullyCollected", True):
@@ -139,3 +146,27 @@ class OpsiHazard1Leveling(OSMap):
                             self.config.task_call(task)
                 self.config.task_call('OpsiMeowfficerFarming')
         self.config.task_stop()
+
+    def run_hazard1_leveling_once(self, ap_preserve=None, fresh_ap=None):
+        """执行一轮侵蚀 1 练级（智能调度 / 防止行动力溢出共用入口）。
+
+        对齐 AzurPilot 的同名方法：把本轮的保留值显式传进来，而不是让子任务
+        自己去读配置——防溢出要的是「花到下限」，不能沿用 200 的保留线。
+
+        Args:
+            ap_preserve (int | None): 本轮行动力保留值；None 时沿用配置。
+            fresh_ap (tuple[int, int] | None): 调用方刚读到的
+                (总行动力, 当前行动力)，用于省掉一次面板往返。
+
+        Returns:
+            OpsiTaskResult: 本轮子任务的执行结果。
+        """
+        yellow_coins = self.get_yellow_coins_for_decision()
+        if fresh_ap is None:
+            fresh_ap = self._get_scheduling_action_point(keep_open=True)
+        try:
+            # 保留值走参数直传（与 AzurPilot 一致），不再临时改配置
+            return self._execute_hazard1_leveling_once(
+                yellow_coins, fresh_ap[0], fresh_ap[1], ap_preserve=ap_preserve)
+        finally:
+            self._close_scheduling_action_point()

@@ -415,7 +415,8 @@ class OpsiScheduling(OSMap):
         logger.info('[大世界-调度] 补跑 os_init 的首次自律寻敌')
         self.run_first_auto_search()
 
-    def _execute_hazard1_leveling_once(self, yellow_coins, total_ap, current_ap) -> OpsiTaskResult:
+    def _execute_hazard1_leveling_once(self, yellow_coins, total_ap, current_ap,
+                                       ap_preserve=None) -> OpsiTaskResult:
         """Proxy one round of侵蚀 1 练级, which is the default NORMAL action."""
         logger.info(f'[大世界-调度] 选择任务: {TASK_NAME_HAZARD1_LEVELING}（原因: 黄币充足）')
         logger.info(f'[大世界-调度] TASK_START {TASK_NAME_HAZARD1_LEVELING}')
@@ -430,8 +431,10 @@ class OpsiScheduling(OSMap):
         self.handle_first_auto_search(run=False)
         try:
             with opsi_task_context(self.config, TASK_NAME_HAZARD1_LEVELING, disable_task_switch=False):
-                # 把决策刚读到的行动力交给子任务，它在同一个面板里完成开工检查
-                self.os_hazard1_leveling(fresh_ap=(total_ap, current_ap))
+                # 把决策刚读到的行动力交给子任务，它在同一个面板里完成开工检查；
+                # ap_preserve 透传给子任务（防溢出要花光，正常调度传 None）
+                self.os_hazard1_leveling(fresh_ap=(total_ap, current_ap),
+                                         ap_preserve=ap_preserve)
         except OpsiNoContent as e:
             return OpsiTaskResult(OpsiStatus.NO_CONTENT, task=TASK_NAME_HAZARD1_LEVELING, reason=str(e))
         return OpsiTaskResult(OpsiStatus.SUCCESS, task=TASK_NAME_HAZARD1_LEVELING, map_changed=True)
@@ -563,6 +566,31 @@ class OpsiScheduling(OSMap):
             raise
         finally:
             self._close_scheduling_action_point()
+
+    # ---------------------------------------------------------- 单轮入口
+
+    def run_smart_scheduling_once(self):
+        """跑一轮智能调度决策，供防溢出等外部调用（对齐 AzurPilot 同名入口）。
+
+        Returns:
+            OpsiTaskResult: 本轮子任务的执行结果。
+        """
+        return self.run_opsi_scheduler_once()
+
+    def _run_with_opsi_task_context(self, task_name, func, *args, **kwargs):
+        """在 Opsi 子任务身份下执行一轮任务（防溢出代跑时复用）。
+
+        Args:
+            task_name (str): 子任务标识名。
+            func (Callable): 子任务"跑一轮"的入口。
+            *args: 透传的位置参数。
+            **kwargs: 透传的关键字参数。
+
+        Returns:
+            Any: func 的返回值。
+        """
+        with opsi_task_context(self.config, task_name):
+            return func(*args, **kwargs)
 
     def _run_opsi_scheduler_decision(self, yellow_coins, total_ap, current_ap):
         """使用首读的行动力做决策；面板在实际地图操作之前关闭或合并开工补充。"""

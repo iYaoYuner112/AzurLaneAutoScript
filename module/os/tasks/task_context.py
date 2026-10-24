@@ -27,7 +27,7 @@ legacy ``task_delay + task_stop`` behaviour when running standalone.
 
 import typing as t
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from module.config.config import Function
 from module.logger import logger
@@ -37,9 +37,12 @@ __all__ = [
     'OpsiTaskResult',
     'TaskDelayRequest',
     'OpsiTaskContext',
+    'OverflowDelay',
     'OpsiNoContent',
     'current_opsi_context',
     'is_running_opsi_proxy',
+    'is_running_prevent_overflow',
+    'prevent_overflow_context',
     'is_opsi_task_switch_disabled',
     'mark_opsi_no_content',
     'pop_opsi_no_content',
@@ -147,10 +150,57 @@ class OpsiTaskContext:
 
     parent_task: str = ''
     current_task: str = ''
+    # 防溢出任务本轮共享的延迟容器（对齐 AzurPilot 的 overflow 字段）：
+    # 子任务申请的延迟请求放这里，防溢出任务退出时优先采用它。
+    overflow: t.Optional['OverflowDelay'] = None
+
+
+@dataclass
+class OverflowDelay:
+    """一轮防溢出任务中共享的延迟请求容器；退出本轮后不再保留。
+
+    Attributes:
+        request (TaskDelayRequest | None): 子任务申请的延迟请求。
+    """
+
+    request: t.Optional[TaskDelayRequest] = None
 
 
 def current_opsi_context(config) -> t.Optional[OpsiTaskContext]:
     return getattr(config, '_opsi_context', None)
+
+
+def is_running_prevent_overflow(config) -> bool:
+    """是否处在「防止行动力溢出」的代理上下文里。
+
+    Returns:
+        bool: 防溢出容器存在时返回 True。
+    """
+    context = current_opsi_context(config)
+    return context is not None and context.overflow is not None
+
+
+@contextmanager
+def prevent_overflow_context(config):
+    """防溢出代理本轮共享一个延迟容器，最外层退出后恢复原上下文。
+
+    对齐 AzurPilot 的 `prevent_overflow_context`：子任务申请的延迟请求会写进
+    这个容器，而不是直接改写自己的排期，由防溢出任务在退出时统一采用。
+
+    Args:
+        config: the Alas config object.
+
+    Yields:
+        OverflowDelay: 本轮共享的延迟请求容器。
+    """
+    previous = current_opsi_context(config)
+    if previous is not None and previous.overflow is not None:
+        overflow = previous.overflow
+    else:
+        overflow = OverflowDelay()
+    base = previous if previous is not None else OpsiTaskContext()
+    with _temporary_attributes(config, _opsi_context=replace(base, overflow=overflow)):
+        yield overflow
 
 
 def is_running_opsi_proxy(config) -> bool:
@@ -289,7 +339,12 @@ def opsi_task_context(config, task_name, *, set_task_identity=True, disable_task
     if child_task is None:
         child_task = previous_task
 
-    context = OpsiTaskContext(parent_task=owner_command, current_task=task_name)
+    context = OpsiTaskContext(
+        parent_task=owner_command,
+        current_task=task_name,
+        # 防溢出容器要穿过代理层传下去，否则子任务看不到「本轮是在花行动力」
+        overflow=getattr(current_opsi_context(config), 'overflow', None),
+    )
     if set_task_identity:
         logger.info(f'[大世界-调度] 代理执行 {task_name}（调度拥有者 {bind_name}）')
 
