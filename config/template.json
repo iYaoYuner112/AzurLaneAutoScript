@@ -1897,8 +1897,8 @@
       "Enable": false,
       "NextRun": "2020-01-01 00:00:00",
       "Command": "OpsiPreventActionPointOverflow",
-      "SuccessInterval": 0,
-      "FailureInterval": 120,
+      "SuccessInterval": 1,
+      "FailureInterval": 30,
       "ServerUpdate": "00:00"
     },
     "OpsiPreventActionPointOverflow": {

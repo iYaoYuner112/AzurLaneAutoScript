@@ -2674,7 +2674,10 @@
     },
     "Task": {
       "name": "行動力を消費するタスク",
-      "help": "上限に達したらこのタスクを1ラウンド実行します"
+      "help": "上限に達したらこのタスクを1ラウンド実行します",
+      "OpsiScheduling": "OpsiScheduling",
+      "OpsiHazard1Leveling": "OpsiHazard1Leveling",
+      "OpsiMeowfficerFarming": "OpsiMeowfficerFarming"
     },
     "ActionPointUpperbound": {
       "name": "開始上限",

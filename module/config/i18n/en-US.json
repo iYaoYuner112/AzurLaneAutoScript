@@ -2674,7 +2674,10 @@
     },
     "Task": {
       "name": "Task to spend AP on",
-      "help": "Run one round of this task when the upper bound is reached"
+      "help": "Run one round of this task when the upper bound is reached",
+      "OpsiScheduling": "OpsiScheduling",
+      "OpsiHazard1Leveling": "OpsiHazard1Leveling",
+      "OpsiMeowfficerFarming": "OpsiMeowfficerFarming"
     },
     "ActionPointUpperbound": {
       "name": "Upper bound",

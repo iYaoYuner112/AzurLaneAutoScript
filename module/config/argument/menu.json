@@ -91,6 +91,7 @@
       "OpsiArchive",
       "OpsiStronghold",
       "OpsiMonthBoss",
+      "OpsiPreventActionPointOverflow",
       "OpsiScheduling",
       "OpsiMeowfficerFarming",
       "OpsiHazard1Leveling",

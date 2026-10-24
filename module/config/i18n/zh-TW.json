@@ -2674,7 +2674,10 @@
     },
     "Task": {
       "name": "花行動力的任務",
-      "help": "到點後替這個任務跑一輪"
+      "help": "到點後替這個任務跑一輪",
+      "OpsiScheduling": "OpsiScheduling",
+      "OpsiHazard1Leveling": "OpsiHazard1Leveling",
+      "OpsiMeowfficerFarming": "OpsiMeowfficerFarming"
     },
     "ActionPointUpperbound": {
       "name": "觸發上限",

@@ -9415,6 +9415,70 @@
       }
     }
   },
+  "OpsiPreventActionPointOverflow": {
+    "Scheduler": {
+      "Enable": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "NextRun": {
+        "type": "datetime",
+        "value": "2020-01-01 00:00:00",
+        "validate": "datetime"
+      },
+      "Command": {
+        "type": "input",
+        "value": "OpsiPreventActionPointOverflow",
+        "display": "hide"
+      },
+      "SuccessInterval": {
+        "type": "input",
+        "value": 1,
+        "display": "hide"
+      },
+      "FailureInterval": {
+        "type": "input",
+        "value": 30,
+        "display": "hide"
+      },
+      "ServerUpdate": {
+        "type": "input",
+        "value": "00:00",
+        "display": "hide"
+      }
+    },
+    "OpsiPreventActionPointOverflow": {
+      "Task": {
+        "type": "select",
+        "value": "OpsiScheduling",
+        "option": [
+          "OpsiScheduling",
+          "OpsiHazard1Leveling",
+          "OpsiMeowfficerFarming"
+        ]
+      },
+      "ActionPointUpperbound": {
+        "type": "input",
+        "value": 200
+      },
+      "ActionPointLowerbound": {
+        "type": "input",
+        "value": 10
+      }
+    },
+    "Storage": {
+      "Storage": {
+        "type": "storage",
+        "value": {},
+        "valuetype": "ignore",
+        "display": "disabled"
+      }
+    }
+  },
   "OpsiScheduling": {
     "Scheduler": {
       "Enable": {
