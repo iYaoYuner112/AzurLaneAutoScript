@@ -248,7 +248,7 @@
     },
     "OpsiPreventActionPointOverflow": {
       "name": "防止行动力溢出",
-      "help": ""
+      "help": "当前行动力达到上限时执行大世界任务消耗行动力\n非必要不开启，仅推荐在大世界坠机或者长时间刷委托等不刷大世界的情况下开启"
     },
     "OpsiScheduling": {
       "name": "智能调度",
@@ -2670,22 +2670,22 @@
   "OpsiPreventActionPointOverflow": {
     "_info": {
       "name": "防止行动力溢出",
-      "help": "行动力快满时替一轮任务把行动力花掉，避免自然回复溢满浪费。\\n行动力每 10 分钟回复 1 点、上限 200，到上限就不再回复。"
+      "help": "当前行动力达到上限时执行大世界任务消耗行动力\n选择智能调度时，如果行动力和黄币都不足导致没有可运行任务，将运行耄耋相接清理当前行动力"
     },
     "Task": {
-      "name": "花行动力的任务",
-      "help": "到点后替这个任务跑一轮",
-      "OpsiScheduling": "OpsiScheduling",
-      "OpsiHazard1Leveling": "OpsiHazard1Leveling",
-      "OpsiMeowfficerFarming": "OpsiMeowfficerFarming"
+      "name": "执行任务",
+      "help": "推荐选择智能调度，防止行动力溢出任务对此有专门处理",
+      "OpsiScheduling": "智能调度（推荐）",
+      "OpsiHazard1Leveling": "侵蚀1练级",
+      "OpsiMeowfficerFarming": "耄耋相接"
     },
     "ActionPointUpperbound": {
-      "name": "触发上限",
-      "help": "行动力达到该值开始消耗，默认 200（自然上限）"
+      "name": "当前行动力上限",
+      "help": "当前行动力达到此值时开始执行大世界任务"
     },
     "ActionPointLowerbound": {
-      "name": "停手下限",
-      "help": "行动力降到该值停止消耗"
+      "name": "当前行动力下限",
+      "help": "防止行动力溢出任务会持续运行，直到当前行动力低于此值"
     }
   },
   "OpsiMeowfficerFarming": {

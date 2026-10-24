@@ -248,7 +248,7 @@
     },
     "OpsiPreventActionPointOverflow": {
       "name": "Prevent AP Overflow",
-      "help": ""
+      "help": "Runs Operation Siren tasks when current AP reaches the upper limit."
     },
     "OpsiScheduling": {
       "name": "Smart Scheduling",
@@ -2669,23 +2669,23 @@
   },
   "OpsiPreventActionPointOverflow": {
     "_info": {
-      "name": "Prevent AP Overflow",
-      "help": "Spend action points once they are about to cap, so natural recovery is not wasted.\\nAction points recover 1 per 10 minutes up to 200 and stop there."
+      "name": "Prevent AP overflow",
+      "help": "Runs Operation Siren tasks when current AP reaches the upper limit.\nWhen Smart Scheduling is selected, it runs Meowfficer Farming if both AP and Operation Supply Coins are insufficient and no other task can run."
     },
     "Task": {
-      "name": "Task to spend AP on",
-      "help": "Run one round of this task when the upper bound is reached",
-      "OpsiScheduling": "OpsiScheduling",
-      "OpsiHazard1Leveling": "OpsiHazard1Leveling",
-      "OpsiMeowfficerFarming": "OpsiMeowfficerFarming"
+      "name": "Task to run",
+      "help": "Recommended: Smart Scheduling, which has dedicated overflow handling.",
+      "OpsiScheduling": "Smart scheduling (recommended)",
+      "OpsiHazard1Leveling": "Corrosion 1 leveling",
+      "OpsiMeowfficerFarming": "Meowfficer farming"
     },
     "ActionPointUpperbound": {
-      "name": "Upper bound",
-      "help": "Start spending at this amount, default 200 (natural cap)"
+      "name": "Current AP upper limit",
+      "help": "Start running Operation Siren tasks when current AP reaches this value."
     },
     "ActionPointLowerbound": {
-      "name": "Lower bound",
-      "help": "Stop spending at this amount"
+      "name": "Current AP lower limit",
+      "help": "Keep running until current AP drops below this value."
     }
   },
   "OpsiMeowfficerFarming": {

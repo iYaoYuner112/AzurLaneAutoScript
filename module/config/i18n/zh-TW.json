@@ -248,7 +248,7 @@
     },
     "OpsiPreventActionPointOverflow": {
       "name": "防止行動力溢出",
-      "help": ""
+      "help": "當前行動力達到上限時執行大世界任務消耗行動力"
     },
     "OpsiScheduling": {
       "name": "智能調度",
@@ -2669,23 +2669,23 @@
   },
   "OpsiPreventActionPointOverflow": {
     "_info": {
-      "name": "防止行動力溢出",
-      "help": "行動力快滿時替一輪任務把行動力花掉，避免自然回復溢滿浪費。\\n行動力每 10 分鐘回復 1 點、上限 200，到上限就不再回復。"
+      "name": "防止行動力溢位",
+      "help": "當前行動力達到上限時執行大世界任務消耗行動力\n選擇智慧排程時，如果行動力和黃幣都不足導致沒有可執行任務，將執行短貓相接清理當前行動力"
     },
     "Task": {
-      "name": "花行動力的任務",
-      "help": "到點後替這個任務跑一輪",
-      "OpsiScheduling": "OpsiScheduling",
-      "OpsiHazard1Leveling": "OpsiHazard1Leveling",
-      "OpsiMeowfficerFarming": "OpsiMeowfficerFarming"
+      "name": "執行任務",
+      "help": "推薦選擇智慧排程，防溢位任務對此有專門處理",
+      "OpsiScheduling": "智慧排程（推薦）",
+      "OpsiHazard1Leveling": "侵蝕1練級",
+      "OpsiMeowfficerFarming": "短貓相接"
     },
     "ActionPointUpperbound": {
-      "name": "觸發上限",
-      "help": "行動力達到該值開始消耗，預設 200（自然上限）"
+      "name": "當前行動力上限",
+      "help": "當前行動力達到此值時開始執行大世界任務"
     },
     "ActionPointLowerbound": {
-      "name": "停手下限",
-      "help": "行動力降到該值停止消耗"
+      "name": "當前行動力下限",
+      "help": "防溢位任務會持續執行，直到當前行動力低於此值"
     }
   },
   "OpsiMeowfficerFarming": {
