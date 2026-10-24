@@ -449,6 +449,11 @@ class GeneratedConfig:
     OpsiMonthBoss_CheckAdaptability = True
     OpsiMonthBoss_ForceRun = False
 
+    # Group `OpsiPreventActionPointOverflow`
+    OpsiPreventActionPointOverflow_Task = 'OpsiScheduling'  # OpsiScheduling, OpsiHazard1Leveling, OpsiMeowfficerFarming
+    OpsiPreventActionPointOverflow_ActionPointUpperbound = 200
+    OpsiPreventActionPointOverflow_ActionPointLowerbound = 10
+
     # Group `OpsiMeowfficerFarming`
     OpsiMeowfficerFarming_ActionPointPreserve = 1000
     OpsiMeowfficerFarming_HazardLevel = 5  # 3, 4, 5, 6, 10

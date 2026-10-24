@@ -446,6 +446,13 @@ OpsiScheduling:
     SuccessInterval: 30
     FailureInterval: 30
     ServerUpdate: 00:00
+OpsiPreventActionPointOverflow:
+  Scheduler:
+    # 正常情况下由任务自己按行动力排期（task_delay），这里的间隔只是异常兜底：
+    # 成功间隔取 1 分钟，宁可早醒一次读个行动力，也不要白等一天。
+    SuccessInterval: 1
+    FailureInterval: 30
+    ServerUpdate: 00:00
 OpsiHazard1Leveling:
   Scheduler:
     SuccessInterval: 30

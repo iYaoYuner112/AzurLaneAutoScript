@@ -246,6 +246,10 @@
       "name": "月度Boss",
       "help": ""
     },
+    "OpsiPreventActionPointOverflow": {
+      "name": "防止行动力溢出",
+      "help": ""
+    },
     "OpsiScheduling": {
       "name": "智能调度",
       "help": ""
@@ -2661,6 +2665,24 @@
     "ForceRun": {
       "name": "无视运行间隔强制运行",
       "help": "开启后将带来额外的行动力消耗，一般不用打开，慢慢打就好"
+    }
+  },
+  "OpsiPreventActionPointOverflow": {
+    "_info": {
+      "name": "防止行动力溢出",
+      "help": "行动力快满时替一轮任务把行动力花掉，避免自然回复溢满浪费。\\n行动力每 10 分钟回复 1 点、上限 200，到上限就不再回复。"
+    },
+    "Task": {
+      "name": "花行动力的任务",
+      "help": "到点后替这个任务跑一轮"
+    },
+    "ActionPointUpperbound": {
+      "name": "触发上限",
+      "help": "行动力达到该值开始消耗，默认 200（自然上限）"
+    },
+    "ActionPointLowerbound": {
+      "name": "停手下限",
+      "help": "行动力降到该值停止消耗"
     }
   },
   "OpsiMeowfficerFarming": {

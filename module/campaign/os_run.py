@@ -48,6 +48,15 @@ class OSCampaignRun(OSMapOperation):
         except ActionPointLimit:
             self.config.task_delay(server_update=True)
 
+    def opsi_prevent_action_point_overflow(self):
+        # 行动力不足时不再排自己：本任务只在快满时才值得跑，
+        # 排回明天由任务自己的排期逻辑负责。
+        campaign = self.load_campaign()
+        try:
+            campaign.os_prevent_action_point_overflow()
+        except ActionPointLimit:
+            self.config.task_delay(server_update=True)
+
     def opsi_meowfficer_farming(self):
         try:
             campaign = self.load_campaign()

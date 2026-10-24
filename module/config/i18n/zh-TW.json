@@ -246,6 +246,10 @@
       "name": "月度Boss",
       "help": ""
     },
+    "OpsiPreventActionPointOverflow": {
+      "name": "防止行動力溢出",
+      "help": ""
+    },
     "OpsiScheduling": {
       "name": "智能調度",
       "help": ""
@@ -2661,6 +2665,24 @@
     "ForceRun": {
       "name": "無視運行間隔強制運行",
       "help": "開啟後將帶來額外的行動力消耗，一般不用打開，慢慢打就好"
+    }
+  },
+  "OpsiPreventActionPointOverflow": {
+    "_info": {
+      "name": "防止行動力溢出",
+      "help": "行動力快滿時替一輪任務把行動力花掉，避免自然回復溢滿浪費。\\n行動力每 10 分鐘回復 1 點、上限 200，到上限就不再回復。"
+    },
+    "Task": {
+      "name": "花行動力的任務",
+      "help": "到點後替這個任務跑一輪"
+    },
+    "ActionPointUpperbound": {
+      "name": "觸發上限",
+      "help": "行動力達到該值開始消耗，預設 200（自然上限）"
+    },
+    "ActionPointLowerbound": {
+      "name": "停手下限",
+      "help": "行動力降到該值停止消耗"
     }
   },
   "OpsiMeowfficerFarming": {

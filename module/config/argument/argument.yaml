@@ -775,6 +775,18 @@ OpsiMonthBoss:
     option: [ normal, normal_hard ]
   CheckAdaptability: true
   ForceRun: false
+OpsiPreventActionPointOverflow:
+  # 到点后替哪个任务花行动力。默认智能调度（侵蚀1/短猫都由它代跑）。
+  Task:
+    value: OpsiScheduling
+    option:
+      - OpsiScheduling
+      - OpsiHazard1Leveling
+      - OpsiMeowfficerFarming
+  # 行动力涨到这个值就开跑（自然上限 200）。
+  ActionPointUpperbound: 200
+  # 花到这个值就停手。
+  ActionPointLowerbound: 10
 OpsiMeowfficerFarming:
   ActionPointPreserve: 1000
   HazardLevel:
