@@ -16,7 +16,7 @@ from dataclasses import replace
 from module.config.config import TaskEnd
 from module.logger import logger
 from module.os.tasks.scheduling import OpsiScheduling
-from module.os.tasks.task_context import prevent_overflow_context
+from module.os.tasks.task_context import OpsiStatus, prevent_overflow_context
 from module.os_handler.action_point import ActionPointLimit
 
 # 大世界行动力每 10 分钟自然回复 1 点。
@@ -157,19 +157,23 @@ class OpsiPreventActionPointOverflow(OpsiScheduling):
         Args:
             task_name (str): 目标任务标识名。
             lowerbound (int): 本轮的行动力下限。
+
+        Returns:
+            OpsiTaskResult | None: 目标任务本轮的返回值（智能调度/短猫会返回
+            结果对象，侵蚀 1 返回 None），用于判断「本轮有没有真的花掉行动力」。
         """
         with self.config.temporary(
                 OS_ACTION_POINT_BOX_USE=False,
                 OpsiGeneral_BuyActionPointLimit=0):
             if task_name == TASK_NAME_SCHEDULING:
-                self._run_with_prevent_action_point_overflow_context(
+                return self._run_with_prevent_action_point_overflow_context(
                     TASK_NAME_SCHEDULING, self.run_smart_scheduling_once)
             elif task_name == TASK_NAME_HAZARD1_LEVELING:
-                self._run_with_prevent_action_point_overflow_context(
+                return self._run_with_prevent_action_point_overflow_context(
                     TASK_NAME_HAZARD1_LEVELING, self.run_hazard1_leveling_once,
                     ap_preserve=lowerbound)
             elif task_name == TASK_NAME_MEOWFFICER_FARMING:
-                self._run_with_prevent_action_point_overflow_context(
+                return self._run_with_prevent_action_point_overflow_context(
                     TASK_NAME_MEOWFFICER_FARMING, self.run_meowfficer_farming_once,
                     ap_preserve=lowerbound)
             else:
@@ -204,7 +208,17 @@ class OpsiPreventActionPointOverflow(OpsiScheduling):
             started = True
             with prevent_overflow_context(self.config) as overflow:
                 try:
-                    self._run_prevent_action_point_overflow_target_once(task_name, lowerbound)
+                    result = self._run_prevent_action_point_overflow_target_once(
+                        task_name, lowerbound)
+                    # 目标任务这一轮没有任何可执行内容（补币任务仓库空了、
+                    # 海域清完了等）：行动力花不出去，继续读一次也只会再转
+                    # 一圈，直接推迟到服务器刷新（对齐 AzurPilot 在
+                    # `_handle_coin_task_no_content` 里对防溢出的处理）。
+                    if getattr(result, 'status', None) is OpsiStatus.NO_CONTENT:
+                        logger.info('[大世界-防止行动力溢出] 目标任务本轮没有可执行内容，'
+                                    '推迟到服务器刷新')
+                        self.config.task_delay(server_update=True)
+                        self.config.task_stop()
                 except ActionPointLimit as e:
                     current = getattr(e, 'current', None)
                     if current is None:
