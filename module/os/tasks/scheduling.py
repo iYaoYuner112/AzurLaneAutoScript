@@ -40,6 +40,9 @@ from module.os.tasks.task_context import (
     OpsiNoContent,
     OpsiStatus,
     OpsiTaskResult,
+    TaskDelayRequest,
+    current_opsi_context,
+    is_running_prevent_overflow,
     opsi_task_context,
     pop_opsi_no_content,
 )
@@ -144,6 +147,31 @@ COIN_TASK_DISABLE_TASK_SWITCH = {
 }
 # Near the monthly reset the tasks themselves delay 2.5 hours instead of a day.
 RESET_NEAR_DELAY_MINUTES = 150
+
+
+def request_delay_for_owner(config, make_request):
+    """把延迟请求交给「拥有者」：防溢出上下文里登记给它，否则返回 False。
+
+    防溢出任务需要知道「这一轮为什么没干活」，它会在收尾时把请求 apply 到自己
+    身上；如果调度直接 `task_delay`，防溢出主循环的收尾会把它覆盖成「1 分钟后
+    重来」，实测会变成每分钟一次的原地空转。
+
+    Args:
+        config (AzurLaneConfig): 配置对象。
+        make_request (Callable[[], TaskDelayRequest]): 惰性构造延迟请求，只有真的
+            在防溢出上下文里才调用（非防溢出路径不读任何额外配置）。
+
+    Returns:
+        bool: True 表示已交给防溢出任务，调用方不要再自行延迟。
+    """
+    context = current_opsi_context(config)
+    overflow = getattr(context, 'overflow', None)
+    if overflow is None:
+        return False
+    if overflow.request is None:
+        overflow.request = make_request()
+    logger.info('[大世界-调度] 延迟请求已交给防止行动力溢出任务处理')
+    return True
 
 
 class OpsiScheduling(OSMap):
@@ -350,7 +378,10 @@ class OpsiScheduling(OSMap):
                 f'[大世界-调度] {task_name} 行动力不足（达到保留线），推迟到服务器刷新: '
                 f'total={e.total} preserve={e.preserve}')
             notify_ap_insufficient(self, e.total, e.preserve)
-            self.config.task_delay(server_update=True)
+            if not request_delay_for_owner(
+                    self.config,
+                    lambda: TaskDelayRequest(server_update=str(self.config.Scheduler_ServerUpdate))):
+                self.config.task_delay(server_update=True)
             self.config.task_stop()
             return OpsiTaskResult(OpsiStatus.FAILED, task=task_name, reason='action point limit')
 
@@ -448,7 +479,11 @@ class OpsiScheduling(OSMap):
 
     def _delay_to_server_update(self, reason=''):
         logger.info(f'[大世界-调度] 延迟到服务器刷新（{reason or "no reason"}）')
-        self.config.task_delay(server_update=True)
+        # server_update 用具体时刻字符串，避免 apply 时再依赖当前绑定的任务
+        if not request_delay_for_owner(
+                self.config,
+                lambda: TaskDelayRequest(server_update=str(self.config.Scheduler_ServerUpdate))):
+            self.config.task_delay(server_update=True)
 
     def _delay_for_opsi_explore(self) -> bool:
         """Let 开荒 have the world to itself: no scheduling while it runs."""
@@ -636,6 +671,21 @@ class OpsiScheduling(OSMap):
 
         if action == 'wait':
             logger.info('[大世界-调度] 原因: 行动力达到保留值，无任务可执行')
+            # 防溢出上下文里「行动力满、普通调度无任务可做」是预期内的：防溢出
+            # 的目的就是花行动力。这里直接拉一轮短猫（保留 0）把它烧掉，而不是
+            # 像普通调度那样等到服务器刷新（对齐 AzurPilot 的
+            # `_handle_smart_scheduling_no_task` 里的防溢出分支）。
+            if is_running_prevent_overflow(self.config) and current_ap > 0:
+                logger.info(f'[大世界-调度] 防溢出上下文：执行耄耋相接清理当前行动力 '
+                            f'(当前={current_ap}, 总行动力={total_ap})')
+                self.handle_first_auto_search(run=True)
+                result = self._run_scheduled_coin_task_once(
+                    TASK_NAME_MEOWFFICER_FARMING, 0)
+                if result.executed:
+                    return result
+                logger.warning('[大世界-调度] 耄耋相接无可执行内容，无法继续清理行动力')
+                self._delay_to_server_update('耄耋相接无可执行内容')
+                self.config.task_stop()
             # 黄币没补够、行动力又跌破补黄币开工线，才叫「双重不足」；
             # 否则本轮只是撞在行动力保留线上（对齐 AP 的两条分支条件）。
             coin_preserve = int(self.config.OpsiScheduling_OperationCoinsPreserve)
