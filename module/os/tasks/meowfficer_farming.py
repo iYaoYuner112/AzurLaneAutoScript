@@ -5,7 +5,11 @@ from module.os_handler.action_point import ActionPointLimit
 from module.map.map_grids import SelectedGrids
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 from module.os.opsi_notify import notify_action_point_change
-from module.os.tasks.task_context import is_running_opsi_proxy, is_running_prevent_overflow
+from module.os.tasks.task_context import (
+    is_running_opsi_proxy,
+    is_running_prevent_overflow,
+    opsi_no_content,
+)
 
 
 class OpsiMeowfficerFarming(OSMap):
@@ -322,12 +326,15 @@ class OpsiMeowfficerFarming(OSMap):
             .sort_by_clock_degree(center=(1252, 1012), start=self.zone.location)
 
         if not zones:
-            # Every zone of the configured hazard level is cleared. Without this guard the
-            # next line raises IndexError and the task dies (AzurPilot 30b5a2b7d).
+            # Every zone of the configured hazard level is cleared.
             hazard = self.config.OpsiMeowfficerFarming_HazardLevel
-            logger.warning(f'No zone left for hazard level {hazard}, nothing to search')
-            self.config.task_delay(server_update=True)
-            self.config.task_stop()
+            message = f'No zone left for hazard level {hazard}'
+            logger.warning(f'{message}, nothing to search')
+            # 代理执行时只报「本轮没内容」，让调度换下一个候选；独立运行才收工到明天。
+            # 之前直接 task_delay + task_stop，代理时延迟会写到 owner（调度/防溢出）上，
+            # 等于把整条调度推迟到明天 0 点，当天侵蚀1 等全部停摆（对齐 AP 的
+            # `_handle_coin_task_no_content`）。
+            opsi_no_content(self.config, 'OpsiMeowfficerFarming', message)
             return False
 
         logger.hr(f'OS meowfficer farming, zone_id={zones[0].zone_id}', level=1)
