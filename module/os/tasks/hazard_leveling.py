@@ -1,7 +1,7 @@
 from module.logger import logger
 from module.os.map import OSMap
 from module.os.opsi_notify import notify_action_point_change
-from module.os.tasks.task_context import is_running_opsi_proxy
+from module.os.tasks.task_context import is_running_opsi_proxy, is_running_prevent_overflow
 
 
 class OpsiHazard1Leveling(OSMap):
@@ -34,7 +34,11 @@ class OpsiHazard1Leveling(OSMap):
                     self.config.OpsiScheduling_ActionPointPreserve
                     if self.is_smart_scheduling_enabled else 200
                 )
-            if self.config.is_task_enabled('OpsiAshBeacon') \
+            # 塞壬信标没收完时忽略保留值，是为了「先收信标」；但防止行动力溢出
+            # 代跑时清零会把用户设的下限一并作废（实测会把行动力花光），
+            # 所以这种放行只在正常代跑/独立运行时生效。
+            if not is_running_prevent_overflow(self.config) \
+                    and self.config.is_task_enabled('OpsiAshBeacon') \
                     and not self._ash_fully_collected \
                     and self.config.cross_get("OpsiAshBeacon.OpsiAshBeacon.EnsureFullyCollected", True):
                 logger.info('Ash beacon not fully collected, ignore action point limit temporarily')

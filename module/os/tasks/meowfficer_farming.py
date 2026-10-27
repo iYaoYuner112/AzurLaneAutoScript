@@ -5,7 +5,7 @@ from module.os_handler.action_point import ActionPointLimit
 from module.map.map_grids import SelectedGrids
 from module.os.map import ALREADY_SOLVED_MAP_EVENTS, OSMap
 from module.os.opsi_notify import notify_action_point_change
-from module.os.tasks.task_context import is_running_opsi_proxy
+from module.os.tasks.task_context import is_running_opsi_proxy, is_running_prevent_overflow
 
 
 class OpsiMeowfficerFarming(OSMap):
@@ -113,7 +113,10 @@ class OpsiMeowfficerFarming(OSMap):
 
         while True:
             self.config.OS_ACTION_POINT_PRESERVE = preserve
-            if self.config.is_task_enabled('OpsiAshBeacon') \
+            # 同侵蚀 1：信标放行（保留值清零）在防溢出代跑时会导致行动力被花光，
+            # 这里不加这个放行，保证用户设置的行动力下限生效。
+            if not is_running_prevent_overflow(self.config) \
+                    and self.config.is_task_enabled('OpsiAshBeacon') \
                     and not self._ash_fully_collected \
                     and self.config.cross_get("OpsiAshBeacon.OpsiAshBeacon.EnsureFullyCollected", True):
                 logger.info('Ash beacon not fully collected, ignore action point limit temporarily')

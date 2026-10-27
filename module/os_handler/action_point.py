@@ -476,6 +476,18 @@ class ActionPointHandler(UI, MapEventHandler):
                 self._action_point_box, self._action_point_current
             )
 
+            # OS_ACTION_POINT_BOX_USE=False 只表示「本轮不许嗑箱」，不是「没有箱子」。
+            # 防止行动力溢出代跑时会临时关掉它：此时行动力不够就该停，绝不能
+            # 靠开箱续命（否则保留值很小的时候会把箱子连同行动力一起清零）。
+            # 用 getattr 取默认 True，兼容没有该属性的精简配置对象。
+            if len(box) and not getattr(self.config, 'OS_ACTION_POINT_BOX_USE', True):
+                logger.info('Action point boxes are disabled, stop instead of using them')
+                self.action_point_quit()
+                raise ActionPointLimit(
+                    current=self._action_point_current,
+                    total=self._action_point_total,
+                    preserve=self.config.OS_ACTION_POINT_PRESERVE)
+
             # Use action point boxes
             if len(box):
                 if self._action_point_total > self.config.OS_ACTION_POINT_PRESERVE:

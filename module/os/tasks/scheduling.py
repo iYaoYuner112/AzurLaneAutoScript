@@ -672,15 +672,24 @@ class OpsiScheduling(OSMap):
         if action == 'wait':
             logger.info('[大世界-调度] 原因: 行动力达到保留值，无任务可执行')
             # 防溢出上下文里「行动力满、普通调度无任务可做」是预期内的：防溢出
-            # 的目的就是花行动力。这里直接拉一轮短猫（保留 0）把它烧掉，而不是
-            # 像普通调度那样等到服务器刷新（对齐 AzurPilot 的
+            # 的目的就是花行动力。这里直接拉一轮短猫把它烧掉，而不是像普通调度
+            # 那样等到服务器刷新（对齐 AzurPilot 的
             # `_handle_smart_scheduling_no_task` 里的防溢出分支）。
             if is_running_prevent_overflow(self.config) and current_ap > 0:
+                # 用防溢出配置的「下限」，不是 AP 原版的 0：传 0 会让短猫一路打到
+                # 行动力归零，用户设的行动力下限形同虚设。
+                try:
+                    meow_preserve = int(self.config.cross_get(
+                        keys='OpsiPreventActionPointOverflow.'
+                             'OpsiPreventActionPointOverflow.ActionPointLowerbound',
+                        default=10) or 10)
+                except (TypeError, ValueError):
+                    meow_preserve = 10
                 logger.info(f'[大世界-调度] 防溢出上下文：执行耄耋相接清理当前行动力 '
-                            f'(当前={current_ap}, 总行动力={total_ap})')
+                            f'(当前={current_ap}, 总行动力={total_ap}, 下限={meow_preserve})')
                 self.handle_first_auto_search(run=True)
                 result = self._run_scheduled_coin_task_once(
-                    TASK_NAME_MEOWFFICER_FARMING, 0)
+                    TASK_NAME_MEOWFFICER_FARMING, meow_preserve)
                 if result.executed:
                     return result
                 logger.warning('[大世界-调度] 耄耋相接无可执行内容，无法继续清理行动力')
