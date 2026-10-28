@@ -420,6 +420,8 @@ class GeneratedConfig:
     OpsiExplore_SpecialRadar = False
     OpsiExplore_ForceRun = False
     OpsiExplore_LastZone = 0
+    OpsiExplore_MeowfficerCleanupState = None
+    OpsiExplore_ExploreProgress = None
 
     # Group `OpsiShop`
     OpsiShop_PresetFilter = 'max_benefit_meta'  # max_benefit, max_benefit_meta, no_meta, all, custom

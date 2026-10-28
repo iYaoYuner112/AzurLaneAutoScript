@@ -734,6 +734,16 @@ OpsiExplore:
   SpecialRadar: false
   ForceRun: false
   LastZone: 0
+  # 以下两项是纯记录字段（对齐 AzurPilot）：进度用于界面显示，
+  # 状态标记记录「本月开荒已完成/进行中」，供后续判断开荒是否完成使用。
+  MeowfficerCleanupState:
+    type: stored
+    value: null
+    display: hide
+  ExploreProgress:
+    type: textarea
+    display: disabled
+    value: ""
 OpsiShop:
   PresetFilter:
     value: max_benefit_meta

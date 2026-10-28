@@ -1729,7 +1729,9 @@
     "OpsiExplore": {
       "SpecialRadar": false,
       "ForceRun": false,
-      "LastZone": 0
+      "LastZone": 0,
+      "MeowfficerCleanupState": null,
+      "ExploreProgress": null
     },
     "OpsiFleet": {
       "Fleet": 1,

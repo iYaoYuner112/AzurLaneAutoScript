@@ -1,7 +1,7 @@
 import numpy as np
 
 from module.config.config import TaskEnd
-from module.config.utils import get_os_reset_remain
+from module.config.utils import get_os_reset_remain, get_os_next_reset
 from module.exception import ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
@@ -21,6 +21,49 @@ class OpsiDaily(OSMap):
     # Set by `os_finish_daily_mission()` when a round ends without finishing anything and
     # retrying would repeat the very same missions (an unenterable zone, a stuck port).
     _os_daily_mission_unavailable = False
+
+    def _os_monthly_explore_complete(self):
+        """本月开荒是否已完成（100% 且标记属于本月）。
+
+        进度字段可能残留上个月的 100%，所以必须同时校验 `reset` 是本月，
+        否则新月头几天会被误判成「已开荒完」。
+
+        Returns:
+            bool: 本月开荒已完成时返回 True。
+        """
+        if self.config.OpsiExplore_ExploreProgress != '已完成百分之100.00':
+            return False
+        state = self.config.OpsiExplore_MeowfficerCleanupState
+        return (isinstance(state, dict)
+                and state.get('reset') == get_os_next_reset().isoformat())
+
+    def _os_daily_needs_recon_scan(self):
+        """每日任务在「本月开荒未完成的普通海域」里是否需要先做一次空域侦察。
+
+        月初新图是迷雾，每日任务开局就在那里清图时容易找不到路；开荒完成后
+        海域全部点亮，就不再浪费这一下（对齐 AzurPilot）。
+
+        Returns:
+            bool: 需要侦察时返回 True。
+        """
+        if self.config.task.command != 'OpsiDaily':
+            return False
+        if self.zone.is_port or self.is_zone_name_hidden:
+            # 港口没有迷雾；安全海域本来就是亮的
+            return False
+        if self.is_in_special_zone():
+            # 隐秘 / 深渊 / 要塞，进图后自己会处理
+            return False
+        if self._os_monthly_explore_complete():
+            return False
+        return True
+
+    def run_first_auto_search(self):
+        """每日开头清当前海域之前，先把未开荒海域照亮（对齐 AzurPilot）。"""
+        if self._os_daily_needs_recon_scan():
+            logger.info('[大世界-每日] 本月开荒未完成，先空域侦察一次')
+            self.os_order_execute(recon_scan=True, submarine_call=False)
+        super().run_first_auto_search()
 
     def os_port_mission(self):
         """

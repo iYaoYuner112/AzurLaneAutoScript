@@ -2564,6 +2564,14 @@
     "LastZone": {
       "name": "Last Zone Completed",
       "help": "Automatically updated with map ID\nReplace with 0 to reset progress\nAlready completed zones will be skipped\nSupports either Zone ID or Name in CN/EN/JP/TW, i.e. \"51\", \"NA Ocean SE Sector E\""
+    },
+    "MeowfficerCleanupState": {
+      "name": "Monthly cleanup state",
+      "help": ""
+    },
+    "ExploreProgress": {
+      "name": "Monthly exploration progress",
+      "help": "Shows the current completion percentage of monthly exploration."
     }
   },
   "OpsiShop": {

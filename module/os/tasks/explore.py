@@ -12,6 +12,20 @@ class OpsiExplore(OSMap):
     # List of failed zone id
     _os_explore_failed_zone = []
 
+    def _os_explore_record_progress(self, completed_count, total_zones):
+        """记录每月开荒进度，供界面显示与「本月是否已开荒完成」判断使用。
+
+        纯记录，不参与任何流程判断。
+
+        Args:
+            completed_count (int): 已完成的海域数。
+            total_zones (int): 本月需要开荒的海域总数。
+        """
+        if total_zones <= 0:
+            return
+        percentage = completed_count / total_zones * 100
+        self.config.OpsiExplore_ExploreProgress = f'已完成百分之{percentage:.2f}'
+
     def _os_explore_task_delay(self):
         """
         Delay other OpSi tasks during os_explore
@@ -41,6 +55,10 @@ class OpsiExplore(OSMap):
             with self.config.multi_set():
                 self.config.OpsiExplore_LastZone = 0
                 self.config.OpsiExplore_SpecialRadar = False
+                # 纯记录：本月开荒已完成（带本月 reset 标记，跨月自动失效）
+                self.config.OpsiExplore_ExploreProgress = '已完成百分之100.00'
+                self.config.OpsiExplore_MeowfficerCleanupState = {
+                    'reset': next_reset.isoformat(), 'phase': 'done'}
                 self.config.task_delay(target=next_reset)
                 self.config.task_call('OpsiDaily', force_call=False)
                 self.config.task_call('OpsiShop', force_call=False)
@@ -49,6 +67,7 @@ class OpsiExplore(OSMap):
 
         logger.hr('OS explore', level=1)
         order = [int(f.strip(' \t\r\n')) for f in self.config.OS_EXPLORE_FILTER.split('>')]
+        total_zones = len(order)
         # Convert user input
         try:
             last_zone = self.name_to_zone(self.config.OpsiExplore_LastZone).zone_id
@@ -57,10 +76,14 @@ class OpsiExplore(OSMap):
             last_zone = 0
         # Start from last zone
         if last_zone in order:
+            completed_count = order.index(last_zone) + 1
             order = order[order.index(last_zone) + 1:]
             logger.info(f'Last zone: {self.name_to_zone(last_zone)}, next zone: {order[:1]}')
+            self._os_explore_record_progress(completed_count, total_zones)
         elif last_zone == 0:
+            completed_count = 0
             logger.info(f'First run, next zone: {order[:1]}')
+            self.config.OpsiExplore_ExploreProgress = '已完成百分之0.00'
         else:
             raise ScriptError(f'Invalid last_zone: {last_zone}')
         if not len(order):
@@ -72,6 +95,8 @@ class OpsiExplore(OSMap):
             # Check if zone already unlock safe zone
             if not self.globe_goto(zone, stop_if_safe=True):
                 logger.info(f'Zone cleared: {self.name_to_zone(zone)}')
+                completed_count += 1
+                self._os_explore_record_progress(completed_count, total_zones)
                 self.config.OpsiExplore_LastZone = zone
                 continue
 
@@ -89,6 +114,8 @@ class OpsiExplore(OSMap):
 
             finished_combat = self.run_auto_search()
             self.config.OpsiExplore_LastZone = zone
+            completed_count += 1
+            self._os_explore_record_progress(completed_count, total_zones)
             logger.info(f'Zone cleared: {self.name_to_zone(zone)}')
             if finished_combat == 0:
                 if 'is_exploration_container' in self._solved_map_event:

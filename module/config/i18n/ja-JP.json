@@ -2564,6 +2564,14 @@
     "LastZone": {
       "name": "OpsiExplore.LastZone.name",
       "help": "OpsiExplore.LastZone.help"
+    },
+    "MeowfficerCleanupState": {
+      "name": "月間再捜索の状態",
+      "help": ""
+    },
+    "ExploreProgress": {
+      "name": "月間開拓進捗",
+      "help": "現在の月間開拓の完了パーセンテージを表示します。"
     }
   },
   "OpsiShop": {

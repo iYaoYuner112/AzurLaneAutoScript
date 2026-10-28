@@ -8880,6 +8880,16 @@
       "LastZone": {
         "type": "input",
         "value": 0
+      },
+      "MeowfficerCleanupState": {
+        "type": "stored",
+        "value": null,
+        "display": "hide"
+      },
+      "ExploreProgress": {
+        "type": "textarea",
+        "value": "",
+        "display": "disabled"
       }
     },
     "OpsiFleet": {
