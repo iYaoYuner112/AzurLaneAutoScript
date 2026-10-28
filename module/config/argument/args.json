@@ -8958,6 +8958,10 @@
       "CustomFilter": {
         "type": "textarea",
         "value": "LoggerAbyssalT6 > LoggerAbyssalT5 > LoggerAbyssalT4 > LoggerObscureT6 > LoggerObscureT5 > LoggerObscureT4 > LoggerObscureT3 > ActionPoint > PurpleCoins\n> GearDesignPlanT3 > PlateRandomT4 > DevelopmentMaterialT3 > GearDesignPlanT2 > GearPart\n> OrdnanceTestingReportT3 > OrdnanceTestingReportT2 > DevelopmentMaterialT2 > OrdnanceTestingReportT1\n> METARedBook > CrystallizedHeatResistantSteel > NanoceramicAlloy > NeuroplasticProstheticArm > SupercavitationGenerator"
+      },
+      "DisableBeforeDate": {
+        "type": "input",
+        "value": 0
       }
     },
     "Storage": {
@@ -9141,6 +9145,10 @@
       }
     },
     "OpsiObscure": {
+      "SkipHazard2Obscure": {
+        "type": "checkbox",
+        "value": false
+      },
       "ForceRun": {
         "type": "checkbox",
         "value": false

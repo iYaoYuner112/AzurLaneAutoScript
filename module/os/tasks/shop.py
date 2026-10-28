@@ -14,6 +14,16 @@ class OpsiShop(OSMap):
         If not having enough yellow coins or purple coins, skip buying supplies in next port.
         """
         logger.hr('OS port daily', level=1)
+        # 月初前 N 天不跑商店：月初商店可能没刷新，或想把黄币留给别的任务。
+        # 默认 0 = 不限制，行为与改动之前完全一致。
+        disable_before = int(self.config.OpsiShop_DisableBeforeDate or 0)
+        today = datetime.now().day
+        if disable_before > 0 and today <= disable_before:
+            logger.info(f'[大世界-商店] 今日 {today} 号 <= 限制日期 {disable_before}，'
+                        '按配置跳过本日商店')
+            self.config.task_delay(server_update=True)
+            self.config.task_stop()
+
         if not self.zone.is_azur_port:
             self.globe_goto(self.zone_nearest_azur_port(self.zone))
 

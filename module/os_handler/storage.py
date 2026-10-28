@@ -1,7 +1,7 @@
 import time
 
 from module.base.timer import Timer
-from module.base.utils import rgb2gray
+from module.base.utils import area_offset, crop, rgb2gray
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
 from module.exception import ScriptError
 from module.handler.assets import GET_MISSION
@@ -245,10 +245,32 @@ class StorageHandler(GlobeOperation, ZoneManager):
         else:
             raise ScriptError(f'Unknown storage item: {item}')
 
-    def storage_checkout_item(self, item):
+    def _storage_obscure_is_hazard_2(self, image, button):
+        """判断命中的坐标图标是不是「侵蚀 2」的隐秘坐标。
+
+        「侵蚀2」的角标在图标左上方，所以要在**灰度图**上按 `(-25, -35)` 偏移
+        裁剪再比对（相似度 0.92），和 AzurPilot 完全一致；用原区域或彩色图都
+        匹配不到，勾了也不生效。
+
+        Args:
+            image: 当前帧的灰度图（`rgb2gray(self.device.image)`）。
+            button: 模板匹配得到的按钮区域。
+
+        Returns:
+            bool: True 表示这是侵蚀 2 的隐秘坐标。
+        """
+        try:
+            crop_image = crop(image, area_offset(button.area, (-25, -35)), copy=False)
+        except Exception as e:
+            logger.warning(f'Fail to crop storage item area: {e}')
+            return False
+        return bool(TEMPLATE_STORAGE_OBSCURE_HAZARD_2.match(crop_image, similarity=0.92))
+
+    def storage_checkout_item(self, item, skip_obscure_hazard_2=False):
         """
         Args:
             item (str): 'OBSCURE' or 'ABYSSAL'.
+            skip_obscure_hazard_2 (bool): Skip hazard 2 obscure coordinates.
 
         Returns:
             bool: If checkout
@@ -269,18 +291,25 @@ class StorageHandler(GlobeOperation, ZoneManager):
             logger.attr(f'Storage_{item}', len(items))
 
             if len(items):
-                self._storage_coordinate_checkout(items[0], types=(item,))
-                return True
+                for button in items:
+                    # 只有隐秘坐标有这个分级；深渊/其它类型不受影响。
+                    if item == 'OBSCURE' and skip_obscure_hazard_2 \
+                            and self._storage_obscure_is_hazard_2(image, button):
+                        logger.info('Skip hazard 2 obscure coordinate')
+                        continue
+                    self._storage_coordinate_checkout(button, types=(item,))
+                    return True
             if confirm_timer.reached():
                 logger.info(f'No more {item} items in storage')
                 self.storage_quit()
                 return False
 
-    def storage_get_next_item(self, item, use_logger=True):
+    def storage_get_next_item(self, item, use_logger=True, skip_obscure_hazard_2=False):
         """
         Args:
             item (str): 'OBSCURE' or 'ABYSSAL'.
             use_logger: If use all loggers.
+            skip_obscure_hazard_2 (bool): Skip hazard 2 obscure coordinates.
 
         Returns:
             bool: If checkout
@@ -295,5 +324,5 @@ class StorageHandler(GlobeOperation, ZoneManager):
         if use_logger:
             self.storage_logger_use_all()
 
-        result = self.storage_checkout_item(item)
+        result = self.storage_checkout_item(item, skip_obscure_hazard_2=skip_obscure_hazard_2)
         return result

@@ -2583,6 +2583,10 @@
     "CustomFilter": {
       "name": "OpsiShop.CustomFilter.name",
       "help": "OpsiShop.CustomFilter.help"
+    },
+    "DisableBeforeDate": {
+      "name": "毎月X日以前にセイレーン作戦ショップで購入しない",
+      "help": "指定日の翌日から1日1回セイレーン作戦ショップで購入する\n0は制限なし、毎日購入することを意味します"
     }
   },
   "OpsiVoucher": {
@@ -2625,6 +2629,10 @@
     "_info": {
       "name": "OpsiObscure._info.name",
       "help": "OpsiObscure._info.help"
+    },
+    "SkipHazard2Obscure": {
+      "name": "レベル2座標をクリアしない",
+      "help": "オンにすると、侵蝕レベル2の隠秘海域を攻撃しません。"
     },
     "ForceRun": {
       "name": "OpsiObscure.ForceRun.name",

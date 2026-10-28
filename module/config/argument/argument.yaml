@@ -748,6 +748,9 @@ OpsiShop:
     > GearDesignPlanT3 > PlateRandomT4 > DevelopmentMaterialT3 > GearDesignPlanT2 > GearPart
     > OrdnanceTestingReportT3 > OrdnanceTestingReportT2 > DevelopmentMaterialT2 > OrdnanceTestingReportT1
     > METARedBook > CrystallizedHeatResistantSteel > NanoceramicAlloy > NeuroplasticProstheticArm > SupercavitationGenerator
+  # 每月该日期之前不购买大世界商店（0 = 不限制，每天都买）。
+  # 排在最后，与 AzurPilot 前端顺序一致。
+  DisableBeforeDate: 0
 OpsiVoucher:
   Filter: |-
     LoggerAbyssal > LoggerObscure > Book > Coin > Fragment
@@ -764,6 +767,7 @@ OpsiDaily:
     value: null
     display: hide
 OpsiObscure:
+  SkipHazard2Obscure: false
   ForceRun: false
 OpsiAbyssal:
   ForceRun: false

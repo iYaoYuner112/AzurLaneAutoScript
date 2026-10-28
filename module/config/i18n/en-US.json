@@ -2583,6 +2583,10 @@
     "CustomFilter": {
       "name": "Custom Research Priority",
       "help": "To use your own filter, set \"OpSi Shop Filter Select\" to \"custom\". All options have been defined at  <https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/filter_string_en>"
+    },
+    "DisableBeforeDate": {
+      "name": "Do not purchase from OpSi shop before the Xth day of each month",
+      "help": "Starting from the day after the specified date, buy from Operation Siren Shop once a day.\n0 means no limit, buy every day."
     }
   },
   "OpsiVoucher": {
@@ -2625,6 +2629,10 @@
     "_info": {
       "name": "OpSi Obscure Settings",
       "help": "Clear obscure zones every 27 minutes\nThe following must be satisfied:\n- OpSi story and practice battles must be complete\n- Task OpSi Explore enabled or consuming 5000 oil for special radar in OpSi voucher shop"
+    },
+    "SkipHazard2Obscure": {
+      "name": "Skip Corrosion Level 2 coordinates",
+      "help": "When enabled, Obscured Zones with Corrosion Level 2 will not be cleared."
     },
     "ForceRun": {
       "name": "Force Run",
