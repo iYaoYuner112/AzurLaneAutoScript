@@ -6,6 +6,7 @@
 
 import os
 import sys
+from datetime import datetime
 from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -49,8 +50,8 @@ def _make_shop(disable_before):
 
 
 def test_shop_skips_before_configured_day():
-    """今天是 28 号，限制日期设成 28 → 推迟到服务器刷新并停止。"""
-    stub = _make_shop(28)
+    """限制日期设成今天 → 今天应推迟到服务器刷新并停止（不写死日期，按当天算）。"""
+    stub = _make_shop(datetime.now().day)
     try:
         OpsiShop.os_shop(stub)
     except TaskEnd:
