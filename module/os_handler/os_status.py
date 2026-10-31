@@ -53,6 +53,14 @@ class OSStatus(UI):
 
     @property
     def is_smart_scheduling_enabled(self) -> bool:
+        """智能调度是否生效；开荒未完成时视为未启用（对齐 AzurPilot）。
+
+        开荒期间返回 False，让侵蚀1/短猫等依赖此判断的子任务按「非代理模式」运行，
+        不再以为调度在代跑。
+        """
+        # 检测是否在开荒中，如果是，则停止智能调度
+        if self.is_in_opsi_explore():
+            return False
         return self.config.is_task_enabled('OpsiScheduling')
 
     @property
