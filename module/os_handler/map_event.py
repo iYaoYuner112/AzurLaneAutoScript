@@ -276,6 +276,25 @@ class MapEventHandler(EnemySearchingHandler):
         if timer is not None:
             timer.clear()
 
+    # 战斗结算返回地图后的过渡窗口（秒）：这段时间里「自律寻敌」按钮可能仍是
+    # 关闭外观，但游戏还没完成状态切换，点它会把仍在执行的自律寻敌点停，
+    # 同时留下「开启自律」的重试计时器（下一个海域第一次点击就误判卡死）。
+    _os_auto_search_battle_settle_time = 2
+
+    def _os_auto_search_battle_settle_start(self):
+        """记录一场战斗刚刚结束（对齐 AzurPilot）。"""
+        if '_os_auto_search_battle_settle_timer' not in self.__dict__:
+            self._os_auto_search_battle_settle_timer = Timer(
+                self._os_auto_search_battle_settle_time)
+        self._os_auto_search_battle_settle_timer.reset()
+
+    def _os_auto_search_battle_settling(self):
+        """是否处于战斗结算返回地图后的过渡窗口。"""
+        timer = self.__dict__.get('_os_auto_search_battle_settle_timer')
+        if timer is None:
+            return False
+        return not timer.reached()
+
     def handle_os_auto_search_map_option(self, drop=None, enable=True):
         """
         Args:
@@ -321,6 +340,10 @@ class MapEventHandler(EnemySearchingHandler):
         if enable is None:
             pass
         elif enable:
+            if self._os_auto_search_battle_settling():
+                # 战斗结算刚回到地图，按钮可能还是界面重建的过渡外观；
+                # 此期间点击会把仍在执行的自律寻敌关掉，等状态稳定后再处理。
+                return False
             # 对齐 AP：侵蚀 1 / 耄耋相接用 0.5 秒，其它任务保持 3 秒的保守间隔。
             # 45 秒预算兜底不受该值影响。实测（10-08 日志）这个值确实在限制
             # 「自律开启失败后重试」的节奏：连发内部间隔精确 1.00 秒、被卡住 22 对，

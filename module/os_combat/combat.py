@@ -284,4 +284,7 @@ class Combat(Combat_, MapEventHandler):
                 continue
             
         logger.info('Combat end.')
+        # 刚回到地图时界面仍在重建，自律寻敌按钮可能是过渡外观；记录窗口，
+        # 期间不操作地图自律开关，避免把仍在执行的自律寻敌点停（对齐 AzurPilot）。
+        self._os_auto_search_battle_settle_start()
         return success
