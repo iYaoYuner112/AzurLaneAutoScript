@@ -8,6 +8,7 @@ from module.handler.assets import POPUP_CONFIRM, STORY_SKIP
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.retire.retirement import Retirement
+from module.statistics.resource_monitor import record_dashboard_resource
 
 RECORD_GACHA_OPTION = ('RewardRecord', 'gacha')
 RECORD_GACHA_SINCE = (0,)
@@ -300,6 +301,8 @@ class RewardGacha(GachaUI, Retirement):
         # OCR Gold and Cubes
         self.build_coin_count = OCR_COIN.ocr(self.device.image)
         self.build_cube_count = OCR_BUILD_CUBE_COUNT.ocr(self.device.image)
+        # 顺手把心智魔方余额上报到总览页（对齐 AzurPilot）
+        record_dashboard_resource(self.config, 'Cube', self.build_cube_count)
 
         # Transition to appropriate target construction pool
         # Returns appropriate costs for gacha as well

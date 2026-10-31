@@ -61,9 +61,14 @@ class CampaignEvent(CampaignStatus):
         )
         tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS + HOSPITAL
         command = self.config.Scheduler_Command
-        if limit <= 0 or command not in tasks:
+        if command not in tasks:
             return False
         if command in GEMS_FARMINGS and self.stage_is_main(self.config.Campaign_Name):
+            # 主线打捞在普通战役页，右上角没有活动 PT 区域，读了会误读成别的数字
+            return False
+        if limit <= 0:
+            # 没设 PT 上限时也读一次：总览页的资源卡靠这里刷新（对齐 AzurPilot）
+            self.get_event_pt()
             return False
 
         pt = self.get_event_pt()

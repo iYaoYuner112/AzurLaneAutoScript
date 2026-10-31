@@ -446,17 +446,6 @@ class AlasGUI(Frame):
         )
 
         with use_scope("resources"):
-            put_scope(
-                "resource-heading",
-                [
-                    put_text(t("Gui.Overview.Resources")).style(
-                        "font-size: 1.25rem; margin: auto .5rem auto;"
-                    ),
-                    put_text(t("Gui.Overview.ResourceHint")).style(
-                        "--arg-help--"
-                    ),
-                ],
-            )
             put_scope("resource-cards")
 
         with use_scope("schedulers"):

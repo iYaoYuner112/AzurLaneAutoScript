@@ -81,6 +81,7 @@ class ShopStatus(UI):
             in: page_shop, guild shop
         """
         amount = OCR_SHOP_GUILD_COINS.ocr(self.device.image)
+        record_dashboard_resource(self.config, 'GuildCoin', amount)
         return amount
 
     def status_get_core(self):

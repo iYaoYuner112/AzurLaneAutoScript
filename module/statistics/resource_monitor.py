@@ -37,21 +37,24 @@ class DashboardResource(NamedTuple):
     shows_total: bool = False
 
 
-# 总览页的资源目录，顺序就是卡片顺序（照参考图排）。
+# 总览页的资源目录，顺序就是卡片顺序（照 AzurPilot 总览页的参考图排）。
 # 前端只按这份目录渲染：以后要加资源，在这里加一行 + 有读取处上报即可。
-# 心智魔方、舰队币没列进来是因为仓库里目前没有任何地方能读到它们的数。
+# 心智魔方读自建造任务（gacha_reward.gacha_run），舰队币读自舰队商店
+# （shop_status.status_get_guild_coins）；图标缺失时前端只是不画图标，不会破图。
 DASHBOARD_RESOURCES = (
-    DashboardResource('Gems', 'ResourceGems', 'gems'),
     DashboardResource('Oil', 'ResourceOil', 'oil'),
     DashboardResource('Coin', 'ResourceCoin', 'coin'),
+    DashboardResource('Gems', 'ResourceGems', 'gems'),
+    DashboardResource('Cube', 'ResourceCube', 'cube'),
     DashboardResource('ActionPoint', 'ResourceActionPoint', 'action_point',
                       shows_total=True),
     DashboardResource('EventPT', 'ResourceEventPT', 'event_pt'),
-    DashboardResource('YellowCoin', 'ResourceYellowCoin', 'yellow_coin'),
     DashboardResource('PurpleCoin', 'ResourcePurpleCoin', 'purple_coin'),
+    DashboardResource('YellowCoin', 'ResourceYellowCoin', 'yellow_coin'),
     DashboardResource('Core', 'ResourceCore', 'core_data'),
     DashboardResource('Medal', 'ResourceMedal', 'medal'),
     DashboardResource('Merit', 'ResourceMerit', 'merit'),
+    DashboardResource('GuildCoin', 'ResourceGuildCoin', 'guild_coin'),
 )
 
 
