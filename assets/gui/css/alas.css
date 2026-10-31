@@ -444,8 +444,8 @@ pre.rich-traceback-code {
    inside a single-quoted JS string, so one apostrophe breaks all of alas.css. */
 #pywebio-scope-resource-cards .ov-res-icon {
     flex: none;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;
