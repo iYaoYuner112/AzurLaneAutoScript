@@ -405,12 +405,12 @@ pre.rich-traceback-code {
 #pywebio-scope-resource-cards .ov-res-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: .35rem;
+    gap: .3rem;
 }
 
 #pywebio-scope-resource-cards .ov-res-card {
     min-width: 0;
-    padding: .3rem .5rem .2rem;
+    padding: .25rem .4rem .15rem;
     border: 1px solid rgba(128, 128, 128, .28);
     border-radius: .35rem;
     background-color: rgba(128, 128, 128, .07);
@@ -444,8 +444,8 @@ pre.rich-traceback-code {
    inside a single-quoted JS string, so one apostrophe breaks all of alas.css. */
 #pywebio-scope-resource-cards .ov-res-icon {
     flex: none;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;

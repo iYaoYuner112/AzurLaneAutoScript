@@ -24,6 +24,13 @@
     grid-area: resources;
 }
 
+/* Keep the 12 resource cards on exactly two rows: pin 6 columns in the PC
+   layout so auto-fill cannot leave a lopsided 5+5+2 tail. Mobile keeps the
+   auto-fill rule from alas-mobile.css. CSS must stay ASCII-only (see alas.css). */
+#pywebio-scope-resource-cards .ov-res-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 #pywebio-scope-schedulers {
     grid-area: schedulers;
 }
