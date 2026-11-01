@@ -75,7 +75,7 @@ def handle_notify(_config: str, **kwargs) -> bool:
             logger.warning("No response from the push server (connection failed or timed out)")
             return False
         if isinstance(resp, Response):
-            if resp.status_code != 200:
+            if not 200 <= resp.status_code < 300:
                 logger.warning("Push notify failed!")
                 logger.warning(f"HTTP Code:{resp.status_code}")
                 return False
