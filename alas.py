@@ -26,6 +26,8 @@ class AzurLaneAutoScript:
         # Failure count of tasks
         # Key: str, task name, value: int, failure count
         self.failure_record = {}
+        # ScriptError 连续计数，达到阈值后退出（代码 bug 重试无意义）
+        self.script_error_count = 0
 
     @cached_property
     def config(self):
@@ -105,10 +107,20 @@ class AzurLaneAutoScript:
                 self.checker.wait_until_available()
                 return False
         except ScriptError as e:
+            # 代码 bug，先重试 3 次再退出（对齐 AzurPilot）
+            self.script_error_count += 1
             logger.exception(e)
-            logger.critical('This is likely to be a mistake of developers, but sometimes just random issues')
-            self._notify_crashed(command, '脚本执行出错，已停止运行', error=e)
-            exit(1)
+            logger.critical(f'Script error ({self.script_error_count}/3)')
+            self.save_error_log()
+            if self.script_error_count >= 3:
+                logger.critical('Script error retry limit reached, stopping')
+                self._notify_crashed(command, '脚本执行出错，已连续 3 次，停止运行', error=e)
+                exit(1)
+            logger.warning(f'Script error {self.script_error_count}/3, restart and retry')
+            self._notify_recoverable(
+                f'脚本执行出错 - 将尝试重启恢复 ({self.script_error_count}/3)')
+            self.config.task_call('Restart')
+            return 'recoverable'
         except RequestHumanTakeover:
             # 对齐 AzurPilot（alas.py:1282-1303）：绝大多数"需要人工介入"靠重启游戏就能
             # 恢复，不再直接终止进程。治不好的情况由 run_loop 的"同一任务连败 3 次"兜底
@@ -639,8 +651,14 @@ class AzurLaneAutoScript:
             self.is_first_task = False
 
             # Check failures
+            # 可恢复错误（success == 'recoverable'）不增加也不重置失败计数（对齐 AzurPilot）
             failed = deep_get(self.failure_record, keys=task, default=0)
-            failed = 0 if success else failed + 1
+            if success is True:
+                failed = 0
+            elif success == 'recoverable':
+                logger.info(f'Task `{task}` hit a recoverable error, not counted as a failure')
+            else:
+                failed = failed + 1
             deep_set(self.failure_record, keys=task, value=failed)
             if failed >= 3:
                 logger.critical(f"Task `{task}` failed 3 or more times.")
@@ -657,10 +675,12 @@ class AzurLaneAutoScript:
                 )
                 exit(1)
 
-            if success:
+            if success is True:
+                if task != 'Restart':
+                    self.script_error_count = 0
                 del_cached_property(self, 'config')
                 continue
-            elif self.config.Error_HandleError:
+            elif success == 'recoverable' or self.config.Error_HandleError:
                 # self.config.task_delay(success=False)
                 del_cached_property(self, 'config')
                 self.checker.check_now()
