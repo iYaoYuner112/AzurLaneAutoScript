@@ -11,6 +11,7 @@ from module.map.map_base import CampaignMap
 class CampaignBase(CampaignUI, Map, AutoSearchCombat):
     FUNCTION_NAME_BASE = 'battle_'
     MAP: CampaignMap
+    AUTO_SEARCH_WITHDRAW = False
 
     def battle_default(self):
         if self.clear_enemy():

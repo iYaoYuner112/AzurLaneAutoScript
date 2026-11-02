@@ -182,6 +182,10 @@ class StaticIntegrationTest(unittest.TestCase):
                       "def handle_auto_search_map_option(self):"]:
             self.assertIn(token, self.combat_py, 'auto_search_combat.py 缺少: %s' % token)
 
+    def test_campaign_base_has_withdraw_attr(self):
+        """GemsCampaign 等动态战役类依赖此默认属性（实测 16-4 紧急委托抓到过）。"""
+        self.assertIs(CampaignBase.AUTO_SEARCH_WITHDRAW, False)
+
     def test_login_hook(self):
         self.assertIn("campaign_recovery_check", self.login_py, 'login.py 缺少续接回调')
 

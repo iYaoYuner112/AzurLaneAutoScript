@@ -169,9 +169,10 @@ class CampaignRecovery:
             self.runner.campaign._recovery_map_active = False
             return False
         # 心情读取当前持久化账本；恢复后每场出击仍按普通战斗入口正常扣减。
+        # 简化移植说明：AP 版此处还会同步 map_is_2x_book（双倍书标志），本 fork
+        # 未引入该体系，跳过。
         campaign = self.runner.campaign
         campaign.emotion = type(campaign.emotion)(campaign.config)
-        campaign.emotion.map_is_2x_book = campaign.map_is_2x_book
         logger.info(f'[战役续接] 尝试恢复原任务 {config.task.command}，第 {self.attempts}/{self.MAX_ATTEMPTS} 次')
         state = self.find_state()
         if state is None:
