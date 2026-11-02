@@ -5,6 +5,7 @@ from module.combat.combat import Combat
 from module.exception import CampaignEnd, GameStuckError
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON
 from module.logger import logger
+from module.map.assets import WITHDRAW
 from module.map.map_operation import MapOperation
 
 
