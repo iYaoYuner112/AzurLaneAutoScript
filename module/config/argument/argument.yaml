@@ -160,6 +160,7 @@ Campaign:
   UseClearMode: true
   UseFleetLock: true
   UseAutoSearch: true
+  ContinueAfterRestart: false
   Use2xBook: false
   AmbushEvade: true
 StopCondition:

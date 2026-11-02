@@ -156,6 +156,7 @@ EventSp:
     AutoSearchMode: sub_standby
 Raid:
   Campaign:
+    ContinueAfterRestart: false
     Name: dynamic
     Mode: normal
     UseClearMode: true
@@ -196,6 +197,7 @@ RaidDaily:
     FailureInterval: 30
     ServerUpdate: 00:00
   Campaign:
+    ContinueAfterRestart: false
     Name: dynamic
     Mode: normal
     UseClearMode: true
@@ -221,6 +223,7 @@ Coalition:
     FailureInterval: 30
     ServerUpdate: 00:00
   Campaign:
+    ContinueAfterRestart: false
     Name: dynamic
     Mode: normal
     UseClearMode: true
@@ -248,6 +251,7 @@ CoalitionSp:
     FailureInterval: 30
     ServerUpdate: 00:00
   Campaign:
+    ContinueAfterRestart: false
     Name: sp
     Mode: normal
     UseClearMode: true

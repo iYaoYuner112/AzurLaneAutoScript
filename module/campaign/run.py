@@ -371,104 +371,126 @@ class CampaignRun(CampaignEvent):
             self.config.task_call('Commission', force_call=True)
             self.config.task_stop('Commission notice found')
 
-    def run(self, name, folder='campaign_main', mode='normal', total=0):
+    def run(self, name, folder='campaign_main', mode='normal', total=0, resume=False):
         """
         Args:
             name (str): Name of .py file.
             folder (str): Name of the file folder under campaign.
             mode (str): `normal` or `hard`
             total (int):
+            resume (bool): 异常重启续接：跳过选关与入场，从原地图状态继续。
         """
-        name, folder = self.handle_stage_name(name, folder, mode=mode)
-        self.config.override(Campaign_Name=name, Campaign_Event=folder)
-        self.load_campaign(name, folder=folder)
-        self.run_count = 0
-        self.run_limit = self.config.StopCondition_RunCount
-        while 1:
-            # End
-            if total and self.run_count >= total:
-                break
-            if self.campaign.event_time_limit_triggered():
-                self.config.task_stop()
-
-            # Log
-            logger.hr(name, level=1)
-            logger.info(f'Campaign run: event="{folder}", name={name}')
-            if self.config.StopCondition_RunCount > 0:
-                logger.info(f'Count remain: {self.config.StopCondition_RunCount}')
+        from module.campaign.recovery import CAMPAIGN_RESTART_ERRORS, capture_campaign_recovery
+        resume = self.__dict__.pop('_resume_campaign_run', False) or resume
+        expected = self.__dict__.pop('_resume_campaign_kwargs', None)
+        if expected is not None and expected != dict(name=name, folder=folder, mode=mode, total=total):
+            self.config.task_stop('任务入口已切换关卡，停止使用原续接断点')
+        try:
+            if resume:
+                name, folder = self.name, self.folder
             else:
-                logger.info(f'Count: {self.run_count}')
+                name, folder = self.handle_stage_name(name, folder, mode=mode)
+                self.config.override(Campaign_Name=name, Campaign_Event=folder)
+                self.load_campaign(name, folder=folder)
+                self.run_count = 0
+                self.run_limit = self.config.StopCondition_RunCount
+            resume_map = resume and self.__dict__.pop('_resume_map', False)
+            while 1:
+                # End
+                if total and self.run_count >= total:
+                    break
+                if self.campaign.event_time_limit_triggered():
+                    self.config.task_stop()
 
-            # UI ensure
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            if not self.device.has_cached_image:
-                self.device.screenshot()
-            self.campaign.device.image = self.device.image
-            if self.campaign.is_in_map():
-                logger.info('Already in map, retreating.')
-                try:
-                    self.campaign.withdraw()
-                except CampaignEnd:
-                    pass
-                self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
-            elif self.campaign.is_in_auto_search_menu():
-                if self.can_use_auto_search_continue():
-                    logger.info('In auto search menu, skip ensure_campaign_ui.')
+                # Log
+                logger.hr(name, level=1)
+                logger.info(f'Campaign run: event="{folder}", name={name}')
+                if self.config.StopCondition_RunCount > 0:
+                    logger.info(f'Count remain: {self.config.StopCondition_RunCount}')
                 else:
-                    logger.info('In auto search menu, closing.')
-                    # Because event_20240725 task balancer delete self.campaign.ensure_auto_search_exit()
+                    logger.info(f'Count: {self.run_count}')
+
+                # UI ensure
+                self.device.stuck_record_clear()
+                self.device.click_record_clear()
+                if not self.device.has_cached_image:
+                    self.device.screenshot()
+                self.campaign.device.image = self.device.image
+                if resume_map:
+                    logger.info('[战役续接] 跳过选关与入场，恢复原战役状态循环')
+                elif self.campaign.is_in_map():
+                    logger.info('Already in map, retreating.')
+                    try:
+                        self.campaign.withdraw()
+                    except CampaignEnd:
+                        pass
                     self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
-            else:
-                self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)            
-            self.config.override(Campaign_Mode=self.campaign.config.Campaign_Mode)
-            self.disable_raid_on_event()
-            self.handle_commission_notice()
+                elif self.campaign.is_in_auto_search_menu():
+                    if self.can_use_auto_search_continue():
+                        logger.info('In auto search menu, skip ensure_campaign_ui.')
+                    else:
+                        logger.info('In auto search menu, closing.')
+                        # Because event_20240725 task balancer delete self.campaign.ensure_auto_search_exit()
+                        self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
+                else:
+                    self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
+                self.config.override(Campaign_Mode=self.campaign.config.Campaign_Mode)
+                if not resume_map:
+                    self.disable_raid_on_event()
+                    self.handle_commission_notice()
 
-            # if in hard mode, check remain times
-            if self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == 'normal':
-                from module.hard.hard import OCR_HARD_REMAIN
-                remain = OCR_HARD_REMAIN.ocr(self.device.image)
-                if not remain:
-                    logger.info('Remaining number of times of hard mode campaign_main is 0, delay task to next day')
-                    self.config.task_delay(server_update=True)
+                # if in hard mode, check remain times
+                if not resume_map and self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == 'normal':
+                    from module.hard.hard import OCR_HARD_REMAIN
+                    remain = OCR_HARD_REMAIN.ocr(self.device.image)
+                    if not remain:
+                        logger.info('Remaining number of times of hard mode campaign_main is 0, delay to tomorrow')
+                        self.config.task_delay(server_update=True)
+                        break
+
+                # End
+                if self.triggered_stop_condition(oil_check=not resume_map and not self.campaign.is_in_auto_search_menu()):
+                    if not resume_map:
+                        break
+                    self.campaign._restart_stop_requested = True
+
+                # Run
+                self.device.stuck_record_clear()
+                self.device.click_record_clear()
+                try:
+                    self.campaign._resume_after_restart = resume_map
+                    resume_map = False
+                    self.campaign.run()
+                except ScriptEnd as e:
+                    logger.hr('Script end')
+                    logger.info(str(e))
                     break
 
-            # End
-            if self.triggered_stop_condition(oil_check=not self.campaign.is_in_auto_search_menu()):
-                break
-
-            # Run
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            try:
-                self.campaign.run()
-            except ScriptEnd as e:
-                logger.hr('Script end')
-                logger.info(str(e))
-                break
-
-            # After run
-            self.run_count += 1
-            if self.config.StopCondition_RunCount:
-                self.config.StopCondition_RunCount -= 1
-            # End
-            if self.triggered_stop_condition(oil_check=False):
-                break
-            # One-time stage limit
-            if self.campaign.config.MAP_IS_ONE_TIME_STAGE:
-                if self.run_count >= 1:
-                    logger.hr('Triggered one-time stage limit')
-                    self.campaign.handle_map_stop()
+                # After run
+                self.run_count += 1
+                if self.config.StopCondition_RunCount:
+                    self.config.StopCondition_RunCount -= 1
+                # End
+                if self.triggered_stop_condition(oil_check=False):
                     break
-            # Loop stages
-            if self.is_stage_loop:
-                if self.run_count >= 1:
-                    logger.hr('Triggered loop stage switch')
-                    break
-            # Scheduler
-            if self.config.task_switched():
-                self.campaign.ensure_auto_search_exit()
-                self.config.task_stop()
+                # One-time stage limit
+                if self.campaign.config.MAP_IS_ONE_TIME_STAGE:
+                    if self.run_count >= 1:
+                        logger.hr('Triggered one-time stage limit')
+                        self.campaign.handle_map_stop()
+                        break
+                # Loop stages
+                if self.is_stage_loop:
+                    if self.run_count >= 1:
+                        logger.hr('Triggered loop stage switch')
+                # Scheduler
+                if self.config.task_switched():
+                    self.campaign.ensure_auto_search_exit()
+                    self.config.task_stop()
 
-        self.campaign.ensure_auto_search_exit()
+            self.campaign.ensure_auto_search_exit()
+        except CAMPAIGN_RESTART_ERRORS:
+            if hasattr(self, 'campaign'):
+                capture_campaign_recovery(self, dict(name=name, folder=folder, mode=mode, total=total))
+            raise
+

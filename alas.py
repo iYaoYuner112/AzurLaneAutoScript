@@ -65,77 +65,95 @@ class AzurLaneAutoScript:
             exit(1)
 
     def run(self, command, skip_first_screenshot=False):
-        try:
-            if not skip_first_screenshot:
-                self.device.screenshot()
-            self.__getattribute__(command)()
-            return True
-        except TaskEnd:
-            return True
-        except GameNotRunningError as e:
-            logger.warning(e)
-            self._notify_recoverable('游戏未运行，已安排重启游戏')
-            self.config.task_call('Restart')
-            return False
-        except (GameStuckError, GameTooManyClickError) as e:
-            logger.error(e)
-            self.save_error_log()
-            logger.warning(f'Game stuck, {self.device.package} will be restarted in 10 seconds')
-            logger.warning('If you are playing by hand, please stop Alas')
-            self._notify_recoverable('游戏卡住，10 秒后自动重启游戏')
-            self.config.task_call('Restart')
-            self.device.sleep(10)
-            return False
-        except GameBugError as e:
-            logger.warning(e)
-            self.save_error_log()
-            logger.warning('An error has occurred in Azur Lane game client, Alas is unable to handle')
-            logger.warning(f'Restarting {self.device.package} to fix it')
-            self._notify_recoverable('游戏客户端出错，10 秒后自动重启游戏')
-            self.config.task_call('Restart')
-            self.device.sleep(10)
-            return False
-        except GamePageUnknownError as e:
-            logger.info('Game server may be under maintenance or network may be broken, check server status now')
-            self.checker.check_now()
-            if self.checker.is_available():
-                logger.critical('Game page unknown')
-                self.save_error_log()
-                self._notify_crashed(command, '无法识别游戏页面（服务器正常），已停止运行', error=e)
-                exit(1)
-            else:
-                self.checker.wait_until_available()
+        from module.campaign.recovery import campaign_recovery_scope
+        recovery = self.__dict__.get('_campaign_recovery')
+        if recovery is not None and inflection.underscore(command) not in (
+                'restart', inflection.underscore(recovery.runner.config.task.command)):
+            logger.info('[战役续接] 已切换到其他任务，丢弃原关卡续接凭据')
+            self._campaign_recovery = None
+        with campaign_recovery_scope(self):
+            try:
+                recovery = self.__dict__.get('_campaign_recovery')
+                if recovery is not None and command != 'restart':
+                    self._campaign_recovery = None
+                    if recovery.ready and recovery.matches(self.config):
+                        self._resuming_campaign_recovery = recovery
+                        try:
+                            recovery.resume(self.config, self.device)
+                        finally:
+                            self._resuming_campaign_recovery = None
+                        return True
+                    logger.warning('[战役续接] 重启未完成、凭据过期或配置已改变，回退原流程')
+                if not skip_first_screenshot:
+                    self.device.screenshot()
+                self.__getattribute__(command)()
+                return True
+            except TaskEnd:
+                return True
+            except GameNotRunningError as e:
+                logger.warning(e)
+                self._notify_recoverable('游戏未运行，已安排重启游戏')
+                self.config.task_call('Restart')
                 return False
-        except ScriptError as e:
-            # 代码 bug，先重试 3 次再退出（对齐 AzurPilot）
-            self.script_error_count += 1
-            logger.exception(e)
-            logger.critical(f'Script error ({self.script_error_count}/3)')
-            self.save_error_log()
-            if self.script_error_count >= 3:
-                logger.critical('Script error retry limit reached, stopping')
-                self._notify_crashed(command, '脚本执行出错，已连续 3 次，停止运行', error=e)
+            except (GameStuckError, GameTooManyClickError) as e:
+                logger.error(e)
+                self.save_error_log()
+                logger.warning(f'Game stuck, {self.device.package} will be restarted in 10 seconds')
+                logger.warning('If you are playing by hand, please stop Alas')
+                self._notify_recoverable('游戏卡住，10 秒后自动重启游戏')
+                self.config.task_call('Restart')
+                self.device.sleep(10)
+                return False
+            except GameBugError as e:
+                logger.warning(e)
+                self.save_error_log()
+                logger.warning('An error has occurred in Azur Lane game client, Alas is unable to handle')
+                logger.warning(f'Restarting {self.device.package} to fix it')
+                self._notify_recoverable('游戏客户端出错，10 秒后自动重启游戏')
+                self.config.task_call('Restart')
+                self.device.sleep(10)
+                return False
+            except GamePageUnknownError as e:
+                logger.info('Game server may be under maintenance or network may be broken, check server status now')
+                self.checker.check_now()
+                if self.checker.is_available():
+                    logger.critical('Game page unknown')
+                    self.save_error_log()
+                    self._notify_crashed(command, '无法识别游戏页面（服务器正常），已停止运行', error=e)
+                    exit(1)
+                else:
+                    self.checker.wait_until_available()
+                    return False
+            except ScriptError as e:
+                # 代码 bug，先重试 3 次再退出（对齐 AzurPilot）
+                self.script_error_count += 1
+                logger.exception(e)
+                logger.critical(f'Script error ({self.script_error_count}/3)')
+                self.save_error_log()
+                if self.script_error_count >= 3:
+                    logger.critical('Script error retry limit reached, stopping')
+                    self._notify_crashed(command, '脚本执行出错，已连续 3 次，停止运行', error=e)
+                    exit(1)
+                logger.warning(f'Script error {self.script_error_count}/3, restart and retry')
+                self._notify_recoverable(
+                    f'脚本执行出错 - 将尝试重启恢复 ({self.script_error_count}/3)')
+                self.config.task_call('Restart')
+                return 'recoverable'
+            except RequestHumanTakeover:
+                # 对齐 AzurPilot（alas.py:1282-1303）：绝大多数"需要人工介入"靠重启游戏就能
+                # 恢复，不再直接终止进程。治不好的情况由 run_loop 的"同一任务连败 3 次"兜底
+                # 停下来等人工，所以这里不会无限重试。
+                logger.critical('Request human takeover, trying to recover by restarting the game')
+                logger.warning('If you are playing by hand, please stop Alas')
+                self.save_error_log()
+                self.config.task_call('Restart')
+                self._notify_recoverable('需要人工介入 - 正在尝试自动重启恢复')
+                return False
+            except Exception as e:
+                logger.exception(e)
+                self.save_error_log()
+                self._notify_crashed(command, '发生未处理的异常，已停止运行', error=e)
                 exit(1)
-            logger.warning(f'Script error {self.script_error_count}/3, restart and retry')
-            self._notify_recoverable(
-                f'脚本执行出错 - 将尝试重启恢复 ({self.script_error_count}/3)')
-            self.config.task_call('Restart')
-            return 'recoverable'
-        except RequestHumanTakeover:
-            # 对齐 AzurPilot（alas.py:1282-1303）：绝大多数"需要人工介入"靠重启游戏就能
-            # 恢复，不再直接终止进程。治不好的情况由 run_loop 的"同一任务连败 3 次"兜底
-            # 停下来等人工，所以这里不会无限重试。
-            logger.critical('Request human takeover, trying to recover by restarting the game')
-            logger.warning('If you are playing by hand, please stop Alas')
-            self.save_error_log()
-            self.config.task_call('Restart')
-            self._notify_recoverable('需要人工介入 - 正在尝试自动重启恢复')
-            return False
-        except Exception as e:
-            logger.exception(e)
-            self.save_error_log()
-            self._notify_crashed(command, '发生未处理的异常，已停止运行', error=e)
-            exit(1)
 
     @staticmethod
     def _error_summary(error) -> str:
@@ -209,7 +227,25 @@ class AzurLaneAutoScript:
 
     def restart(self):
         from module.handler.login import LoginHandler
-        LoginHandler(self.config, device=self.device).app_restart()
+        login = LoginHandler(self.config, device=self.device)
+        recovery = self.__dict__.get('_campaign_recovery')
+        if recovery is not None and (recovery.ready or not recovery.matches(
+                self.config, task=recovery.runner.config.task.command)):
+            logger.info('[战役续接] 重启来源或原任务配置已改变，丢弃续接凭据')
+            self._campaign_recovery = None
+            recovery = None
+        if recovery is not None and recovery.restart_attempts >= recovery.MAX_ATTEMPTS:
+            logger.warning('[战役续接] 关联 Restart 次数已达上限，停止续接并回退原重启流程')
+            self._campaign_recovery = None
+            recovery = None
+        if recovery is not None:
+            recovery.restart_attempts += 1
+            recovery.bind_device(self.device)
+            login.campaign_recovery_check = recovery.runner.campaign.auto_search_recovery_state
+        login.app_restart()
+        if recovery is not None:
+            recovery.ready = True
+            logger.info('[战役续接] 异常 Restart 已完成，等待原任务接管')
 
     def start(self):
         from module.handler.login import LoginHandler
@@ -403,30 +439,25 @@ class AzurLaneAutoScript:
         from module.campaign.os_run import OSCampaignRun
         OSCampaignRun(config=self.config, device=self.device).opsi_cross_month()
 
-    def main(self):
+    def _run_campaign(self):
+        """主线与普通活动槽位的战役调用；断点由公共 CampaignRun 保存。（对齐 AzurPilot）"""
         from module.campaign.run import CampaignRun
         CampaignRun(config=self.config, device=self.device).run(
             name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+    def main(self):
+        self._run_campaign()
 
     def main2(self):
-        from module.campaign.run import CampaignRun
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+        self._run_campaign()
 
     def main3(self):
-        from module.campaign.run import CampaignRun
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+        self._run_campaign()
 
     def event(self):
-        from module.campaign.run import CampaignRun
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+        self._run_campaign()
 
     def event2(self):
-        from module.campaign.run import CampaignRun
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name, folder=self.config.Campaign_Event, mode=self.config.Campaign_Mode)
+        self._run_campaign()
 
     def raid(self):
         from module.raid.run import RaidRun

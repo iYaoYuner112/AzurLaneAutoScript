@@ -639,13 +639,14 @@ class GemsFarming(CampaignRun, Dock):
 
         return super().triggered_stop_condition(oil_check=oil_check)
 
-    def run(self, name, folder='campaign_main', mode='normal', total=0):
+    def run(self, name, folder='campaign_main', mode='normal', total=0, resume=False):
         """
         Args:
             name (str): Name of .py file.
             folder (str): Name of the file folder under campaign.
             mode (str): `normal` or `hard`
             total (int):
+            resume (bool): 异常重启续接（透传给 CampaignRun.run）。
         """
         self.config.override(STOP_IF_REACH_LV32=True)
 
@@ -654,7 +655,7 @@ class GemsFarming(CampaignRun, Dock):
             is_limit = self.config.StopCondition_RunCount
 
             try:
-                super().run(name=name, folder=folder, total=total)
+                super().run(name=name, folder=folder, total=total, resume=resume)
             except CampaignEnd as e:
                 if "Emotion" in e.args[0]:
                     self._trigger_emotion = True
