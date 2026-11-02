@@ -64,12 +64,14 @@ def show_function_call():
 class Device(Screenshot, Control, AppControl):
     _screen_size_checked = False
     detect_record = set()
-    click_record = collections.deque(maxlen=15)
+    click_record = collections.deque(maxlen=50)
     stuck_timer = Timer(60, count=60).start()
     stuck_timer_long = Timer(180, count=180).start()
     stuck_long_wait_list = ['BATTLE_STATUS_S', 'PAUSE', 'LOGIN_CHECK', 'TEMPLATE_MANJUU']
 
     def __init__(self, *args, **kwargs):
+        # Per-instance record so several Device instances never share click history.
+        self.click_record = collections.deque(maxlen=50)
         for trial in range(4):
             try:
                 super().__init__(*args, **kwargs)
@@ -296,23 +298,28 @@ class Device(Screenshot, Control, AppControl):
         return removed
 
     def click_record_check(self):
+        """Detect 50 consecutive clicks on the same button, or two buttons alternating.
+
+        Confirmed state progress is cleared by callers via click_record_clear().
+        Map swipes are validated by Camera's movement confirmation and bounded
+        positioning, not by click counts.
         """
-        Raises:
-            GameTooManyClickError:
-        """
-        count = collections.Counter(self.click_record).most_common(2)
-        if count[0][1] >= 12:
-            show_function_call()
-            logger.warning(f'Too many click for a button: {count[0][0]}')
-            logger.warning(f'History click: {[str(prev) for prev in self.click_record]}')
-            self.click_record_clear()
-            raise GameTooManyClickError(f'Too many click for a button: {count[0][0]}')
-        if len(count) >= 2 and count[0][1] >= 6 and count[1][1] >= 6:
-            show_function_call()
-            logger.warning(f'Too many click between 2 buttons: {count[0][0]}, {count[1][0]}')
-            logger.warning(f'History click: {[str(prev) for prev in self.click_record]}')
-            self.click_record_clear()
-            raise GameTooManyClickError(f'Too many click between 2 buttons: {count[0][0]}, {count[1][0]}')
+        if len(self.click_record) < 50:
+            return
+        record = list(self.click_record)[-50:]
+        if any(name.startswith('MAP_SWIPE_') for name in record):
+            return
+        if all(name == record[0] for name in record):
+            reason = f'Too many click for a button: {record[0]}'
+        elif record[0] != record[1] and all(name == record[index % 2] for index, name in enumerate(record)):
+            reason = f'Too many click between 2 buttons: {record[0]}, {record[1]}'
+        else:
+            return
+        show_function_call()
+        logger.warning(f'[Device-Click] {reason}')
+        logger.warning(f'[Device-Click] Click history: {record}')
+        self.click_record_clear()
+        raise GameTooManyClickError(f'[Device-Click] {reason}')
 
     def disable_stuck_detection(self):
         """

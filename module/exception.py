@@ -46,7 +46,10 @@ class GameBugError(Exception):
 
 
 class GameTooManyClickError(Exception):
-    pass
+    """50 consecutive operations are all the same button, or two buttons alternating.
+
+    Map swipes are validated by camera movement instead of click counts.
+    """
 
 
 class EmulatorNotRunningError(Exception):

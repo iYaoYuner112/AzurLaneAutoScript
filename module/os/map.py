@@ -1859,7 +1859,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             # Restore the primary fleet, so that later steps do not work on a wrong fleet.
             self.fleet_set(self.config.OpsiFleet_Fleet)
 
-    def run_auto_search(self, question=True, rescan=None, after_auto_search=True, interrupt=None):
+    def run_auto_search(self, question=True, rescan=None, after_auto_search=True, interrupt=None,
+                        on_search_finished=None):
         """
         Clear current zone by running auto search.
         OpSi story mode must be cleared to unlock auto search.
@@ -1877,6 +1878,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             after_auto_search (bool):
                 Whether to call handle_after_auto_search() after auto search
             interrupt (callable | list[callable]): Interrupt callback for auto search.
+            on_search_finished (callable | None):
+                Called after battles finish, before clearing questions and rescanning.
 
         Returns:
             int: Number of finished combat
@@ -1909,6 +1912,9 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                             self.globe_goto(prev, types='DANGEROUS')
                             continue
                 break
+
+            if on_search_finished is not None:
+                on_search_finished()
 
             # Rescan
             self._solved_map_event = set()
@@ -2335,8 +2341,9 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             self.map_init(map_=None)
             queue = self.map.camera_data
             while len(queue) > 0:
-                logger.hr(f'Map rescan {queue[0]}')
                 queue = queue.sort_by_camera_distance(self.camera)
+                logger.hr(f'Map rescan {queue[0]}')
+                logger.attr('Rescan camera/target', f'{location2node(self.camera)} -> {queue[0]}')
                 self.focus_to(queue[0], swipe_limit=(6, 5))
                 self.focus_to_grid_center(0.3)
 
