@@ -2,10 +2,10 @@ from module.base.timer import Timer
 from module.campaign.campaign_status import CampaignStatus
 from module.combat.assets import *
 from module.combat.combat import Combat
-from module.exception import CampaignEnd, GameStuckError
+from module.exception import CampaignEnd, GameStuckError, RequestHumanTakeover, ScriptEnd
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON
 from module.logger import logger
-from module.map.assets import WITHDRAW
+from module.map.assets import WITHDRAW, FLEET_NUM_1, FLEET_NUM_2
 from module.map.map_operation import MapOperation
 
 
@@ -28,6 +28,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         # 续接是新流程的起点，重置重启前留下的 OFF 确认，避免与之后的截图凑成两帧。
         self._auto_search_off_frame = None
         self._auto_search_status_confirm = False
+        self._auto_search_fleet_confirmed = False
+        self._restart_emotion_checked = False
         if self.is_auto_search_running():
             logger.info('[战役续接] 自律寻敌已开启，直接接管，不重复点击')
         self._restart_resume_timer = Timer(30, count=60).start()
@@ -65,6 +67,21 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                                          offset=self._auto_search_offset, threshold=10):
             self._auto_search_off_frame = None
             return False
+        if not self._restart_emotion_checked:
+            self.auto_search_watch_fleet()
+            if not self.__dict__.get('_auto_search_fleet_confirmed'):
+                return False
+            try:
+                self.emotion.check_fleet(self.fleet_show_index, after_restart=True)
+            except (ScriptEnd, RequestHumanTakeover):
+                logger.warning('[战役续接] 舰队心情检查未通过，先撤退再交回任务处理')
+                try:
+                    self.withdraw()
+                except CampaignEnd:
+                    pass
+                raise
+            self._restart_emotion_checked = True
+            logger.info('[战役续接] 已确认自律寻敌关闭，尝试恢复')
         return super().handle_auto_search_map_option()
 
     def _handle_auto_search_menu_missing(self):
@@ -127,6 +144,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         Returns:
             bool: If executed.
         """
+        if self.appear(FLEET_NUM_1, offset=(20, 20)) or self.appear(FLEET_NUM_2, offset=(20, 20)):
+            self._auto_search_fleet_confirmed = True
         prev = self.fleet_current_index
         self.get_fleet_show_index()
         self.get_fleet_current_index()

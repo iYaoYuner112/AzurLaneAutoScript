@@ -90,11 +90,15 @@ class ResumeResetTest(unittest.TestCase):
         stub = AutoSearchCombat.__new__(AutoSearchCombat)
         stub._auto_search_off_frame = object()
         stub._auto_search_status_confirm = True
+        stub._auto_search_fleet_confirmed = True
+        stub._restart_emotion_checked = True
         stub._auto_search_in_stage_timer = Timer(3, count=6)
         stub.is_auto_search_running = lambda: False
 
         self.assertTrue(stub.prepare_auto_search_recovery('map'))
         self.assertIsNone(stub._auto_search_off_frame)
+        self.assertFalse(stub._auto_search_fleet_confirmed)
+        self.assertFalse(stub._restart_emotion_checked)
         self.assertTrue(stub._restart_resume_guard)
 
 

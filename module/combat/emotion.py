@@ -242,6 +242,33 @@ class Emotion:
             self.config.task_delay(target=recovered)
             raise ScriptEnd('Emotion control')
 
+    def check_fleet(self, fleet_index, after_restart=False):
+        """检查接替舰队是否够打下一场，不够就延后任务。
+
+        异常重启续接时会跳过进图前的 check_reduce，用这次单场检查补上，
+        避免恢复后的第一场顶着低心情开打。
+
+        Args:
+            fleet_index (int): 画面显示的舰队编号，1 或 2。
+            after_restart (bool): 重启续接预检标记，不参与计算。
+
+        Raises:
+            ScriptEnd: 心情不足，任务已延后到恢复时间。
+        """
+        if not self.is_calculate:
+            return
+
+        self.update()
+        self.record()
+        self.show()
+
+        fleet = self.fleets[fleet_index - 1]
+        recovered = fleet.get_recovered(expected_reduce=self.reduce_per_battle)
+        if recovered > datetime.now():
+            logger.info(f'[情绪-延迟] 接替舰队心情不足，延后到 {recovered}')
+            self.config.task_delay(target=recovered)
+            raise ScriptEnd('[情绪-延迟] 接替舰队情绪控制')
+
     def wait(self, fleet_index):
         """
         Wait emotion of specific fleet.
