@@ -41,28 +41,33 @@ class OpsiExplore(OSMap):
                     logger.info(f'Delay task `{task}` to {next_run}')
                     self.config.cross_set(keys=keys, value=next_run)
 
+    def _os_explore_end(self):
+        """完成收尾，但跨月时放弃本轮，避免把上月进度写到新月份。"""
+        next_reset = get_os_next_reset()
+        reset = next_reset.isoformat()
+        state = self.config.OpsiExplore_MeowfficerCleanupState
+        if isinstance(state, dict) and state.get('reset') != reset:
+            raise GameStuckError('开荒期间跨月，停止本轮收尾，下次重新开荒')
+
+        logger.info('OS explore finished, delay to next reset')
+        logger.attr('OpsiNextReset', next_reset)
+        logger.info('To run again, clear OpsiExplore.Scheduler.NextRun and set OpsiExplore.OpsiExplore.LastZone=0')
+        with self.config.multi_set():
+            self.config.OpsiExplore_LastZone = 0
+            self.config.OpsiExplore_SpecialRadar = False
+            # 纯记录：本月开荒已完成（带本月 reset 标记，跨月自动失效）
+            self.config.OpsiExplore_ExploreProgress = '已完成百分之100.00'
+            self.config.OpsiExplore_MeowfficerCleanupState = dict(reset=reset, phase='done')
+            self.config.task_delay(target=next_reset)
+            self.config.task_call('OpsiDaily', force_call=False)
+            self.config.task_call('OpsiShop', force_call=False)
+        self.config.task_stop()
+
     def _os_explore(self):
         """
         Explore all dangerous zones at the beginning of month.
         Failed zone id will be set to _os_explore_failed_zone
         """
-
-        def end():
-            logger.info('OS explore finished, delay to next reset')
-            next_reset = get_os_next_reset()
-            logger.attr('OpsiNextReset', next_reset)
-            logger.info('To run again, clear OpsiExplore.Scheduler.NextRun and set OpsiExplore.OpsiExplore.LastZone=0')
-            with self.config.multi_set():
-                self.config.OpsiExplore_LastZone = 0
-                self.config.OpsiExplore_SpecialRadar = False
-                # 纯记录：本月开荒已完成（带本月 reset 标记，跨月自动失效）
-                self.config.OpsiExplore_ExploreProgress = '已完成百分之100.00'
-                self.config.OpsiExplore_MeowfficerCleanupState = {
-                    'reset': next_reset.isoformat(), 'phase': 'done'}
-                self.config.task_delay(target=next_reset)
-                self.config.task_call('OpsiDaily', force_call=False)
-                self.config.task_call('OpsiShop', force_call=False)
-            self.config.task_stop()
 
         logger.hr('OS explore', level=1)
         order = [int(f.strip(' \t\r\n')) for f in self.config.OS_EXPLORE_FILTER.split('>')]
@@ -86,7 +91,7 @@ class OpsiExplore(OSMap):
         else:
             raise ScriptError(f'Invalid last_zone: {last_zone}')
         if not len(order):
-            end()
+            self._os_explore_end()
 
         # Run
         self._os_explore_failed_zone = []
@@ -127,9 +132,20 @@ class OpsiExplore(OSMap):
 
             # Reached end
             if zone == order[-1]:
-                end()
+                self._os_explore_end()
 
     def os_explore(self):
+        state = self.config.OpsiExplore_MeowfficerCleanupState
+        reset = get_os_next_reset().isoformat()
+        if isinstance(state, dict) and state.get('reset') != reset:
+            with self.config.multi_set():
+                self.config.OpsiExplore_LastZone = 0
+                self.config.OpsiExplore_ExploreProgress = '已完成百分之0.00'
+                self.config.OpsiExplore_MeowfficerCleanupState = None
+            state = None
+        if state is None:
+            self.config.OpsiExplore_MeowfficerCleanupState = dict(reset=reset, phase='explore')
+
         for _ in range(2):
             try:
                 self._os_explore()
