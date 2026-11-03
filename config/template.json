@@ -19,6 +19,7 @@
       "SaveError": true,
       "OnePushConfig": "provider: null",
       "LowPushMode": false,
+      "TaskRestartLimit": 3,
       "ScreenshotLength": 1
     },
     "Optimization": {

@@ -554,6 +554,10 @@
       "True": "有効",
       "False": "無効"
     },
+    "TaskRestartLimit": {
+      "name": "同一タスクの連続再起動上限",
+      "help": "同じタスクの連続エラーによる復旧がこの回数に達すると、サーバーの翌日0時まで延期し、エラー通知設定で通知します。そのタスクの成功で回数をリセットします。他のタスクやゲーム再起動の成功ではリセットしません。0 = 無制限。"
+    },
     "ScreenshotLength": {
       "name": "Error.ScreenshotLength.name",
       "help": "Error.ScreenshotLength.help"

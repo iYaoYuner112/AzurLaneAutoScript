@@ -10,6 +10,7 @@ from cached_property import cached_property
 from module.base.decorator import del_cached_property
 from module.config.config import AzurLaneConfig, TaskEnd
 from module.config.deep import deep_get, deep_set
+from module.config.utils import get_server_next_update
 from module.exception import *
 from module.logger import logger
 from module.notify import handle_notify
@@ -26,6 +27,12 @@ class AzurLaneAutoScript:
         # Failure count of tasks
         # Key: str, task name, value: int, failure count
         self.failure_record = {}
+        # Consecutive recovery count per task (AzurPilot scheduler guard)
+        # Key: str, task name, value: int, consecutive recoveries without success
+        self.task_restart_record = {}
+        # Task cooldown deadlines applied by the consecutive recovery guard
+        # Key: str, task name, value: datetime, cooldown until
+        self.task_restart_delays = {}
         # ScriptError 连续计数，达到阈值后退出（代码 bug 重试无意义）
         self.script_error_count = 0
 
@@ -90,11 +97,16 @@ class AzurLaneAutoScript:
                 return True
             except TaskEnd:
                 return True
+            except EmulatorNotRunningError as e:
+                logger.warning(e)
+                self._notify_recoverable('模拟器/设备连接断开，已安排重启游戏')
+                self.config.task_call('Restart')
+                return 'recoverable'
             except GameNotRunningError as e:
                 logger.warning(e)
                 self._notify_recoverable('游戏未运行，已安排重启游戏')
                 self.config.task_call('Restart')
-                return False
+                return 'recoverable'
             except (GameStuckError, GameTooManyClickError) as e:
                 logger.error(e)
                 self.save_error_log()
@@ -103,7 +115,7 @@ class AzurLaneAutoScript:
                 self._notify_recoverable('游戏卡住，10 秒后自动重启游戏')
                 self.config.task_call('Restart')
                 self.device.sleep(10)
-                return False
+                return 'recoverable'
             except GameBugError as e:
                 logger.warning(e)
                 self.save_error_log()
@@ -112,7 +124,7 @@ class AzurLaneAutoScript:
                 self._notify_recoverable('游戏客户端出错，10 秒后自动重启游戏')
                 self.config.task_call('Restart')
                 self.device.sleep(10)
-                return False
+                return 'recoverable'
             except GamePageUnknownError as e:
                 logger.info('Game server may be under maintenance or network may be broken, check server status now')
                 self.checker.check_now()
@@ -148,7 +160,7 @@ class AzurLaneAutoScript:
                 self.save_error_log()
                 self.config.task_call('Restart')
                 self._notify_recoverable('需要人工介入 - 正在尝试自动重启恢复')
-                return False
+                return 'recoverable'
             except Exception as e:
                 logger.exception(e)
                 self.save_error_log()
@@ -246,6 +258,82 @@ class AzurLaneAutoScript:
         if recovery is not None:
             recovery.ready = True
             logger.info('[战役续接] 异常 Restart 已完成，等待原任务接管')
+
+    def _record_task_restart(self, task, success):
+        """同一任务连续恢复达到上限后，延后到服务器次日零点并推送提醒。
+
+        移植自 AzurPilot（f19f708bd）。语义：
+        - Restart 是恢复入口，永不进入故障冷却，否则游戏未运行时会拖死恢复；
+        - 任务成功一次即清零；其他任务或游戏重启成功不清零；
+        - Error_TaskRestartLimit <= 0 关闭限制，并解除已有冷却；
+        - 达到上限只延后该任务，进程不退出，其他任务照常运行。
+
+        Args:
+            task (str): 任务名。
+            success (bool | str): run() 的返回值。
+
+        Returns:
+            bool: 是否已安排故障冷却（调用方应 continue，不要执行后续成功/失败分支）。
+        """
+        if task == 'Restart':
+            self.task_restart_record.pop(task, None)
+            self.task_restart_delays.pop(task, None)
+            return False
+        if success is True:
+            self.task_restart_record.pop(task, None)
+            return False
+        limit = int(self.config.Error_TaskRestartLimit)
+        if limit <= 0:
+            self.task_restart_record.pop(task, None)
+            self.task_restart_delays.pop(task, None)
+            return False
+        count = self.task_restart_record.get(task, 0) + 1
+        self.task_restart_record[task] = count
+        if count < limit:
+            return False
+
+        # 延后到服务器次日零点，避免带多个日内触发点的任务当天再次运行。
+        next_run = get_server_next_update('00:00')
+        now = datetime.now()
+        if next_run <= now:
+            next_run += timedelta(days=1)
+        self.config.task_delay(target=next_run, task=task)
+        self.task_restart_delays[task] = next_run
+        self.task_restart_record.pop(task, None)
+        self.failure_record.pop(task, None)
+        content = (
+            f'<{self.config_name}> 任务 {task} 连续恢复 {count} 次仍未成功，'
+            f'已延后至 {next_run:%Y-%m-%d %H:%M:%S}。请检查错误日志和截图。'
+        )
+        logger.warning(content)
+        # 达到上限需要人工关注，即使开启低推送量模式也发送通知。
+        handle_notify(
+            self.config.Error_OnePushConfig,
+            title=f'Alas <{self.config_name}> 警告',
+            content=content,
+        )
+        return True
+
+    def _release_restart_cooldown(self, task):
+        """关闭连续重启限制后解除该任务的故障冷却。
+
+        只有当持久化排期仍等于故障冷却截止时间时才提前到当前时间；
+        用户后来另设的排期保持不动，任务是否启用不变。
+        """
+        deadline = self.task_restart_delays.pop(task, None)
+        if deadline is None:
+            return False
+        next_run = self.config.cross_get(keys=[task, 'Scheduler', 'NextRun'], default=None)
+        if next_run != deadline:
+            return False
+        self.config.cross_set(f'{task}.Scheduler.NextRun', datetime.now().replace(microsecond=0))
+        logger.info(f'[配置] 已解除任务 `{task}` 的连续重启冷却')
+        return True
+
+    def _release_restart_cooldowns(self):
+        """关闭连续重启限制后清空所有任务的故障冷却记录。"""
+        for task in list(self.task_restart_delays):
+            self._release_restart_cooldown(task)
 
     def start(self):
         from module.handler.login import LoginHandler
@@ -657,8 +745,23 @@ class AzurLaneAutoScript:
                 del_cached_property(self, 'config')
                 logger.info('Server or network is recovered. Restart game client')
                 self.config.task_call('Restart')
+            # 用户关掉连续重启限制后，旧的故障冷却不应再拦下任务。
+            # 冷却中的任务在截止时间前不会被 get_next_task() 选中，
+            # 所以必须在取任务之前统一清理。
+            if self.task_restart_delays and int(self.config.Error_TaskRestartLimit) <= 0:
+                self._release_restart_cooldowns()
             # Get task
             task = self.get_next_task()
+            # 故障冷却中的任务不执行：Restart 永远放行（恢复入口不能冷却）。
+            if task == 'Restart':
+                self.task_restart_delays.pop(task, None)
+            deadline = self.task_restart_delays.get(task)
+            if deadline is not None:
+                if deadline > datetime.now():
+                    self.config.task_delay(target=deadline, task=task)
+                    self.wait_until(min(deadline, datetime.now() + timedelta(seconds=4)))
+                    continue
+                self.task_restart_delays.pop(task, None)
             # Init device and change server
             _ = self.device
             self.device.config = self.config
@@ -705,6 +808,12 @@ class AzurLaneAutoScript:
                              f"可能是该任务的设置不正确，也可能是一个 bug"),
                 )
                 exit(1)
+
+            # 连续恢复达到上限：延后到次日零点并推送，进程不退出（对齐 AzurPilot）。
+            deferred = self._record_task_restart(task, success)
+            if deferred:
+                del_cached_property(self, 'config')
+                continue
 
             if success is True:
                 if task != 'Restart':

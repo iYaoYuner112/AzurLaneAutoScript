@@ -201,6 +201,10 @@
           false
         ]
       },
+      "TaskRestartLimit": {
+        "type": "input",
+        "value": 3
+      },
       "ScreenshotLength": {
         "type": "input",
         "value": 1
