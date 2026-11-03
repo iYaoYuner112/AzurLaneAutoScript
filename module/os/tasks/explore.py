@@ -62,7 +62,6 @@ class OpsiExplore(OSMap):
                 self.config.task_delay(target=next_reset)
                 self.config.task_call('OpsiDaily', force_call=False)
                 self.config.task_call('OpsiShop', force_call=False)
-                self.config.task_call('OpsiHazard1Leveling', force_call=False)
             self.config.task_stop()
 
         logger.hr('OS explore', level=1)

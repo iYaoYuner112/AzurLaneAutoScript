@@ -105,6 +105,17 @@ def test_explore_delay_list_includes_scheduling():
     assert 'OpsiHazard1Leveling' in written, '侵蚀1 仍应被推迟（我们没搬 AllowHazard1Leveling 开关）'
 
 
+def test_explore_end_does_not_force_call_hazard_leveling():
+    """开荒结束只叫每日和商店，侵蚀1按自己的排期，对齐 AP。"""
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        'module', 'os', 'tasks', 'explore.py')
+    with open(path, encoding='utf-8') as f:
+        source = f.read()
+    assert "task_call('OpsiHazard1Leveling'" not in source, \
+        '开荒结束不应主动叫侵蚀1，AP 让它按自己的排期'
+
+
 if __name__ == '__main__':
     for name in sorted(n for n in dir() if n.startswith('test_')):
         globals()[name]()
