@@ -649,6 +649,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
         """
         logger.hr('OS auto search', level=2)
         self.on_auto_search_battle_count_reset()
+        # 上轮领奖和切换海域的耗时不属于本轮开启自律的重试预算。
+        self._os_auto_search_enable_budget_clear()
         unlock_checked = False
         unlock_check_timer = Timer(5, count=10).start()
         self.ash_popup_canceled = False
