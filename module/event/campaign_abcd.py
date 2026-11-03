@@ -9,8 +9,6 @@ from module.logger import logger
 
 class CampaignABCD(EventBase):
     def run(self, *args, **kwargs):
-        # 异常重启续接：从原关卡继续，不从头重打（对齐 AzurPilot）
-        resume_stage = kwargs.get('name') if self.__dict__.get('_resume_campaign_run', False) else None
         # Filter map files
         stages = [EventStage(file) for file in os.listdir(f'./campaign/{self.config.Campaign_Event}')]
         stages = self.convert_stages(stages)
@@ -39,14 +37,6 @@ class CampaignABCD(EventBase):
                 logger.attr('Filter sort', ' > '.join(stages))
             else:
                 logger.info('Start from the beginning')
-
-        if resume_stage is not None:
-            # 每日刷新可能发生在重启期间；先完成原图，不能从第一关重打。
-            resume_stage = str(resume_stage)
-            if resume_stage not in stages:
-                self.config.task_stop('原关卡已不在活动每日过滤器中，停止续接')
-            stages = stages[stages.index(resume_stage):]
-            logger.attr('Filter sort', ' > '.join(stages))
 
         # Run
         for stage in stages:

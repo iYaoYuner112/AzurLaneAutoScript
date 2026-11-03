@@ -201,10 +201,6 @@
           false
         ]
       },
-      "TaskRestartLimit": {
-        "type": "input",
-        "value": 3
-      },
       "ScreenshotLength": {
         "type": "input",
         "value": 1
@@ -506,10 +502,6 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
-      },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -890,10 +882,6 @@
         "type": "checkbox",
         "value": true
       },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
-      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false
@@ -1272,10 +1260,6 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
-      },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -1729,10 +1713,6 @@
         "type": "checkbox",
         "value": true
       },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
-      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -2136,10 +2116,6 @@
         "type": "checkbox",
         "value": true
       },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
-      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false
@@ -2534,10 +2510,6 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
-      },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -3909,10 +3881,6 @@
         "type": "checkbox",
         "value": true
       },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
-      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false
@@ -4318,10 +4286,6 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
-      },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -4735,10 +4699,6 @@
         "type": "checkbox",
         "value": true
       },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
-      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -5150,10 +5110,6 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
-      },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -5567,10 +5523,6 @@
         "type": "checkbox",
         "value": true
       },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
-      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -5972,10 +5924,6 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
-      },
-      "ContinueAfterRestart": {
-        "type": "checkbox",
-        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",

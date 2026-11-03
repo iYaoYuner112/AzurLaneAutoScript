@@ -36,7 +36,6 @@ class GeneratedConfig:
     Error_SaveError = True
     Error_OnePushConfig = 'provider: null'
     Error_LowPushMode = False  # True, False
-    Error_TaskRestartLimit = 3
     Error_ScreenshotLength = 1
 
     # Group `Optimization`
@@ -81,7 +80,6 @@ class GeneratedConfig:
     Campaign_UseClearMode = True
     Campaign_UseFleetLock = True
     Campaign_UseAutoSearch = True
-    Campaign_ContinueAfterRestart = False  # True, False
     Campaign_Use2xBook = False
     Campaign_AmbushEvade = True
 

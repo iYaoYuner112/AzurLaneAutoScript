@@ -92,9 +92,6 @@ Error:
     type: checkbox
     value: false
     option: [true, false]
-  TaskRestartLimit:
-    value: 3
-    validate: [0, 999]
   ScreenshotLength: 1
 Optimization:
   ScreenshotInterval: 0.3
@@ -163,7 +160,6 @@ Campaign:
   UseClearMode: true
   UseFleetLock: true
   UseAutoSearch: true
-  ContinueAfterRestart: false
   Use2xBook: false
   AmbushEvade: true
 StopCondition:

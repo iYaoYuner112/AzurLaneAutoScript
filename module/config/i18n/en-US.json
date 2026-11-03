@@ -554,10 +554,6 @@
       "True": "Enabled",
       "False": "Disabled"
     },
-    "TaskRestartLimit": {
-      "name": "Consecutive restart limit per task",
-      "help": "After this many consecutive failed recovery attempts, defer the task until the next server midnight and send an alert using error notification settings. Only success of that task resets its count; other tasks and successful game restarts do not. 0 = unlimited."
-    },
     "ScreenshotLength": {
       "name": "Record Screenshot(s)",
       "help": "Number of screenshots saved when exception occurs"
@@ -912,10 +908,6 @@
     "UseAutoSearch": {
       "name": "Use Auto Search",
       "help": ""
-    },
-    "ContinueAfterRestart": {
-      "name": "Continue battle after restart",
-      "help": "Available for main and event map tasks, including daily event stages, SP, urgent commissions and three-oil farming; off by default. Requires clearing mode and auto search. After an abnormal restart returns to the original map, enable auto search and account for morale normally in each subsequent battle. Does not resume a pre-restart battle or settlement. Map context exists only in this scheduler process; changed settings or exhausted retries fall back to the existing flow."
     },
     "Use2xBook": {
       "name": "Use High-Efficiency Combat Logistics Plan",

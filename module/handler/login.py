@@ -46,12 +46,6 @@ class LoginHandler(UI):
 
             self.device.screenshot()
 
-            # 仅由异常恢复凭据设置；识别到原地图后交回任务开启自律。（移植自 AzurPilot）
-            recovery_check = self.__dict__.get('campaign_recovery_check')
-            if recovery_check is not None and recovery_check() is not None:
-                logger.info('[登录] 检测到异常重启保留的地图，交回原任务恢复')
-                break
-
             # End
             if self.is_in_main():
                 if confirm_timer.reached():

@@ -19,7 +19,6 @@
       "SaveError": true,
       "OnePushConfig": "provider: null",
       "LowPushMode": false,
-      "TaskRestartLimit": 3,
       "ScreenshotLength": 1
     },
     "Optimization": {
@@ -95,7 +94,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -170,7 +168,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -245,7 +242,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -331,7 +327,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -407,7 +402,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -482,7 +476,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -709,7 +702,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -788,7 +780,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -867,7 +858,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -946,7 +936,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -1025,7 +1014,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -1100,7 +1088,6 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
-      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
