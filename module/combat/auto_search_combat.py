@@ -2,9 +2,10 @@ from module.base.timer import Timer
 from module.campaign.campaign_status import CampaignStatus
 from module.combat.assets import *
 from module.combat.combat import Combat
-from module.exception import CampaignEnd
-from module.handler.assets import AUTO_SEARCH_MAP_OPTION_ON
+from module.exception import CampaignEnd, GameStuckError
+from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON
 from module.logger import logger
+from module.map.assets import WITHDRAW
 from module.map.map_operation import MapOperation
 
 
@@ -13,6 +14,58 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
     _auto_search_status_confirm = False
     auto_search_oil_limit_triggered = False
     auto_search_coin_limit_triggered = False
+
+    def auto_search_recovery_state(self):
+        """异常重启只识别返回的关卡地图，不接管重启前的战斗或结算。（移植自 AzurPilot）"""
+        if self.is_auto_search_running() or (self.is_in_map() and self.appear(WITHDRAW, offset=(30, 30))):
+            return 'map'
+        return None
+
+    def prepare_auto_search_recovery(self, state):
+        """确认已回到地图后开启自律，后续战斗重新按普通入口计算心情。"""
+        if state != 'map':
+            return False
+        # 续接是新流程的起点，重置重启前留下的 OFF 确认，避免与之后的截图凑成两帧。
+        self._auto_search_off_frame = None
+        self._auto_search_status_confirm = False
+        if self.is_auto_search_running():
+            logger.info('[战役续接] 自律寻敌已开启，直接接管，不重复点击')
+        self._restart_resume_timer = Timer(30, count=60).start()
+        self._restart_resume_click_timer = Timer(2).start()
+        self._restart_resume_guard = True
+        self._auto_search_in_stage_timer.reset()
+        logger.info('[战役续接] 已返回关卡地图，恢复自律；后续战斗按正常流程计算心情')
+        return True
+
+    def handle_auto_search_map_option(self):
+        """重启续接时以模板和颜色共同确认 OFF，沿用原点击冷却。
+
+        简化移植说明：AP 版在此处还包含舰队心情预检（check_fleet），本 fork
+        未引入该体系，跳过预检；低心情由游戏内警告与 handle_combat_low_emotion 兜底。
+        """
+        if not self.__dict__.get('_restart_resume_guard', False):
+            return super().handle_auto_search_map_option()
+        if self._restart_resume_timer is None:
+            if not (self.is_auto_search_running() or self.is_in_map()):
+                return False
+            self._restart_resume_timer = Timer(30, count=60).start()
+        if self._restart_resume_timer.reached():
+            raise GameStuckError('[战役续接] 自律寻敌未在期限内进入战斗')
+        if self.is_auto_search_running():
+            # 识别到 ON 说明开关已翻面，清空残留确认，避免与后续 OFF 合并成两帧。
+            self._auto_search_off_frame = None
+            return False
+        # 刚回到地图时先持续截图两秒，避免游戏尚未就绪就触发开关。
+        if not self._restart_resume_click_timer.reached():
+            return False
+        if self.is_combat_loading() or self.is_combat_executing():
+            self._auto_search_off_frame = None
+            return False
+        if not self.match_template_color(AUTO_SEARCH_MAP_OPTION_OFF,
+                                         offset=self._auto_search_offset, threshold=10):
+            self._auto_search_off_frame = None
+            return False
+        return super().handle_auto_search_map_option()
 
     def _handle_auto_search_menu_missing(self):
         """
@@ -39,6 +92,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
             out: is_combat_loading
         """
         self.interval_reset(AUTO_SEARCH_MAP_OPTION_ON)
+        # 清空上一流程残留的 OFF 确认，确保本流程内重新积累
+        self._auto_search_off_frame = None
         for _ in self.loop():
 
             if self.handle_auto_search_map_option():
@@ -48,7 +103,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
             # Auto search icon shows it's running but it's doing nothing
             # when Alas exited from retirement and turned it on immediately.
             # Monkey clicker, disable auto search every 3s, beginning not included
-            if self.appear(AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset, interval=3) \
+            if not self.__dict__.get('_restart_resume_guard', False) \
+                    and self.appear(AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset, interval=3) \
                     and self.appear_then_click(AUTO_SEARCH_MAP_OPTION_ON):
                 continue
             if self.handle_combat_low_emotion():
@@ -164,6 +220,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         """
         logger.info('Auto search moving')
         self.device.stuck_record_clear()
+        # 清空上一流程残留的 OFF 确认，确保本流程内重新积累
+        self._auto_search_off_frame = None
         checked_fleet = False
         checked_oil = False
         checked_coin = False
@@ -218,6 +276,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         logger.info('Auto search combat loading')
         self.device.stuck_record_clear()
         self.device.click_record_clear()
+        # 清空上一流程残留的 OFF 确认，确保本流程内重新积累
+        self._auto_search_off_frame = None
         self.device.screenshot_interval_set('combat')
         for _ in self.loop():
 
@@ -237,6 +297,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                 break
 
         logger.info('Auto Search combat execute')
+        self._restart_resume_guard = False
         self.submarine_call_reset()
         submarine_mode = 'do_not_use'
         if self.config.Submarine_Fleet:
@@ -299,6 +360,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         logger.info('Auto Search combat status')
         self.device.stuck_record_clear()
         self.device.click_record_clear()
+        # 清空上一流程残留的 OFF 确认，确保本流程内重新积累
+        self._auto_search_off_frame = None
         exp_info = False  # This is for the white screen bug in game
 
         for _ in self.loop():

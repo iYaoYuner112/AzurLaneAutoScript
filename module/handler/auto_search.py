@@ -170,6 +170,8 @@ class AutoSearchHandler(EnemySearchingHandler):
     _auto_search_offset = (5, 5)
     # Move 213px left when MULTIPLE_SORTIE appears
     _auto_search_menu_offset = (250, 30)
+    # 上一次确认到 OFF 时的截图，用于要求两次确认来自不同的截图
+    _auto_search_off_frame = None
 
     def is_auto_search_running(self):
         """
@@ -183,14 +185,25 @@ class AutoSearchHandler(EnemySearchingHandler):
         """
         Ensure auto search option in map is ON
 
+        The game opens a short window after a battle result where clicking the
+        switch flips the icon but the fleet never receives the move order. Require
+        two OFF confirmations from different screenshots before clicking, so the
+        UI state replaces a fixed sleep.
+
         Returns:
             bool: If clicked
         """
-        if self.appear(AUTO_SEARCH_MAP_OPTION_OFF, offset=self._auto_search_offset) \
-                and self.appear_then_click(AUTO_SEARCH_MAP_OPTION_OFF, interval=2):
-            return True
-
-        return False
+        if not self.match_template_color(AUTO_SEARCH_MAP_OPTION_OFF,
+                                         offset=self._auto_search_offset, threshold=30):
+            self._auto_search_off_frame = None
+            return False
+        if self._auto_search_off_frame is None:
+            self._auto_search_off_frame = self.device.image
+            return False
+        if self._auto_search_off_frame is self.device.image:
+            return False
+        self._auto_search_off_frame = None
+        return self.appear_then_click(AUTO_SEARCH_MAP_OPTION_OFF, interval=2)
 
     def is_in_auto_search_menu(self):
         """

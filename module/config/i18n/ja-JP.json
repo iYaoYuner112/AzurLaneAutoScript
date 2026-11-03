@@ -554,6 +554,10 @@
       "True": "有効",
       "False": "無効"
     },
+    "TaskRestartLimit": {
+      "name": "同一タスクの連続再起動上限",
+      "help": "同じタスクの連続エラーによる復旧がこの回数に達すると、サーバーの翌日0時まで延期し、エラー通知設定で通知します。そのタスクの成功で回数をリセットします。他のタスクやゲーム再起動の成功ではリセットしません。0 = 無制限。"
+    },
     "ScreenshotLength": {
       "name": "Error.ScreenshotLength.name",
       "help": "Error.ScreenshotLength.help"
@@ -908,6 +912,10 @@
     "UseAutoSearch": {
       "name": "Campaign.UseAutoSearch.name",
       "help": "Campaign.UseAutoSearch.help"
+    },
+    "ContinueAfterRestart": {
+      "name": "再起動後に戦闘を継続",
+      "help": "メイン・イベント海域の任務で利用可能。イベント日課、SP、緊急委託、燃料3周回を含み、既定はオフです。周回モードと自動攻略が必要です。異常再起動後に元の海域マップへ戻ったら自動攻略を有効にし、以後の各戦闘で通常どおりコンディションを計算します。再起動前の戦闘やリザルトは引き継ぎません。マップ情報は同じスケジューラープロセス内のみ保持し、設定変更や復旧上限到達時は従来の処理に戻ります。"
     },
     "Use2xBook": {
       "name": "Campaign.Use2xBook.name",
