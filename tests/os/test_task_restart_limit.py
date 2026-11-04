@@ -160,5 +160,40 @@ class StaticIntegrationTest(unittest.TestCase):
         self.assertIn('Error_TaskRestartLimit', gen)
 
 
+class EnvironmentRestartTest(unittest.TestCase):
+    def make_runner(self, error):
+        script = object.__new__(AzurLaneAutoScript)
+        script.config = SimpleNamespace(task_call=Mock())
+        script._notify_recoverable = Mock()
+
+        def boom():
+            raise error
+
+        script.boom = boom
+        return script
+
+    def test_environment_errors_do_not_consume_restart_budget(self):
+        script = make_script()
+        self.assertFalse(script._should_count_task_restart('recoverable', True))
+        self.assertTrue(script._should_count_task_restart('recoverable', False))
+        self.assertTrue(script._should_count_task_restart(True, True))
+
+    def test_game_not_running_marks_environment_error(self):
+        from module.exception import GameNotRunningError
+
+        script = self.make_runner(GameNotRunningError('game died'))
+        assert script.run('boom', skip_first_screenshot=True) == 'recoverable'
+        assert script._recoverable_environment_error is True
+        script.config.task_call.assert_called_once_with('Restart')
+
+    def test_emulator_offline_marks_environment_error(self):
+        from module.exception import EmulatorNotRunningError
+
+        script = self.make_runner(EmulatorNotRunningError('adb offline'))
+        assert script.run('boom', skip_first_screenshot=True) == 'recoverable'
+        assert script._recoverable_environment_error is True
+        script.config.task_call.assert_called_once_with('Restart')
+
+
 if __name__ == '__main__':
     unittest.main()

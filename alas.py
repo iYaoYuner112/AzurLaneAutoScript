@@ -73,6 +73,7 @@ class AzurLaneAutoScript:
 
     def run(self, command, skip_first_screenshot=False):
         from module.campaign.recovery import campaign_recovery_scope
+        self._recoverable_environment_error = False
         recovery = self.__dict__.get('_campaign_recovery')
         if recovery is not None and inflection.underscore(command) not in (
                 'restart', inflection.underscore(recovery.runner.config.task.command)):
@@ -101,11 +102,13 @@ class AzurLaneAutoScript:
                 logger.warning(e)
                 self._notify_recoverable('模拟器/设备连接断开，已安排重启游戏')
                 self.config.task_call('Restart')
+                self._recoverable_environment_error = True
                 return 'recoverable'
             except GameNotRunningError as e:
                 logger.warning(e)
                 self._notify_recoverable('游戏未运行，已安排重启游戏')
                 self.config.task_call('Restart')
+                self._recoverable_environment_error = True
                 return 'recoverable'
             except (GameStuckError, GameTooManyClickError) as e:
                 logger.error(e)
@@ -258,6 +261,10 @@ class AzurLaneAutoScript:
         if recovery is not None:
             recovery.ready = True
             logger.info('[战役续接] 异常 Restart 已完成，等待原任务接管')
+
+    def _should_count_task_restart(self, success, environment_error):
+        """Environment recoveries must not consume the business task's restart budget."""
+        return not (success == 'recoverable' and environment_error)
 
     def _record_task_restart(self, task, success):
         """同一任务连续恢复达到上限后，延后到服务器次日零点并推送提醒。
@@ -781,6 +788,8 @@ class AzurLaneAutoScript:
             self.device.click_record_clear()
             logger.hr(task, level=0)
             success = self.run(inflection.underscore(task))
+            environment_error = getattr(self, '_recoverable_environment_error', False)
+            self._recoverable_environment_error = False
             logger.info(f'Scheduler: End task `{task}`')
             self.is_first_task = False
 
@@ -810,7 +819,13 @@ class AzurLaneAutoScript:
                 exit(1)
 
             # 连续恢复达到上限：延后到次日零点并推送，进程不退出（对齐 AzurPilot）。
-            deferred = self._record_task_restart(task, success)
+            # 游戏未运行/设备离线属于运行环境问题，不占用业务任务的重启额度。
+            if not self._should_count_task_restart(success, environment_error):
+                logger.info(f'Task `{task}` hit an environment recoverable error, '
+                            f'not counted against the restart limit')
+                deferred = False
+            else:
+                deferred = self._record_task_restart(task, success)
             if deferred:
                 del_cached_property(self, 'config')
                 continue
