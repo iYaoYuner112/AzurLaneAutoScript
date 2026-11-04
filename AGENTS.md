@@ -35,16 +35,10 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 3. origin URL 带凭据：不要打印 `git remote -v`，不要外发报错堆栈或截图。
 4. 不做破坏性 git 操作（force push、reset --hard、删除未提交文件）除非用户明确要求。
 
-## 已定决策（用户改口才更新）
+## 已定决策与踩坑
 
-- 相机、明石、事件收尾已对齐 AP 当前版；不要再搬 AP 已回档的旧加固。
-- 固定巡逻“问号不可达”标志被 L0 覆盖：AP 同构，用户明确不改。
-- `exit(1)` 连续失败停机：保持现状（2026-11-04）。只针对 `failure_record` 的
-  **非可恢复**失败（如页面不识别）；可恢复错误走 `Error_TaskRestartLimit` 冷却延后，不走这条。
-- 未搬 AP-only：智能开荒、OpsiExploreCleanup、模拟器重启/watchdog、茗交所重构、多来源补币。
-- 刻意偏差：剧情点击 0.8 秒、委托延期只存内存、黄币默认 20000/60000、B 站登录记录弹窗未搬、
-  环境错误（游戏未运行/模拟器掉线）不计连续恢复额度（AP 只计已完成的模拟器重启，环境错误同样不计；完整模拟器重启体系未搬）。
-- 判定类改动不要只加防线就删原方案；用户拿实跑反驳时先找状态差异。
+动手前先读 `doc/decisions-and-pitfalls.txt`：已定决策、刻意偏差和踩过的坑都在那里。
+本文件只保留稳定规则和入口；新决策或新坑追加到该文件，不要扩这里。
 
 ## 合并官方上游
 
@@ -64,8 +58,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 
 - 批量回退用 `git revert --no-commit <提交>...`，完成后必须
   `git diff <回退目标提交> --stat` 为空才算完成。
-- 恢复此前回退的内容后，必须 `git diff <当时的提交> HEAD --stat` 逐文件核对忠实度
-  （2026-11-04 恢复续战时靠它抓出丢失的关卡循环 `break` 与 2 倍书心情同步）。
+- 恢复此前回退的内容后，必须 `git diff <当时的提交> HEAD --stat` 逐文件核对忠实度。
 - 回退/恢复后跑全量 tests/os，基线数字按当次输出更新。
 
 ## 搬 AP
@@ -135,7 +128,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 ## 维护
 
 - 不要每次提交都改本文件。
-- 只有规则或用户决策变化才更新，并写日期。
+- 只有规则变化才更新本文件；决策和新坑写 `doc/decisions-and-pitfalls.txt`，并写日期。
 - 当前状态用命令查：git log、HEAD..upstream/master、AP master/dev、测试输出。
 - 汇报用中文、结论先行；审计逐项讲作用/适用性，再问做不做。
 - 交付时列出：改动文件清单、测试结果、需要用户实机验证的点（静态测试覆盖不到的）。
