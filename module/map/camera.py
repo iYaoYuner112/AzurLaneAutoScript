@@ -5,7 +5,7 @@ import numpy as np
 from module.base.timer import Timer
 from module.base.utils import area_offset
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_1_RYZA
-from module.exception import CampaignEnd, GameNotRunningError, GameStuckError, MapDetectionError
+from module.exception import CampaignEnd, GameNotRunningError, MapDetectionError
 from module.handler.assets import AUTO_SEARCH_MENU_CONTINUE, GAME_TIPS, GET_MISSION
 from module.logger import logger
 from module.map.assets import MAP_PREPARATION, MAP_PREPARATION_HARD
@@ -28,9 +28,6 @@ class Camera(MapOperation):
     grid_class = Grid
     _prev_view = None
     _prev_swipe = None
-    _camera_confirm_swipe = False
-    _last_swipe_observed = None
-    _last_swipe_confirmed = False
 
     def _map_swipe(self, vector, box=(123, 159, 1175, 628)):
         """
@@ -81,17 +78,11 @@ class Camera(MapOperation):
             bool: if camera moved.
         """
         logger.info('Map swipe: %s' % str(vector))
-        self._last_swipe_observed = None
-        self._last_swipe_confirmed = False
         self._prev_view = copy.copy(self.view)
         self._prev_swipe = vector
         vector = np.array(vector)
         vector = np.array([0.5, 0.5]) - self.view.center_offset + vector
-        swiped = self._map_swipe(vector)
-        if not swiped:
-            self._prev_view = None
-            self._prev_swipe = None
-        return swiped
+        return self._map_swipe(vector)
 
     def focus_to_grid_center(self, tolerance=None):
         """
@@ -203,6 +194,10 @@ class Camera(MapOperation):
                 logger.warning('Perspective error caused by game tips')
                 self.device.click(GAME_TIPS)
                 return False
+            elif self.handle_popup_confirm('NETWORK'):
+                # Network / generic popup blocks the map and causes perspective errors.
+                logger.warning('Perspective error caused by network popup')
+                return False
             elif 'Camera outside map' in str(e):
                 string = str(e)
                 logger.warning(string)
@@ -218,27 +213,16 @@ class Camera(MapOperation):
         return True
 
     def _update_view_data(self):
-        previous_camera = self.camera
-        requested = self._prev_swipe
-        if self._prev_view is not None:
-            swipe = None
-            if self.config.MAP_SWIPE_PREDICT or self._camera_confirm_swipe:
+        if self._prev_view is not None and np.linalg.norm(self._prev_swipe) > 0:
+            if self.config.MAP_SWIPE_PREDICT:
                 swipe = self._prev_view.predict_swipe(
                     self.view,
                     with_current_fleet=self.config.MAP_SWIPE_PREDICT_WITH_CURRENT_FLEET,
                     with_sea_grids=self.config.MAP_SWIPE_PREDICT_WITH_SEA_GRIDS
                 )
-                if swipe is None and self._camera_confirm_swipe and not self.config.MAP_SWIPE_PREDICT_WITH_SEA_GRIDS:
-                    # The fleet left the view; match sea grids to confirm the move.
-                    swipe = self._prev_view.predict_swipe(
-                        self.view, with_current_fleet=False, with_sea_grids=True
-                    )
-            self._last_swipe_observed = swipe
-            if swipe is not None:
-                self._last_swipe_confirmed = True
-                self.camera = tuple(np.add(self.camera, swipe))
-            elif not self._camera_confirm_swipe:
-                self.camera = tuple(np.add(self.camera, requested))
+                if swipe is not None:
+                    self._prev_swipe = swipe
+            self.camera = tuple(np.add(self.camera, self._prev_swipe))
             self._prev_view = None
             self._prev_swipe = None
             self.show_camera()
@@ -261,15 +245,6 @@ class Camera(MapOperation):
             logger.attr_align('camera_corrected', f'{location2node(self.camera)} -> {location2node((x, y))}')
         self.camera = (x, y)
         self.show_camera()
-
-        if requested is not None:
-            # Visible edges give absolute coordinates; only count axes with image evidence.
-            edges = (self.view.left_edge or self.view.right_edge,
-                     self.view.upper_edge or self.view.lower_edge)
-            if any(requested) and all(value == 0 or edge for value, edge in zip(requested, edges)):
-                self._last_swipe_confirmed = True
-            if self._last_swipe_confirmed and self.camera != previous_camera:
-                self.device.click_record_clear()
 
         self.predict()
         return True
@@ -308,6 +283,8 @@ class Camera(MapOperation):
 
         def is_still_prev():
             # Still the same as prev view
+            if prev_center_offset is None:
+                return False
             return np.linalg.norm(self.view.center_offset - prev_center_offset) < 0.001
 
         while 1:
@@ -380,29 +357,49 @@ class Camera(MapOperation):
         Returns:
             list[tuple]: Swipe record.
         """
-        logger.info('Ensure edge in sight.')
+        logger.info(f'Ensure edge in sight.')
         record = []
         x_swipe, y_swipe = np.multiply(swipe_limit, random_direction(self.config.MAP_ENSURE_EDGE_INSIGHT_CORNER))
 
-        if not skip_first_update:
-            self.update()
-        if preset is not None:
-            self.map_swipe(preset)
-            record.append(preset)
-        for _ in range(12):
+        while 1:
+            if len(record) == 0:
+                if not skip_first_update:
+                    self.update()
+                if preset is not None:
+                    self.map_swipe(preset)
+                    record.append(preset)
+
             x = 0 if self.view.left_edge or self.view.right_edge else x_swipe
             y = 0 if self.view.lower_edge or self.view.upper_edge else y_swipe
+
+            if len(record) > 0:
+                # Swipe even if two edges insight, this will avoid some embarrassing camera position.
+                prev_homo = getattr(self.view.backend, 'homo_loca', None)
+                self.map_swipe((x, y))
+                cur_homo = getattr(self.view.backend, 'homo_loca', None)
+                if prev_homo is not None and cur_homo is not None:
+                    delta = np.subtract(cur_homo, prev_homo)
+                    base = self.view.swipe_base
+                    # A swipe that moves the map by less than half a grid means the map is
+                    # smaller than the view or already at its edge, so the game stops
+                    # scrolling. Stop that axis and take back the dead-reckoned camera move,
+                    # otherwise the camera position diverges and the pan never ends
+                    # (AzurPilot 9c0a086a3).
+                    if x != 0 and abs(delta[0]) < base[0] / 2:
+                        logger.info('Map no longer scrolls horizontally, assume the edge is in reach')
+                        x_swipe = 0
+                        if not (self.view.left_edge or self.view.right_edge):
+                            self.camera = (self.camera[0] - x, self.camera[1])
+                    if y != 0 and abs(delta[1]) < base[1] / 2:
+                        logger.info('Map no longer scrolls vertically, assume the edge is in reach')
+                        y_swipe = 0
+                        if not (self.view.upper_edge or self.view.lower_edge):
+                            self.camera = (self.camera[0], self.camera[1] - y)
+
+            record.append((x, y))
+
             if x == 0 and y == 0:
                 break
-            # homo_loca is a modulo offset inside a grid, so a full-grid swipe may
-            # leave it unchanged. It cannot be used to detect map edges.
-            self.map_swipe((x, y))
-            record.append((x, y))
-        if not (self.view.left_edge or self.view.right_edge) \
-                or not (self.view.lower_edge or self.view.upper_edge):
-            reason = f'Edge relocation failed: camera={location2node(self.camera)}, swipes={len(record)}'
-            logger.warning(f'[Camera] {reason}')
-            raise GameStuckError(reason)
 
         if reverse:
             logger.info('Reverse swipes.')
@@ -414,87 +411,22 @@ class Camera(MapOperation):
         return record
 
     def focus_to(self, location, swipe_limit=(4, 3)):
-        """Focus camera on a grid.
+        """Focus camera on a grid
 
         Args:
             location: grid
             swipe_limit(tuple): (x, y). Limit swipe in (-x, -y, x, y).
-
-        Raises:
-            GameStuckError: no confirmed progress, oscillation or unreachable target,
-                even after one edge relocation.
         """
         location = location_ensure(location)
         logger.info('Focus to: %s' % location2node(location))
 
-        tracking = self._camera_confirm_swipe
-        self._camera_confirm_swipe = True
-        recovery = 0
-        attempts = 0
-        best_distance = np.sum(np.abs(np.subtract(location, self.camera)))
-        no_progress = 0
-        positions = [self.camera]
-        try:
-            for _ in range(40):
-                attempts += 1
-                before = self.camera
-                offset_before = np.linalg.norm(self.view.center_offset - 0.5)
-                vector = np.array(location) - before
-                swipe = tuple(np.min([np.abs(vector), swipe_limit], axis=0) * np.sign(vector))
-                reason = None
-                try:
-                    has_swiped = self.map_swipe(swipe)
-                except MapDetectionError as error:
-                    reason = f'Map detection failed after swipe: {error}'
-                else:
-                    distance = np.sum(np.abs(np.subtract(location, self.camera)))
-                    centered = np.all(np.abs(self.view.center_offset - 0.5) <= self.config.MAP_SWIPE_DROP)
-                    if distance == 0 and centered and (not has_swiped or self._last_swipe_confirmed):
-                        logger.attr('Focus done', f'{location2node(self.camera)}, attempts={attempts}, recovery={recovery}')
-                        return
+        while 1:
+            vector = np.array(location) - self.camera
+            swipe = tuple(np.min([np.abs(vector), swipe_limit], axis=0) * np.sign(vector))
+            has_swiped = self.map_swipe(swipe)
 
-                    offset_progress = distance == 0 and \
-                        np.linalg.norm(self.view.center_offset - 0.5) < offset_before - 0.01
-                    if self._last_swipe_confirmed and (distance < best_distance or offset_progress):
-                        best_distance = distance
-                        no_progress = 0
-                    else:
-                        no_progress += 1
-                    positions.append(self.camera)
-                    logger.debug(
-                        f'[Camera] focus: {location2node(before)} -> {location2node(self.camera)}, '
-                        f'target={location2node(location)}, observed={self._last_swipe_observed}, '
-                        f'confirmed={self._last_swipe_confirmed}, distance={distance}, stalled={no_progress}'
-                    )
-                    if len(positions) >= 5 and positions[-1] == positions[-3] == positions[-5] \
-                            and positions[-1] != positions[-2]:
-                        reason = 'Camera position oscillates'
-                    elif no_progress >= 3:
-                        reason = 'No confirmed progress in three attempts'
-                if reason is None and attempts >= 20:
-                    reason = 'Exceeded focus attempt budget'
-                if reason is None:
-                    continue
-                failure = (f'{reason}: camera={location2node(self.camera)}, target={location2node(location)}, '
-                           f'observed={self._last_swipe_observed}, confirmed={self._last_swipe_confirmed}, '
-                           f'attempts={attempts}, recovery={recovery}')
-                logger.warning(f'[Camera] {failure}')
-                self._prev_view = None
-                self._prev_swipe = None
-                if recovery:
-                    raise GameStuckError(failure)
-                logger.info('[Camera] Relocate by map edges')
-                try:
-                    self.ensure_edge_insight(skip_first_update=False)
-                except (MapDetectionError, GameStuckError) as error:
-                    raise GameStuckError(f'{failure}; relocation failed: {error}') from error
-                recovery += 1
-                attempts = no_progress = 0
-                best_distance = np.sum(np.abs(np.subtract(location, self.camera)))
-                positions = [self.camera]
-            raise GameStuckError('Focus attempts exhausted')
-        finally:
-            self._camera_confirm_swipe = tracking
+            if not has_swiped:
+                break
 
     def full_scan(self, queue=None, must_scan=None, battle_count=0, mystery_count=0, siren_count=0, carrier_count=0,
                   mode='normal'):
