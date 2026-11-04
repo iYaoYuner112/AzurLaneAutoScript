@@ -288,7 +288,7 @@ class OpsiDaily(OSMap):
                     continue
             self.fleet_set(self.config.OpsiFleet_Fleet)
             self.os_order_execute(
-                recon_scan=False,
+                recon_scan=result != 'pinned_at_archive_zone' and self._os_daily_needs_recon_scan(),
                 submarine_call=self.config.OpsiFleet_Submarine and result != 'pinned_at_archive_zone')
             if keep_mission_zone and not self.zone.is_port:
                 interrupt = [self.daily_interrupt_check, self.is_meowfficer_searching]
