@@ -538,7 +538,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
         Args:
             repair (bool): call handle_fleet_repair after restart
         """
-        if not self.appear(MAP_GOTO_GLOBE_FOG):
+        # The globe button shifts left in port and is brighter under the fog.
+        if not self.match_template_color(MAP_GOTO_GLOBE_FOG, offset=(200, 5), threshold=40):
             return False
 
         logger.warning(f'Triggered stuck fog status, restarting '
