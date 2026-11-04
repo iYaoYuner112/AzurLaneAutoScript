@@ -975,7 +975,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 # device / tower walks since 2026-03-14): 1.5s called the walk "nothing met"
                 # while the event was still coming, so the click was lost.
                 result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4),
+                    allow_event_finish=True)
             if 'akashi' in result:
                 self._solved_map_event.add('is_akashi')
                 return True
@@ -1714,7 +1715,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4),
+                    allow_event_finish=True)
             if 'akashi' in result:
                 return True
             if self._close_fleet_bar_if_open():
@@ -2161,7 +2163,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False, STORY_OPTION=1):
                 result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4),
+                    allow_event_finish=True)
             if 'event' in result:
                 self._solved_map_event.add('is_exploration_container')
                 return True
@@ -2173,7 +2176,9 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             grid = grids[0]
             logger.info(f'Found exploration reward on {grid}')
             self.device.click(grid)
-            result = self.wait_until_walk_stable(drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+            result = self.wait_until_walk_stable(
+                drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4),
+                allow_event_finish=True)
             if 'event' in result:
                 self._solved_map_event.add('is_exploration_reward')
                 return True
@@ -2196,6 +2201,7 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                         confirm_timer=Timer(walk_time, count=4),
                         drop=drop,
                         walk_out_of_step=False,
+                        allow_event_finish=True,
                     )
                 if 'akashi' in result:
                     self._solved_map_event.add('is_akashi')
@@ -2260,7 +2266,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 # 3s like AzurPilot (wess09 2026-03-14, "使用吊机有时漏点击"): the 1.5s
                 # window gave up before the dialog arrived, and the click was lost.
                 self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4),
+                    allow_event_finish=True)
             # Not `'event' in result`: an enemy, a container or a pillar met on the way also
             # answers 'event', and then the search rounds below would run on a device that was
             # never used. AzurPilot judges by the same flag (map_rescan_current / its
@@ -2318,7 +2325,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 # 3s like AzurPilot (same 漏点击 fix as the device walk above).
                 result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4))
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4),
+                    allow_event_finish=True)
             if 'event' in result:
                 self._solved_map_event.add('is_logging_tower')
                 self._set_device_state(DEVICE_COMPLETED)

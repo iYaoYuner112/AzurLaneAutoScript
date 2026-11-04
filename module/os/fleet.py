@@ -21,7 +21,9 @@ from module.os.camera import OSCamera
 from module.os.map_base import OSCampaignMap
 from module.os_ash.ash import OSAsh
 from module.os_combat.combat import Combat, BATTLE_PREPARATION, SIREN_PREPARATION
-from module.os_handler.assets import AUTO_SEARCH_REWARD, CLICK_SAFE_AREA, IN_MAP, PORT_ENTER
+from module.os_handler.assets import (
+    AUTO_SEARCH_REWARD, CLICK_SAFE_AREA, IN_MAP, PORT_ENTER, STRATEGIC_SEARCH_MAP_OPTION_OFF
+)
 from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
 
@@ -251,7 +253,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
         logger.info('Camera stabled')
 
-    def wait_until_walk_stable(self, confirm_timer=None, skip_first_screenshot=False, walk_out_of_step=True, drop=None):
+    def wait_until_walk_stable(self, confirm_timer=None, skip_first_screenshot=False, walk_out_of_step=True,
+                               drop=None, *, allow_event_finish=False):
         """
         Wait until homo_loca stabled.
         DETECTION_BACKEND must be 'homography'.
@@ -262,6 +265,9 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             walk_out_of_step (bool): If catch walk_out_of_step error.
                 Default to True, use False in abyssal zones.
             drop (DropImage):
+            allow_event_finish (bool): Event search may return right after the event
+                finished, without waiting for camera stability. Off for positioning
+                and recovery walks.
 
         Returns：
             str: Things that fleet met on its way,
@@ -287,6 +293,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         fast_farming = getattr(getattr(self.config, 'task', None), 'command', None) in (
             'OpsiHazard1Leveling', 'OpsiMeowfficerFarming',
         )
+        completed_event = False
+        finish_without_stability = False
         siren_confirmed = bool(getattr(self, 'is_siren_device_confirmed', False))
         stuck_timer = Timer(20, count=5).start()
         confirm_timer.reset()
@@ -305,6 +313,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 stuck_timer.reset()
                 result.add('event')
                 if event == 'story_skip':
+                    # 领奖后仍可能出现下一组选项；旧完成标记不能越过新的剧情。
+                    completed_event = False
                     clicked_story = True
                     confirmed = bool(getattr(self, 'is_siren_device_confirmed', False))
                     if fast_farming and confirmed and not siren_confirmed \
@@ -314,6 +324,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                         record = None
                     siren_confirmed = confirmed
                 elif event == 'map_get_items':
+                    completed_event = True
                     # story_skip -> map_get_items means abyssal progress reward is received
                     if clicked_story:
                         logger.info('Got items from story')
@@ -324,6 +335,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                             confirm_timer = Timer(0.8, count=2).start()
                             record = None
                 else:
+                    if event == 'map_archives':
+                        completed_event = True
                     # Handled other events, clear history
                     clicked_story = False
                 continue
@@ -332,11 +345,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 stuck_timer.reset()
                 continue
             if self.handle_walk_out_of_step():
+                completed_event = False
                 if walk_out_of_step:
                     raise MapWalkError('walk_out_of_step')
                 else:
                     continue
             if self.handle_popup_confirm('WALK_UNTIL_STABLE'):
+                completed_event = False
                 # Confirm to submit items, in siren scanning devices
                 confirm_timer.reset()
                 stuck_timer.reset()
@@ -344,16 +359,19 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
             # Accident click
             if self.is_in_globe():
+                completed_event = False
                 self.os_globe_goto_map()
                 confirm_timer.reset()
                 stuck_timer.reset()
                 continue
             if self.is_in_storage():
+                completed_event = False
                 self.storage_quit()
                 confirm_timer.reset()
                 stuck_timer.reset()
                 continue
             if self.is_in_os_mission():
+                completed_event = False
                 self.os_mission_quit()
                 confirm_timer.reset()
                 stuck_timer.reset()
@@ -363,6 +381,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 stuck_timer.reset()
                 continue
             if self.is_in_map_order():
+                completed_event = False
                 self.order_quit()
                 confirm_timer.reset()
                 stuck_timer.reset()
@@ -373,6 +392,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 # Use ui_back() for testing, because there are too few abyssal loggers every month.
                 # self.ui_back(check_button=self.is_in_map)
                 self.combat(expected_end=abyssal_expected_end, fleet_index=self.fleet_show_index, save_get_items=drop)
+                completed_event = True
                 confirm_timer.reset()
                 stuck_timer.reset()
                 result.add('event')
@@ -382,6 +402,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
                 self.interval_clear(PORT_SUPPLY_CHECK)
                 self.handle_akashi_supply_buy(CLICK_SAFE_AREA)
+                completed_event = True
                 if fast_farming:
                     # 商店退出已确认返回地图，原先按路程计算的到达时间不再适用。
                     confirm_timer = Timer(0.8, count=2).start()
@@ -416,6 +437,12 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 if self.is_in_map():
                     self.enemy_searching_color_initial()
 
+            # 只在最终领奖/商店退出之后的新画面直接收尾；选项提交、普通移动和恢复仍等定位。
+            if (fast_farming and allow_event_finish and completed_event and self.is_in_map()
+                    and self.match_template_color(STRATEGIC_SEARCH_MAP_OPTION_OFF, offset=(20, 20))):
+                finish_without_stability = True
+                break
+
             # Arrive
             # Check colors, because screen goes black when something is unlocking.
             # A direct use of IN_MAP, basically `self.is_in_map() and IN_MAP.match_template_color()`
@@ -439,7 +466,10 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 stuck_timer.reset()
 
         result = '_'.join(result)
-        logger.info(f'Walk stabled, result: {result}')
+        if finish_without_stability:
+            logger.info(f'Event finished and auto search entry confirmed, skip stability wait, result: {result}')
+        else:
+            logger.info(f'Walk stabled, result: {result}')
         self.device.screenshot_interval_set()
         return result
 
