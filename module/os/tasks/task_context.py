@@ -30,6 +30,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 
 from module.config.config import Function
+from module.config.utils import get_server_next_update
 from module.logger import logger
 
 __all__ = [
@@ -47,6 +48,8 @@ __all__ = [
     'mark_opsi_no_content',
     'pop_opsi_no_content',
     'opsi_no_content',
+    'task_zone_locked_until',
+    'delay_task_for_locked_zone',
     'opsi_task_context',
 ]
 
@@ -228,6 +231,26 @@ def pop_opsi_no_content(config) -> t.Optional[str]:
     task_name = getattr(config, '_opsi_no_content_task', None)
     config._opsi_no_content_task = None
     return task_name
+
+
+def task_zone_locked_until(config, task):
+    """Return today's locked-zone delay deadline for ``task``, if any."""
+    until = get_server_next_update('00:00')
+    key = f'{task}.Storage.Storage.ZoneLockedUntil'
+    if config.cross_get(key, default=None) == until.isoformat():
+        return until
+    return None
+
+
+def delay_task_for_locked_zone(config):
+    """Delay the current task to the next daily reset after a locked zone."""
+    task = config.task.command
+    until = get_server_next_update('00:00')
+    with config.multi_set():
+        config.cross_set(f'{task}.Storage.Storage.ZoneLockedUntil', until.isoformat())
+        config.task_delay(target=until)
+    logger.warning(f'[大世界] {task}: 周边海域未压制，延期到 {until}')
+    config.task_stop()
 
 
 def opsi_no_content(config, task_name, reason='', *, server_update=True, minute=None):

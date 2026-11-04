@@ -18,6 +18,10 @@ class OSExploreError(Exception):
     pass
 
 
+class OSZoneLockedError(OSExploreError):
+    """The zone is locked because neighbouring zones are not suppressed yet."""
+
+
 class RewardUncollectedError(Exception):
     pass
 
@@ -390,7 +394,7 @@ class GlobeOperation(ActionPointHandler):
             if self.is_zone_pinned():
                 if self.appear(ZONE_LOCKED, offset=(20, 20)):
                     logger.warning(f'Zone {zone} locked, neighbouring zones may not have been explored')
-                    raise OSExploreError
+                    raise OSZoneLockedError(f'周边海域未压制: {zone}')
                 if click_count > 5:
                     logger.warning(f'Unable to enter zone {zone}, neighbouring zones may not have been explored')
                     raise OSExploreError

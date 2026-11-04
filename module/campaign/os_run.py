@@ -1,8 +1,10 @@
 from module.config.utils import get_os_reset_remain
 from module.logger import logger
 from module.os.config import OSConfig
+from module.os.globe_operation import OSZoneLockedError
 from module.os.map_operation import OSMapOperation
 from module.os.operation_siren import OperationSiren
+from module.os.tasks.task_context import delay_task_for_locked_zone
 from module.os_handler.action_point import ActionPointLimit
 
 
@@ -26,6 +28,8 @@ class OSCampaignRun(OSMapOperation):
             campaign.os_shop()
         except ActionPointLimit:
             self.config.opsi_task_delay(ap_limit=True)
+        except OSZoneLockedError:
+            delay_task_for_locked_zone(self.config)
 
     def opsi_voucher(self):
         try:
@@ -40,6 +44,8 @@ class OSCampaignRun(OSMapOperation):
             campaign.os_daily()
         except ActionPointLimit:
             self.config.opsi_task_delay(ap_limit=True)
+        except OSZoneLockedError:
+            delay_task_for_locked_zone(self.config)
 
     def opsi_scheduling(self):
         # 必须在 load_campaign() 前拦截，否则 os_init() 会执行首次自律寻敌。
@@ -62,11 +68,13 @@ class OSCampaignRun(OSMapOperation):
     def opsi_prevent_action_point_overflow(self):
         # 行动力不足时不再排自己：本任务只在快满时才值得跑，
         # 排回明天由任务自己的排期逻辑负责。
-        campaign = self.load_campaign()
         try:
+            campaign = self.load_campaign()
             campaign.os_prevent_action_point_overflow()
         except ActionPointLimit:
             self.config.task_delay(server_update=True)
+        except OSZoneLockedError:
+            delay_task_for_locked_zone(self.config)
 
     def opsi_meowfficer_farming(self):
         try:

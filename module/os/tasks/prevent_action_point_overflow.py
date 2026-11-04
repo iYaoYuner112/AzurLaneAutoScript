@@ -16,7 +16,11 @@ from dataclasses import replace
 from module.config.config import TaskEnd
 from module.logger import logger
 from module.os.tasks.scheduling import OpsiScheduling
-from module.os.tasks.task_context import OpsiStatus, prevent_overflow_context
+from module.os.tasks.task_context import (
+    OpsiStatus,
+    prevent_overflow_context,
+    task_zone_locked_until,
+)
 from module.os_handler.action_point import ActionPointLimit
 
 # 大世界行动力每 10 分钟自然回复 1 点。
@@ -124,7 +128,12 @@ class OpsiPreventActionPointOverflow(OpsiScheduling):
             f'[大世界-防止行动力溢出] 当前={current_ap} 上限={upper}，'
             f'{delay_minutes:.0f} 分钟后运行')
 
-        self.config.task_delay(minute=delay_minutes, task=TASK_NAME)
+        locked_until = task_zone_locked_until(self.config, TASK_NAME)
+        if locked_until is not None:
+            # 锁定提示造成的延期只在当天有效，行动力重排也不能提前它。
+            self.config.task_delay(target=locked_until, task=TASK_NAME)
+        else:
+            self.config.task_delay(minute=delay_minutes, task=TASK_NAME)
 
     # ------------------------------------------------------------ 执行
 
