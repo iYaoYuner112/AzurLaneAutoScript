@@ -208,13 +208,9 @@ class Combat(Combat_, MapEventHandler):
         return False
 
     def handle_auto_search_exp_info(self):
-        if self.appear_then_click(EXP_INFO_C):
-            self.device.sleep((0.25, 0.5))
-            return True
-        if self.appear_then_click(EXP_INFO_D):
-            self.device.sleep((0.25, 0.5))
-            return True
-
+        for button in (EXP_INFO_S, EXP_INFO_A, EXP_INFO_B, EXP_INFO_C, EXP_INFO_D):
+            if self.appear_then_click(button, interval=self.battle_status_click_interval):
+                return True
         return False
 
     def auto_search_combat(self, drop=None):
