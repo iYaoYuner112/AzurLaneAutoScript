@@ -1,6 +1,7 @@
 # AGENTS.md — ALAS fork 维护入口
 
 新会话先读。这里只放长期有效的规则和入口；当前状态、版本、测试数一律现场查。
+最后更新：2026-11-04。
 主要场景：B 站客户端（com.bilibili.azurlane）、GemsFarming 长期挂机、大世界调度；实例常在另一台机器。
 
 ## 开工
@@ -13,8 +14,8 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 ```
 
 - upstream = LmeSzinc/AzurLaneAutoScript，唯一官方上游。
-- AP 是另一套本地镜像，只做行为参照；路径用 `AZURPILOT_PATH`，没有就问用户，不要猜。
-  先确认版本再对照：
+- AP 是另一套本地镜像，只做行为参照；路径优先用环境变量 `AZURPILOT_PATH`，
+  没有就问用户，不要猜。先确认版本再对照：
   ```bash
   git -C "$AZURPILOT_PATH" fetch --all
   git -C "$AZURPILOT_PATH" log -1 --format="%h %ad %s" master
@@ -37,10 +38,11 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 
 - 相机、明石、事件收尾已对齐 AP 当前版；不要再搬 AP 已回档的旧加固。
 - 固定巡逻“问号不可达”标志被 L0 覆盖：AP 同构，用户明确不改。
-- `exit(1)` 连续失败停机：保持现状（2026-11-04）。
-- 环境错误（游戏未运行/模拟器掉线）不计任务重启额度；完整模拟器重启体系未搬。
+- `exit(1)` 连续失败停机：保持现状（2026-11-04）。只针对 `failure_record` 的
+  **非可恢复**失败（如页面不识别）；可恢复错误走 `Error_TaskRestartLimit` 冷却延后，不走这条。
 - 未搬 AP-only：智能开荒、OpsiExploreCleanup、模拟器重启/watchdog、茗交所重构、多来源补币。
-- 刻意偏差：剧情点击 0.8 秒、委托延期只存内存、黄币默认 20000/60000、B 站登录记录弹窗未搬。
+- 刻意偏差：剧情点击 0.8 秒、委托延期只存内存、黄币默认 20000/60000、B 站登录记录弹窗未搬、
+  环境错误（游戏未运行/模拟器掉线）不计连续恢复额度（AP 只计已完成的模拟器重启，环境错误同样不计；完整模拟器重启体系未搬）。
 - 判定类改动不要只加防线就删原方案；用户拿实跑反驳时先找状态差异。
 
 ## 合并官方上游
@@ -57,6 +59,14 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 4. 共享判断（is_in_map、经验页、关卡页确认）会横向影响老定制，必须实机验证港口/要塞雾天和 GemsFarming。
 5. 合并后跑全量测试；用户明确说“推送”后才推送。
 
+## 回退与恢复
+
+- 批量回退用 `git revert --no-commit <提交>...`，完成后必须
+  `git diff <回退目标提交> --stat` 为空才算完成。
+- 恢复此前回退的内容后，必须 `git diff <当时的提交> HEAD --stat` 逐文件核对忠实度
+  （2026-11-04 恢复续战时靠它抓出丢失的关卡循环 `break` 与 2 倍书心情同步）。
+- 回退/恢复后跑全量 tests/os，基线数字按当次输出更新。
+
 ## 搬 AP
 
 1. 以 AP 当前 master/dev 代码和调用链为准，不能只看旧提交 diff；旧结论会过期。
@@ -67,21 +77,40 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
    git -C "$AZURPILOT_PATH" log --all --oneline -S"<关键函数名或常量>"
    ```
    已被删掉的行为不要搬（相机、明石踩过）。
-3. 说“AP 没有 X”必须给当前分支函数名/行号；实现不同但效果相同时要写清差异。
-4. 只对齐效果，不要求目录/命名/配置位置一致。
-5. 适配本仓库：
+3. 涉及配置绑定、对象生命周期、跨任务状态的方案，**动笔前先实测三件事**（2026-11-04 轻量版
+   方案因此被否）：
+   - `bind()` 后该任务的 config 能读到哪些键（按任务分组绑定，Restart 读不到 Campaign 组）；
+   - 写入的键会不会被 `config_updater` 剪掉（它从空字典只遍历注册键，未登记即删）；
+   - 绕过某段初始化后，对象上还剩哪些属性（`self.map`、`map_is_auto_search` 之类都会缺）。
+4. 说“AP 没有 X”必须给当前分支函数名/行号；实现不同但效果相同时要写清差异。
+5. 只对齐效果，不要求目录/命名/配置位置一致。
+6. 适配本仓库：
    - 调度代理会换 `config.task`，注意任务上下文。
    - 续战保留原 `CampaignRun` / `CampaignBase` 对象，不能重建后跳过初始化。
    - TaskEnd 不是 ScriptEnd；容错放行 `UNSWALLOWABLE_ERRORS`（`module/os/map.py:57`）。
    - `cross_get` 的 default 只在缺键时生效，须等于生成默认；关闭显式存 false。
    - 配置生成器会删未登记 i18n；自用文案先登记。
-6. AP 删掉/回档的加固不要以“更稳”恢复；用户说“AP 是这样就不用改”就保持。
+7. AP 删掉/回档的加固不要以“更稳”恢复；用户说“AP 是这样就不用改”就保持。
+
+## 游戏交互代码约定
+
+- 游戏识别基于 1280×720 截图，资源和坐标都按这个分辨率。
+- 状态循环：截图→识别→操作；退出用 `appear()`，操作用 `appear_then_click()`，
+  点击 interval 一般 2~5 秒。
+- 不在状态循环里 sleep 猜界面、不嵌套状态循环；`handle_*` 返回 bool，
+  True 表示已操作、需要新截图。
+- 复用 `GameStuckError`、`GameTooManyClickError` 和上层恢复，不吞异常。
+- 页面跳转用现有 UI/Page；docstring 用 `Pages:` 标注进入/退出页面。
+- 改配置相关测试用临时配置目录，避免写用户 `config/alas.json`。
 
 ## 配置、运行与硬约束
 
 - 运行：`python alas.py`（调度器）、`python gui.py -p <端口>`（WebUI）。
 - 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录运行
   `python module/config/config_updater.py`，不要只手改 `config_generated.py`。
+  职责：`task.yaml` 任务/菜单，`argument.yaml` 参数/默认/校验，`default.yaml` 任务默认值，
+  `override.yaml` 强制覆盖，`gui.yaml` GUI 翻译键。配置路径是 `<Task>.<Group>.<Argument>`，
+  绑定后通过 `self.config.Group_Argument` 访问。
 - `config/*.json`、`log/` 是运行期数据，不提交；资产按 `assets/<server>/`，按钮图用 `dev_tools/button_extract.py`。
 - 不做任务外扩展；没有数据源就不显示，禁止伪造数据。
 - 改动最小、默认关闭或可回退，补离线测试，按主题分开提交。
@@ -104,4 +133,5 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 - 只有规则或用户决策变化才更新，并写日期。
 - 当前状态用命令查：git log、HEAD..upstream/master、AP master/dev、测试输出。
 - 汇报用中文、结论先行；审计逐项讲作用/适用性，再问做不做。
+- 交付时列出：改动文件清单、测试结果、需要用户实机验证的点（静态测试覆盖不到的）。
 - 本文件不替代用户当场任务说明。
