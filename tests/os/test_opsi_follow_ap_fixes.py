@@ -138,6 +138,9 @@ class DailyStub:
     _os_deferred_mission_zones = MissionHandler._os_deferred_mission_zones
     _os_defer_mission_zone = MissionHandler._os_defer_mission_zone
 
+    def _os_daily_needs_recon_scan(self):
+        return False
+
     def __init__(self, script, daily_task=True):
         self.script = list(script)
         self.daily_task = daily_task
@@ -248,6 +251,9 @@ class PortStuckStub:
     _os_deferred_mission_zones = MissionHandler._os_deferred_mission_zones
     _os_defer_mission_zone = MissionHandler._os_defer_mission_zone
     OS_DAILY_STUCK_PORT_RETRY = OpsiDaily.OS_DAILY_STUCK_PORT_RETRY
+
+    def _os_daily_needs_recon_scan(self):
+        return False
 
     def __init__(self, zone_ids, combat=0, is_port=True):
         self.zone_ids = list(zone_ids)
@@ -369,6 +375,7 @@ class MeowStub:
         self.stopped = False
         self.entered = None
         self.searched = 0
+        self.rescans = []
         self.config = SimpleNamespace(
             OpsiMeowfficerFarming_HazardLevel=4,
             OpsiFleet_Fleet=1,
@@ -395,6 +402,7 @@ class MeowStub:
 
     def run_auto_search(self, question=True, rescan=None, interrupt=None):
         self.searched += 1
+        self.rescans.append(rescan)
 
     def _meow_fixed_patrol_scan(self):
         pass
@@ -422,6 +430,8 @@ def test_normal_search_still_runs_with_zones_left():
     stub._meow_handle_normal_search()
     assert stub.entered is not None
     assert stub.searched == 1
+    # 自律结束后先全图重扫，画面里可见的明石/装置/记录塔才不会漏
+    assert stub.rescans == ['full']
     assert stub.delay == []
 
 

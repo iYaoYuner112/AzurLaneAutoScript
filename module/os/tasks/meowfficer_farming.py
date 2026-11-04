@@ -343,7 +343,7 @@ class OpsiMeowfficerFarming(OSMap):
         self.os_order_execute(
             recon_scan=False,
             submarine_call=self.config.OpsiFleet_Submarine)
-        self.run_auto_search()
+        self.run_auto_search(rescan='full')
         self._meow_fixed_patrol_scan()
         self.handle_after_auto_search()
         self.config.check_task_switch()
