@@ -146,6 +146,7 @@ class RescanStub(PendingEventStub, SirenRoundStub):
         self.states = []
         self.fleet_sets = []
         self.siren_device_mode = mode
+        self._mode = mode
         self.is_siren_device_confirmed = False
         self.config = _Config(research_enable=research_enable, has_key=has_key)
         self.device = SimpleNamespace(image=None, click=self._click, screenshot=lambda: None)
@@ -157,12 +158,16 @@ class RescanStub(PendingEventStub, SirenRoundStub):
     def _set_device_state(self, state):
         self.states.append(state)
 
+    def _close_fleet_bar_if_open(self):
+        return False
+
     def _goto_scanning_device_with_other_fleets(self, drop=None):
         return False
 
     def wait_until_walk_stable(self, **kwargs):
         # 真实现里剧情选项被认成装置剧情才置位（story_skip -> _identify_siren_device_option）
         self.is_siren_device_confirmed = True
+        self.siren_device_mode = self._mode
         return 'event'
 
     def os_auto_search_run(self, drop=None):
@@ -255,6 +260,9 @@ class ClearStub(PendingEventStub, SirenRoundStub):
 
     def _click(self, grid):
         self.clicks += 1
+
+    def _close_fleet_bar_if_open(self):
+        return False
 
     def handle_info_bar(self):
         pass

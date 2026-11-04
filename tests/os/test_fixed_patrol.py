@@ -394,6 +394,8 @@ class RecoveryStub:
         self._rotation_succeeds = rotation_succeeds
         self._meow = meow
         self.patrol_calls = 0
+        self.patrol_overrides = []
+        self._question_unreachable = False
 
     def _is_meowfficer_task(self):
         return self._meow
@@ -401,8 +403,9 @@ class RecoveryStub:
     def _goto_akashi_with_other_fleets(self, drop=None):
         return self._rotation_succeeds
 
-    def execute_fixed_patrol_scan(self):
+    def execute_fixed_patrol_scan(self, override=False):
         self.patrol_calls += 1
+        self.patrol_overrides.append(override)
 
     _mark_event_unreachable = OSMap._mark_event_unreachable
     _recover_unreachable_akashi = OSMap._recover_unreachable_akashi
@@ -418,6 +421,9 @@ def test_unreachable_akashi_falls_back_to_patrol_once_per_round():
     stub = RecoveryStub(rotation_succeeds=False)
     assert OSMap._recover_unreachable_akashi(stub, None, 'B7') is False
     assert stub.patrol_calls == 1
+    # 事件已经看见：绕过强制移动开关和行动力门槛，不能白白放跑
+    assert stub.patrol_overrides == [True]
+    assert stub._question_unreachable is True
     assert 'B7' in stub._unreachable_event_nodes
     # 同一格在本轮重扫里不再重复触发大规模挪舰队
     assert OSMap._recover_unreachable_akashi(stub, None, 'B7') is False
@@ -564,8 +570,10 @@ class ClearQuestionStub(PendingEventStub, SirenRoundStub):
         self._solved_map_event = set()
         self._question_unreachable = False
         self.events = []
+        self.close_bar_calls = 0
         self.is_siren_device_confirmed = False
         self.siren_device_mode = siren_device_mode
+        self._mode = siren_device_mode
         self.auto_search_calls = 0
         self.fleet_sets = []
         self._confirmed_on_walk = confirmed_on_walk
@@ -588,6 +596,10 @@ class ClearQuestionStub(PendingEventStub, SirenRoundStub):
     def handle_info_bar(self):
         pass
 
+    def _close_fleet_bar_if_open(self):
+        self.close_bar_calls += 1
+        return False
+
     def update_os(self):
         pass
 
@@ -600,6 +612,7 @@ class ClearQuestionStub(PendingEventStub, SirenRoundStub):
         # 模拟真实 story_skip：识别到装置剧情会置位 is_siren_device_confirmed
         if self._confirmed_on_walk:
             self.is_siren_device_confirmed = True
+            self.siren_device_mode = self._mode
         return self._walk_results.pop(0) if self._walk_results else 'timeout'
 
     def os_auto_search_run(self, drop=None):
@@ -622,6 +635,8 @@ def test_story_event_from_question_is_not_marked_unreachable():
     assert OSMap.clear_question(stub) is False
     assert stub._question_unreachable is False
     assert stub.events == ['click']
+    # 点击可能落在舰队栏上：行军后必须收起，否则后续问号/装置操作被挡住
+    assert stub.close_bar_calls == 1
 
 
 def test_all_attempts_failed_marks_unreachable():

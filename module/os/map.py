@@ -969,6 +969,7 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 self._solved_map_event.add('is_scanning_device')
                 return True
             self.is_siren_device_confirmed = False
+            self.siren_device_mode = None
             self.device.click(grid)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
                 # 3s, not upstream's 1.5s (AzurPilot wess09 2026-03-10; same change for the
@@ -977,6 +978,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 result = self.wait_until_walk_stable(
                     drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4),
                     allow_event_finish=True)
+            # 点击被舰队选择栏吃掉时画面仍是地图：收起下拉栏后重新预测问号重试。
+            self._close_fleet_bar_if_open()
             if 'akashi' in result:
                 self._solved_map_event.add('is_akashi')
                 return True
@@ -1667,6 +1670,7 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                     logger.info(f'Fleet {fleet} did not identify the device, fallback to the radar question')
                 logger.info(f'Fleet {fleet} clicks the device ({grid}) and tries to walk there')
                 self.is_siren_device_confirmed = False
+                self.siren_device_mode = None
                 self.device.click(grid)
                 with self.config.temporary(STORY_ALLOW_SKIP=False):
                     self.wait_until_walk_stable(
@@ -1755,7 +1759,10 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             return True
         logger.info('No fleet can reach Akashi, run the fixed patrol')
         self._mark_event_unreachable(node)
-        self.execute_fixed_patrol_scan()
+        # 事件已经看见了，挪舰队找它和行动力无关：置位后 L2 不受行动力门槛限制，
+        # override 也让本次恢复不受「强制移动」开关限制。
+        self._question_unreachable = True
+        self.execute_fixed_patrol_scan(override=True)
         return False
 
     def _forced_move_enabled(self):
@@ -2260,6 +2267,7 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             # Cleared before the click: the story option handler raises it when a device
             # dialog really was opened, which is what "reached" means below.
             self.is_siren_device_confirmed = False
+            self.siren_device_mode = None
             self.device.click(grid)
             self._set_device_state(DEVICE_DIALOG_OPEN)
             with self.config.temporary(STORY_ALLOW_SKIP=False):
@@ -2268,6 +2276,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 self.wait_until_walk_stable(
                     drop=drop, walk_out_of_step=False, confirm_timer=Timer(3, count=4),
                     allow_event_finish=True)
+            # 点击落在舰队选择栏上时画面仍是地图，装置对话不会出现。
+            self._close_fleet_bar_if_open()
             # Not `'event' in result`: an enemy, a container or a pillar met on the way also
             # answers 'event', and then the search rounds below would run on a device that was
             # never used. AzurPilot judges by the same flag (map_rescan_current / its
@@ -2285,7 +2295,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 logger.info('Unable to reach the siren device, run the fixed patrol')
                 self._mark_event_unreachable(location2node(grid.location))
                 self._set_device_state(DEVICE_NONE)
-                self.execute_fixed_patrol_scan()
+                self._question_unreachable = True
+                self.execute_fixed_patrol_scan(override=True)
                 return False
 
             # How many auto search rounds this dialog is worth, decided from the mode

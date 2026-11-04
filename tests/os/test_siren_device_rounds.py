@@ -69,7 +69,11 @@ class DeviceStub(PendingEventStub):
         self.auto_searches = 0
         self.fleets_set = []
         self.patrol_calls = 0
+        self.patrol_overrides = []
+        self.close_bar_calls = 0
+        self._question_unreachable = False
         self.siren_device_mode = mode
+        self._mode = mode
         self.is_siren_device_confirmed = False
         self._walk_result = walk_result
         self._dialog = dialog
@@ -112,7 +116,12 @@ class DeviceStub(PendingEventStub):
         # 真实现里剧情选项被认成装置剧情才置位（story_skip -> _identify_siren_device_option）
         if self._dialog and 'event' in self._walk_result:
             self.is_siren_device_confirmed = True
+            self.siren_device_mode = self._mode
         return self._walk_result
+
+    def _close_fleet_bar_if_open(self):
+        self.close_bar_calls += 1
+        return False
 
     def _goto_scanning_device_with_other_fleets(self, drop=None):
         return False
@@ -131,14 +140,16 @@ class DeviceStub(PendingEventStub):
         if self._update_fails:
             raise MapDetectionError('Image to detect is not in_map')
 
-    def execute_fixed_patrol_scan(self):
+    def execute_fixed_patrol_scan(self, override=False):
         self.patrol_calls += 1
+        self.patrol_overrides.append(override)
 
 
 def test_resource_mode_runs_one_round_and_rescans_the_view():
     """探测资源：1 轮自律 + 当前视野补扫一次，产物不会留到下一轮。"""
     stub = DeviceStub(mode='resource')
     assert stub.map_rescan_current() is True
+    assert stub.close_bar_calls == 1
     assert stub.auto_searches == 1
     assert stub.view.device_seen == 2          # 第一遍 + 补扫那一遍
     assert stub._solved_map_event == {'is_scanning_device'}
@@ -189,6 +200,9 @@ def test_unreachable_device_runs_no_auto_search_and_no_rescan():
     assert stub.auto_searches == 0
     assert stub.view.device_seen == 1          # 没有第二遍
     assert stub.patrol_calls == 1
+    assert stub.patrol_overrides == [True]
+    assert stub._question_unreachable is True
+    assert stub.close_bar_calls == 1
     assert location2node(DeviceGrid.location) in stub._unreachable_event_nodes
     assert stub.states[-1] == DEVICE_NONE
 
