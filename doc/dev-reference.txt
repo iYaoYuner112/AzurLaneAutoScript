@@ -41,7 +41,7 @@
 
 4. Button、Template、assets 制作
    经典手册：用于识别的类 / 添加 Button / Template
-   本项目：module/base/button.py、dev_tools/button_extract.py
+   本项目：module/base/button.py、dev_tools/button_extract.py、assets/<server>/
    注意：assets.py 由 button_extract 生成，不要手写坐标。
 
 5. 异常与恢复
@@ -56,6 +56,16 @@
 7. 配置系统
    AP 当前文档：docs/modules/config.md
    本项目：module/config/、module/config/argument/、module/config/config_updater.py
+   源文件职责：
+     task.yaml     任务、选项组映射与菜单
+     argument.yaml 参数类型、选项、默认值与校验
+     default.yaml  用户可修改的任务默认值
+     override.yaml 强制覆盖、隐藏等属性
+     gui.yaml      GUI 翻译键
+     i18n/*.json   各语言翻译
+   配置路径：<Task>.<Group>.<Argument>；绑定后通过 self.config.Group_Argument 访问。
+   新增配置：先改源文件并登记，再运行 config_updater；不要只手改生成物。
+   服务器/包名：module/config/server.py；B 站客户端是 com.bilibili.azurlane。
 
 8. 大世界与智能调度
    AP 当前文档：docs/modules/os/index.md、docs/modules/os/scheduling-flowchart.md

@@ -15,6 +15,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 
 - upstream = LmeSzinc/AzurLaneAutoScript，唯一官方上游。
 - AP 是另一套本地镜像，只做行为参照；路径优先用 `AZURPILOT_PATH`，没有就问用户，不要猜。
+  用户要求 AP 对齐、差异审计或搬功能时，才 fetch 并记录版本；日常任务不用每次查。
   ```bash
   git -C "$AZURPILOT_PATH" fetch --all
   git -C "$AZURPILOT_PATH" log -1 --format="%h %ad %s" master
@@ -24,6 +25,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 - 测试：`PYTHONIOENCODING=utf-8 python tests/run_os_tests.py [单文件/目录]`。
   `tests/island` 等截图/UI 测试需要 pytest 和素材，不在此 runner 范围。
   失败先报告具体项，不要继续提交；测试数按当次输出写，不要沿用旧数字。
+  找不到 Python 解释器或依赖时问用户，不要猜或往系统环境乱装。
 - 具体开发问题：先查 `doc/dev-reference.txt` 的主题索引，只读对应章节/代码，不要整篇加载。
 
 ## 铁律
@@ -41,7 +43,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 
 ## 流程入口
 
-- 合并官方上游、回退与恢复、搬 AP 的具体步骤：见 `doc/workflows.txt`，按任务只读对应段。
+- 合并官方上游、回退与恢复、搬 AP、AP 差异审计：见 `doc/workflows.txt`，按任务只读对应段。
 - 通用底线：合并前做整仓三方演练；搬 AP 前查回档；回退后用 diff 验证；共享判断实机验证。
 
 ## 游戏交互代码约定
@@ -67,6 +69,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
   PowerShell 用 `$env:PYTHONIOENCODING="utf-8"`。
 - 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录运行
   `python module/config/config_updater.py`，不要只手改 `config_generated.py`。
+  源文件职责、新增配置流程和服务器/包名见 `doc/dev-reference.txt` 的“配置系统”。
 - `config/*.json`、`log/` 是运行期数据，不提交；资产按 `assets/<server>/`，按钮图用 `dev_tools/button_extract.py`。
 - 不做任务外扩展；没有数据源就不显示，禁止伪造数据。
 - 改动最小、默认关闭或可回退，补离线测试，按主题分开提交。
@@ -77,10 +80,11 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 
 ## 模块地图
 
+- 底层：`module/base/`、`module/map_detection/`、`module/ocr/`
 - 大世界：`module/os/map.py`、`fleet.py`、`map_event_resume.py`、`tasks/scheduling|daily|explore|meowfficer_farming.py`
 - 事件/战斗/商店：`module/os_handler/`、`module/os_combat/`、`module/os_shop/`
 - 续战：`module/campaign/run.py`、`campaign_base.py`、`recovery.py`、`alas.py`
-- 配置/UI/设备：`module/config/`、`module/webui/`、`webapp/`、`module/device/`
+- 配置/UI/设备：`module/config/`、`module/ui/`、`module/webui/`、`webapp/`、`module/device/`
 - 测试：`tests/os/`，入口 `tests/run_os_tests.py`
 
 ## 维护
