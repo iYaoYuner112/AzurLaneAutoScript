@@ -25,6 +25,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 - 测试：`PYTHONIOENCODING=utf-8 python tests/run_os_tests.py [单文件/目录]`。
   `tests/island` 等截图/UI 测试需要 pytest 和素材，不在此 runner 范围。
   失败先报告具体项，不要继续提交；测试数按当次输出写，不要沿用旧数字。
+- 具体开发问题：先查 `doc/dev-reference.txt` 的主题索引，只读对应章节/代码，不要整篇加载。
 
 ## 铁律
 
@@ -97,6 +98,10 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 - 游戏识别基于 1280×720 截图，资源和坐标都按这个分辨率。
 - 状态循环：截图→识别→操作；退出用 `appear()`，操作用 `appear_then_click()`，
   点击 interval 一般 2~5 秒。
+- 退出条件只用 `appear()` 正面识别，不带 interval；不要用 `appear_then_click`、
+  `handle_*` 或负面条件退出。
+- 识别调试可脱离游戏：给 `device.image` 加载本地截图；模块尽量可独立调用，
+  只有任务入口依赖用户配置。
 - 不在状态循环里 sleep 猜界面、不嵌套状态循环；`handle_*` 返回 bool，
   True 表示已操作、需要新截图。
 - 复用 `GameStuckError`、`GameTooManyClickError` 和上层恢复，不吞异常。

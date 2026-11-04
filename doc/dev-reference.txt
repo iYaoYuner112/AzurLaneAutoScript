@@ -1,0 +1,72 @@
+开发参考索引（按需读）
+
+用途：AGENTS.md 只放规则和入口。遇到具体开发问题，先在这里定位主题，
+再只读对应章节或代码；不要一次性加载整本手册。
+
+一、经典 ALAS 开发手册在哪
+
+本机 AP 镜像：
+  <AP 镜像目录>/README/开发必看文档.md
+
+在线（如可访问）：
+  https://doc.azurpilot.com/llms.txt
+
+注意：这是经典 ALAS 通用开发文档，偏原理和历史做法；
+当前 AP 的工程标准以 AP 的 AGENTS.md、docs/modules/ 和实际代码为准。
+
+路径是否通用：
+- module/base、module/handler、module/map_detection、module/map、module/ocr、
+  module/exception.py、campaign/、dev_tools/button_extract.py：两家同源，本仓库也有，通常通用。
+- module/os、module/os_handler、module/os_combat、module/os_shop、module/ui、
+  module/webui、webapp：本仓库也有，但文件内容/改动可能不同，以本仓库实际文件为准。
+- docs/modules、frontend、AP 的 uv/npm 命令、dashboard.yaml：AP 专有，本仓库没有，不要照抄。
+- <AP 镜像目录>/README/开发必看文档.md：只在 AP 镜像里，不在本仓库；
+  本仓库的对应入口是这份索引和实际代码。
+
+二、按主题定位
+
+1. 状态循环、点击间隔、常见错误
+   经典手册：基本运作模式 / State Loop / 常见错误
+   本项目：module/base/base.py、module/base/timer.py、module/handler/
+   重点：截图→识别→操作；退出只用 appear()；操作加 interval；不要 sleep 猜界面。
+
+2. 海图识别、地图格式、镜头
+   经典手册：地图识别 / 创建全局地图
+   本项目：module/map_detection/、module/map/map_base.py、campaign/
+   大世界版本：module/os/camera.py、module/map/camera.py
+
+3. OCR
+   经典手册：OCR / 预训练模型 / Digit / DigitCounter
+   本项目：module/ocr/
+
+4. Button、Template、assets 制作
+   经典手册：用于识别的类 / 添加 Button / Template
+   本项目：module/base/button.py、dev_tools/button_extract.py
+   注意：assets.py 由 button_extract 生成，不要手写坐标。
+
+5. 异常与恢复
+   经典手册：异常
+   本项目：module/exception.py、alas.py
+   重点：GameStuckError / GameTooManyClickError / CampaignEnd / TaskEnd 的语义。
+
+6. 工具、装饰器、日志
+   经典手册：工具类 / 装饰器 / 日志
+   本项目：module/base/utils.py、module/base/decorator.py、module/logger.py
+
+7. 配置系统
+   AP 当前文档：docs/modules/config.md
+   本项目：module/config/、module/config/argument/、module/config/config_updater.py
+
+8. 大世界与智能调度
+   AP 当前文档：docs/modules/os/index.md、docs/modules/os/scheduling-flowchart.md
+   本项目：module/os/、module/os_handler/、module/os_combat/
+
+9. UI 导航与 WebUI
+   AP 当前文档：docs/modules/ui.md、docs/modules/webui/
+   本项目：module/ui/、module/webui/、webapp/
+
+三、使用纪律
+
+- 先判断问题属于哪一类，只读对应章节/文件。
+- 经典手册里的命令和路径是 AP 的，不要照抄；以本项目 AGENTS.md 的命令为准。
+- 读完参考后，回到 AGENTS.md 的测试、提交和实机验证规则。
