@@ -464,6 +464,9 @@ class AkashiView:
         self.fleet = fleet
         self.akashi = akashi
 
+    def predict(self):
+        pass
+
     def select(self, **kwargs):
         if kwargs.get('is_current_fleet'):
             return PointList([] if self.fleet is None else [self.fleet])
@@ -476,8 +479,10 @@ class AkashiStub(PendingEventStub):
     """跑真实的 `map_rescan_current` 明石分支，把 confirm_timer 收下来看给它多长窗口。"""
 
     map_rescan_current = OSMap.map_rescan_current
+    _open_akashi_store = OSMap._open_akashi_store
+    _close_fleet_bar_if_open = OSMap._close_fleet_bar_if_open
 
-    def __init__(self, view, radar_fleet=(5, 5)):
+    def __init__(self, view, radar_fleet=(5, 5), walk_result='timeout'):
         self.view = view
         self._radar_fleet = Point(radar_fleet)
         self._solved_map_event = set()
@@ -487,16 +492,19 @@ class AkashiStub(PendingEventStub):
         self.confirms = []
         self.buys = 0
         self.recovered = []
+        self.walk_result = walk_result
 
     def convert_radar_to_local(self, location):
         return self._radar_fleet
 
     def wait_until_walk_stable(self, confirm_timer=None, **kwargs):
         self.confirms.append(confirm_timer)
-        return 'timeout'
+        return self.walk_result
 
-    def handle_akashi_supply_buy(self, grid):
-        self.buys += 1
+    def update_os(self):
+        pass
+
+    def is_in_map(self):
         return True
 
     def _recover_unreachable_akashi(self, drop, node):
@@ -533,20 +541,11 @@ def test_window_shrinks_with_the_distance():
     assert abs(near.confirms[0].limit - 3.3) < 1e-6, near.confirms[0].limit
 
 
-def test_adjacent_akashi_is_bought_without_walking():
-    """舰队就在明石旁边：直接开商店，一点也不要等。"""
+def test_adjacent_akashi_uses_bounded_click():
+    """舰队就在明石旁边：点一次、等商店，走 AP 当前版的有界点击。"""
     stub = akashi_stub((6, 5))
+    stub.walk_result = 'akashi'
     assert stub.map_rescan_current() is True
-    assert stub.buys == 1
-    assert stub.confirms == []
-    assert stub._solved_map_event == {'is_akashi'}
-
-
-def test_invisible_fleet_does_not_take_the_adjacent_shortcut():
-    """看不到自己的舰队时不能按"紧贴"短路，只能用雷达换算的位置估路程。"""
-    stub = akashi_stub((6, 5), fleet_loc=None, radar_fleet=(6, 5))
-    assert stub.map_rescan_current() is False
     assert stub.buys == 0
     assert len(stub.confirms) == 1
-    # 雷达换算说就在旁边 -> 1.5 秒起步，仍然比原来的 0.8 秒稳
-    assert abs(stub.confirms[0].limit - 1.5) < 1e-6, stub.confirms[0].limit
+    assert stub._solved_map_event == {'is_akashi'}

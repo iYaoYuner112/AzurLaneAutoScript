@@ -1600,7 +1600,7 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                     logger.info(f'Akashi ({grid}) is near fleet {fleet} ({fleet_loc}), buy directly')
                     # 先落盘再动手：购买/行军中途卡死重启时，由续查流程重新找这只猫。
                     self._save_pending_map_event('akashi', grid)
-                    if self.handle_akashi_supply_buy(grid):
+                    if self._open_akashi_store(grid, drop=drop):
                         self._solved_map_event.add('is_akashi')
                         self._finish_pending_map_event('akashi', node=location2node(grid.location))
                         return True
@@ -1622,6 +1622,9 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                     self._solved_map_event.add('is_akashi')
                     self._finish_pending_map_event('akashi', node=location2node(grid.location))
                     return True
+                if self._close_fleet_bar_if_open():
+                    logger.info(f'Fleet {fleet} clicked the fleet bar instead of Akashi, next')
+                    continue
                 logger.info(f'Fleet {fleet} cannot reach Akashi either, next')
             return False
         finally:
@@ -1679,6 +1682,48 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
             # Restore the original fleet on every path, so later steps do not act on
             # a wrong fleet.
             self.fleet_set(current)
+
+    def _close_fleet_bar_if_open(self):
+        """Close the fleet selector bar when a missed Akashi click opened it."""
+        selector = getattr(self, 'fleet_selector', None)
+        if selector is None or not selector.bar_opened():
+            return False
+        logger.warning('Akashi click opened the fleet bar, close it')
+        selector.close()
+        return True
+
+    def _open_akashi_store(self, grid, drop=None, attempts=3):
+        """Click Akashi a bounded number of times, then return to the caller.
+
+        Akashi may overlap the fixed fleet bar: the click hits that button and the
+        shop never opens. `handle_akashi_supply_buy()` uses `ui_click()` and waits
+        for the map/shop transition, which would spin until the stuck detector
+        restarts the game. Wait for one bounded window per click instead and give
+        up quickly so the caller can switch fleets or run the fixed patrol.
+
+        Args:
+            grid (OSGrid): Grid where Akashi stands.
+            drop: Drop record.
+            attempts (int): Maximum clicks.
+
+        Returns:
+            bool: True if the shop was opened and the purchase finished.
+        """
+        for index in range(attempts):
+            logger.info(f'Click Akashi {grid} ({index + 1}/{attempts})')
+            self.device.click(grid)
+            with self.config.temporary(STORY_ALLOW_SKIP=False):
+                result = self.wait_until_walk_stable(
+                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+            if 'akashi' in result:
+                return True
+            if self._close_fleet_bar_if_open():
+                return False
+            if not self.is_in_map():
+                logger.warning('Clicked Akashi but left the map, stop retrying')
+                return False
+        logger.warning(f'Akashi {grid} did not react after {attempts} clicks')
+        return False
 
     def _recover_unreachable_akashi(self, drop, node):
         """
@@ -2139,62 +2184,53 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
         if 'is_akashi' not in self._solved_map_event and grids and grids[0].is_akashi:
             grid = grids[0]
             logger.info(f'Found Akashi on {grid}')
-            # Only take the "already adjacent" shortcut when the current fleet is
-            # actually visible AND within one grid of Akashi. During a full rescan
-            # the camera is panned away from the fleet, so convert_radar_to_local()
-            # would fall back to "camera center is fleet" and wrongly trigger the
-            # shortcut, then click Akashi repeatedly while the fleet is far away.
-            node = location2node(grid.location)
-            # 先落盘再动手：点击/购买/行军中途卡死重启时，由续查流程重新找这只猫。
+            # Persist before acting: a crash during the click/walk is resumed later.
             self._save_pending_map_event('akashi', grid)
-            fleets = self.view.select(is_current_fleet=True)
-            if fleets.count == 1 and fleets[0].distance_to(grid) <= 1:
-                logger.info(f'Akashi ({grid}) is near current fleet ({fleets[0]})')
-                if self.handle_akashi_supply_buy(grid):
+            node = location2node(grid.location)
+            fleet = self.convert_radar_to_local((0, 0))
+            if fleet.distance_to(grid) > 1:
+                self.device.click(grid)
+                with self.config.temporary(STORY_ALLOW_SKIP=False):
+                    walk_time = 1.5 + 0.6 * grid.distance_to(fleet)
+                    result = self.wait_until_walk_stable(
+                        confirm_timer=Timer(walk_time, count=4),
+                        drop=drop,
+                        walk_out_of_step=False,
+                    )
+                if 'akashi' in result:
                     self._solved_map_event.add('is_akashi')
                     self._finish_pending_map_event('akashi', node=node)
                     return True
-                # 点不进去 / 商店没买成：不能标已处理，按"够不着"走换队 + 强制移动。
-                logger.info('Akashi shop was not opened, try other fleets first')
+                # A missed click may have opened the fleet bar; close it and
+                # re-identify Akashi before the bounded retry.
+                self._close_fleet_bar_if_open()
+                self.device.screenshot()
+                self.update_os()
+                self.view.predict()
+                grids = self.view.select(is_akashi=True)
+                if 'is_akashi' not in self._solved_map_event and grids and grids[0].is_akashi:
+                    grid = grids[0]
+                    fleet = self.convert_radar_to_local((0, 0))
+                    if fleet.distance_to(grid) <= 1 and self._open_akashi_store(grid, drop=drop):
+                        self._solved_map_event.add('is_akashi')
+                        self._finish_pending_map_event('akashi', node=node)
+                        return True
+                    logger.info('Unable to reach Akashi, try other fleets')
+                else:
+                    logger.info('Akashi not identified again, try other fleets')
                 result = self._recover_unreachable_akashi(drop, node)
-                if result:
-                    self._finish_pending_map_event('akashi', node=node)
+                self._finish_pending_map_event('akashi', node=node)
                 return result
-            # Fleet not in sight (or far away): click Akashi and walk to it;
-            # wait_until_walk_stable opens the shop once the fleet arrives.
-            self.device.click(grid)
-            with self.config.temporary(STORY_ALLOW_SKIP=False):
-                # Akashi has to be *seen* in the shop to count as reached, so the window that
-                # decides "nothing happened" is scaled with how far the fleet still has to
-                # walk (AzurPilot's formula): a fixed short one returns "cannot reach" while a
-                # distant Akashi is being walked to, and the recovery costs a fleet switch
-                # plus the fixed patrol. `convert_radar_to_local()` gives the fleet's grid when
-                # it is in sight, otherwise the camera center.
-                fleet = self.convert_radar_to_local((0, 0))
-                walk_time = 1.5 + 0.6 * grid.distance_to(fleet)
-                result = self.wait_until_walk_stable(
-                    drop=drop, walk_out_of_step=False, confirm_timer=Timer(walk_time, count=4))
-            if 'akashi' in result:
-                self._solved_map_event.add('is_akashi')
-                self._finish_pending_map_event('akashi', node=node)
-                return True
-            # Cannot reach Akashi: try the other fleets first, and fall back to the
-            # fixed patrol (move the blocking fleet away) when none works.
-            grids = self.view.select(is_akashi=True)
-            if 'is_akashi' not in self._solved_map_event and grids and grids[0].is_akashi:
-                grid = grids[0]
-                logger.info('Unable to reach Akashi, try other fleets first')
             else:
-                # Akashi "disappeared" from the view: it was clicked but no shop was
-                # opened, which means the current fleet cannot reach it. Its icon is
-                # hidden by the fleet model and the detection flickers, so a missing
-                # re-identification must not be treated as "nothing happened".
-                logger.info('Akashi was not identified again, try other fleets first')
-            result = self._recover_unreachable_akashi(drop, node)
-            # 换队 + 强制移动都没买成时记录留着，下次进海域继续续查。
-            if result:
+                logger.info(f'Akashi ({grid}) is near current fleet ({fleet})')
+                if self._open_akashi_store(grid, drop=drop):
+                    self._solved_map_event.add('is_akashi')
+                    self._finish_pending_map_event('akashi', node=node)
+                    return True
+                logger.info('Akashi did not react, try other fleets')
+                result = self._recover_unreachable_akashi(drop, node)
                 self._finish_pending_map_event('akashi', node=node)
-            return result
+                return result
 
         grids = self.view.select(is_scanning_device=True)
         if 'is_scanning_device' not in self._solved_map_event and grids and grids[0].is_scanning_device:
