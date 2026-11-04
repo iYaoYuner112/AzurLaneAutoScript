@@ -1,6 +1,6 @@
 # AGENTS.md — ALAS fork 维护入口
 
-新会话先读。这里只放长期有效的规则和入口；当前状态、版本、测试数一律现场查。
+新会话先读。这里只放稳定规则和入口；当前状态、版本、测试数一律现场查。
 最后更新：2026-11-04。
 主要场景：B 站客户端（com.bilibili.azurlane）、GemsFarming 长期挂机、大世界调度；实例常在另一台机器。
 
@@ -14,8 +14,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 ```
 
 - upstream = LmeSzinc/AzurLaneAutoScript，唯一官方上游。
-- AP 是另一套本地镜像，只做行为参照；路径优先用环境变量 `AZURPILOT_PATH`，
-  没有就问用户，不要猜。先确认版本再对照：
+- AP 是另一套本地镜像，只做行为参照；路径优先用 `AZURPILOT_PATH`，没有就问用户，不要猜。
   ```bash
   git -C "$AZURPILOT_PATH" fetch --all
   git -C "$AZURPILOT_PATH" log -1 --format="%h %ad %s" master
@@ -40,51 +39,10 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 动手前先读 `doc/decisions-and-pitfalls.txt`：已定决策、刻意偏差和踩过的坑都在那里。
 本文件只保留稳定规则和入口；新决策或新坑追加到该文件，不要扩这里。
 
-## 合并官方上游
+## 流程入口
 
-1. 工作区干净，在 master；逐提交看 diff，重点 os/combat/campaign/alas.py/配置生成物。
-2. 做整仓三方演练，不只看文本冲突：
-   ```bash
-   tree=$(git merge-tree --write-tree HEAD upstream/master | head -1)
-   git diff --stat HEAD "$tree"
-   git diff HEAD "$tree"
-   ```
-   逐条确认没有覆盖历史定制。
-3. 重灾区：`module/os/map.py`、`globe_operation.py`、`tasks/scheduling|explore|daily`、`alas.py`、`campaign/run|campaign_base`、`config/argument`。
-4. 共享判断（is_in_map、经验页、关卡页确认）会横向影响老定制，必须实机验证港口/要塞雾天和 GemsFarming。
-5. 合并后跑全量测试；用户明确说“推送”后才推送。
-
-## 回退与恢复
-
-- 批量回退用 `git revert --no-commit <提交>...`，完成后必须
-  `git diff <回退目标提交> --stat` 为空才算完成。
-- 恢复此前回退的内容后，必须 `git diff <当时的提交> HEAD --stat` 逐文件核对忠实度。
-- 回退/恢复后跑全量 tests/os，基线数字按当次输出更新。
-
-## 搬 AP
-
-1. 以 AP 当前 master/dev 代码和调用链为准，不能只看旧提交 diff；旧结论会过期。
-   AP 合官方上游是“几天一批”，未合同批时我们领先不算偏差；AP 配置默认值不等于用户实跑值，必要时看 AP 的 `config/alas.json`。
-2. 搬前查回档/重写：
-   ```bash
-   git -C "$AZURPILOT_PATH" log --all --oneline --grep="Revert"
-   git -C "$AZURPILOT_PATH" log --all --oneline -S"<关键函数名或常量>"
-   ```
-   已被删掉的行为不要搬（相机、明石踩过）。
-3. 涉及配置绑定、对象生命周期、跨任务状态的方案，**动笔前先实测三件事**（2026-11-04 轻量版
-   方案因此被否）：
-   - `bind()` 后该任务的 config 能读到哪些键（按任务分组绑定，Restart 读不到 Campaign 组）；
-   - 写入的键会不会被 `config_updater` 剪掉（它从空字典只遍历注册键，未登记即删）；
-   - 绕过某段初始化后，对象上还剩哪些属性（`self.map`、`map_is_auto_search` 之类都会缺）。
-4. 说“AP 没有 X”必须给当前分支函数名/行号；实现不同但效果相同时要写清差异。
-5. 只对齐效果，不要求目录/命名/配置位置一致。
-6. 适配本仓库：
-   - 调度代理会换 `config.task`，注意任务上下文。
-   - 续战保留原 `CampaignRun` / `CampaignBase` 对象，不能重建后跳过初始化。
-   - TaskEnd 不是 ScriptEnd；容错放行 `UNSWALLOWABLE_ERRORS`（`module/os/map.py:57`）。
-   - `cross_get` 的 default 只在缺键时生效，须等于生成默认；关闭显式存 false。
-   - 配置生成器会删未登记 i18n；自用文案先登记。
-7. AP 删掉/回档的加固不要以“更稳”恢复；用户说“AP 是这样就不用改”就保持。
+- 合并官方上游、回退与恢复、搬 AP 的具体步骤：见 `doc/workflows.txt`，按任务只读对应段。
+- 通用底线：合并前做整仓三方演练；搬 AP 前查回档；回退后用 diff 验证；共享判断实机验证。
 
 ## 游戏交互代码约定
 
@@ -104,11 +62,11 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 ## 配置、运行与硬约束
 
 - 运行：`python alas.py`（调度器）、`python gui.py -p <端口>`（WebUI）。
+- 依赖：`pip install -r requirements.txt`；优先用项目约定环境，不要装系统 Python。
+  Windows bash 用 `PYTHONIOENCODING=utf-8 python ...`；cmd 用 `set PYTHONIOENCODING=utf-8`，
+  PowerShell 用 `$env:PYTHONIOENCODING="utf-8"`。
 - 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录运行
   `python module/config/config_updater.py`，不要只手改 `config_generated.py`。
-  职责：`task.yaml` 任务/菜单，`argument.yaml` 参数/默认/校验，`default.yaml` 任务默认值，
-  `override.yaml` 强制覆盖，`gui.yaml` GUI 翻译键。配置路径是 `<Task>.<Group>.<Argument>`，
-  绑定后通过 `self.config.Group_Argument` 访问。
 - `config/*.json`、`log/` 是运行期数据，不提交；资产按 `assets/<server>/`，按钮图用 `dev_tools/button_extract.py`。
 - 不做任务外扩展；没有数据源就不显示，禁止伪造数据。
 - 改动最小、默认关闭或可回退，补离线测试，按主题分开提交。
@@ -129,6 +87,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 
 - 不要每次提交都改本文件。
 - 只有规则变化才更新本文件；决策和新坑写 `doc/decisions-and-pitfalls.txt`，并写日期。
+- 流程细节写 `doc/workflows.txt`，开发参考资料写 `doc/dev-reference.txt`。
 - 当前状态用命令查：git log、HEAD..upstream/master、AP master/dev、测试输出。
 - 汇报用中文、结论先行；审计逐项讲作用/适用性，再问做不做。
 - 交付时列出：改动文件清单、测试结果、需要用户实机验证的点（静态测试覆盖不到的）。

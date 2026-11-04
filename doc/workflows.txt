@@ -1,0 +1,64 @@
+开发流程细节（按需读）
+
+用途：AGENTS.md 只放入口和稳定规则。本文件放“合并上游、搬 AP、回退与恢复”
+的具体步骤；动手前按任务类型只读对应段，不要整份加载。
+
+一、合并官方上游
+
+1. 工作区干净，确认在 master。
+2. 拉取并列出新提交：
+   git fetch upstream
+   git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
+   如果 fetch 被环境代理挡住（如 502），先检查/清空 http_proxy / https_proxy；
+   FETCH_HEAD 不要跨命令信任，用 git rev-parse 落成变量再用。
+3. 逐提交看 diff，重点 module/os、combat、campaign、alas.py、配置生成物。
+4. 做整仓三方合并演练，不只看文本冲突：
+   tree=$(git merge-tree --write-tree HEAD upstream/master | head -1)
+   git diff --stat HEAD "$tree"
+   git diff HEAD "$tree"
+   这份差异才是合并后真正会变的地方，逐条确认没有覆盖历史定制。
+5. 重灾区：
+   module/os/map.py、globe_operation.py、tasks/scheduling|explore|daily、
+   alas.py、campaign/run|campaign_base、config/argument 与生成配置。
+6. 合并时保留我们的防线和 AP 对齐逻辑，只把上游修复落到对应局部函数。
+7. 共享判断（is_in_map、经验页、关卡页确认）会横向影响老定制，必须实机验证
+   港口/要塞雾天和 GemsFarming。
+8. 合并后跑全量 tests/os；tests/island 等截图/UI 测试需要 pytest 和素材。
+9. 用户明确说“推送”后才推送。
+
+
+二、回退与恢复
+
+- 批量回退用 git revert --no-commit <提交>...，完成后必须
+  git diff <回退目标提交> --stat 为空才算完成。
+- 恢复此前回退的内容后，必须 git diff <当时的提交> HEAD --stat 逐文件核对忠实度。
+- 回退/恢复后跑全量 tests/os，基线数字按当次输出更新。
+- config/alas.json 里可能残留已删除的键（通常无害，代码不读）；需要时在设置页重置该组。
+
+
+三、搬 AP
+
+1. 以 AP 当前 master/dev 代码和调用链为准，不能只看旧提交 diff；旧结论会过期。
+   AP 合官方上游是“几天一批”，未合同批时我们领先不算偏差；
+   AP 配置默认值不等于用户实跑值，必要时看 AP 的 config/alas.json。
+2. 搬前查回档/重写：
+   git -C "<AP 镜像目录>" log --all --oneline --grep="Revert"
+   git -C "<AP 镜像目录>" log --all --oneline -S"<关键函数名或常量>"
+   已被删掉的行为不要搬（相机、明石踩过）。
+3. 涉及配置绑定、对象生命周期、跨任务状态的方案，动笔前先实测三件事：
+   - bind() 后该任务的 config 能读到哪些键（跨任务组可能读不到，
+     例如 Restart 与 Campaign 的绑定范围不同）；
+   - 写入的键会不会被 config_updater 剪掉（它从空字典只遍历注册键，未登记即删）；
+   - 绕过某段初始化后，对象上还剩哪些属性（self.map、map_is_auto_search 等可能缺）。
+4. 说“AP 没有 X”必须给当前分支函数名/行号；实现不同但效果相同时，
+   在代码注释和交付说明里写清差异。
+5. 只对齐效果，不要求目录/命名/配置位置一致。
+6. 适配本仓库：
+   - 调度代理会换 config.task，注意任务上下文。
+   - 续战保留原 CampaignRun / CampaignBase 对象，不能重建后跳过初始化。
+   - TaskEnd 不是 ScriptEnd；容错放行 UNSWALLOWABLE_ERRORS（module/os/map.py:57）。
+   - cross_get 的 default 只在缺键时生效，须等于生成默认；关闭显式存 false。
+   - 配置生成器会删未登记 i18n；自用文案先登记。
+7. AP 删掉/回档的加固不要以“更稳”恢复；用户说“AP 是这样就不用改”就保持。
+8. AP 独有的整块功能（智能开荒、OpsiExploreCleanup、模拟器重启/watchdog、
+   茗交所重构、多来源补币等）不要顺手全搬；先问要不要。
