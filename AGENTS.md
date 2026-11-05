@@ -1,7 +1,7 @@
 # AGENTS.md — ALAS fork 维护入口
 
 新会话先读。这里只放稳定规则和入口；当前状态、版本、测试数一律现场查。
-最后更新：2026-11-04。
+最后更新：2026-11-05。
 主要场景：B 站客户端（com.bilibili.azurlane）、GemsFarming 长期挂机、大世界调度；实例常在另一台机器。
 
 ## 开工
@@ -44,6 +44,8 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 ## 流程入口
 
 - 合并官方上游、回退与恢复、搬 AP、AP 差异审计：见 `doc/workflows.txt`，按任务只读对应段。
+- 用户贴日志/报错时：按 `doc/workflows.txt` 第五节；结论先行，先还原时间线和调用栈，
+  再查 AP 当前版；未批准不改代码。
 - 通用底线：合并前做整仓三方演练；搬 AP 前查回档；回退后用 diff 验证；共享判断实机验证。
 
 ## 游戏交互代码约定
