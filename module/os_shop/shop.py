@@ -245,6 +245,8 @@ class OSShop(PortShop, AkashiShop):
                 if self.is_coins_both_not_enough():
                     logger.info('Not enough coins to buy any items, stop.')
                     break
+                # 没有购买，货币不变，下一件继续用上次读数
+                skip_get_coins = True
                 continue
             logger.info(f'Buying item: {item.name}. In shop {item.shop_index + 1}. At pos {item.scroll_pos:.2f}.')
             self.os_shop_side_navbar_ensure(upper=item.shop_index + 1)
