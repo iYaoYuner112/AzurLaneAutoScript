@@ -305,6 +305,25 @@ class GlobeOperation(ActionPointHandler):
 
         return True
 
+    def handle_combat_result_on_exit(self):
+        """
+        Close a combat result screen left behind when leaving a zone.
+
+        A fleet sinking in a stronghold stops auto search while another fleet's
+        battle may still finish on the "PERFECT S / Touch to continue" screen.
+        Without dismissing it the exit loop can wait until stuck detection.
+
+        Returns:
+            bool: True if a combat result screen was handled.
+        """
+        if not hasattr(self, 'handle_battle_status'):
+            return False
+        if self.handle_battle_status():
+            return True
+        if hasattr(self, 'handle_exp_info') and self.handle_exp_info():
+            return True
+        return False
+
     def os_map_goto_globe(self, unpin=True):
         """
         Args:
@@ -335,6 +354,8 @@ class GlobeOperation(ActionPointHandler):
                 self.interval_reset(MAP_GOTO_GLOBE)
                 continue
             if self.handle_map_event():
+                continue
+            if self.handle_combat_result_on_exit():
                 continue
             # Accidentally entered port
             if self.appear(PORT_CHECK, offset=(20, 20), interval=5):
