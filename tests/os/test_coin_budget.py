@@ -1,10 +1,11 @@
 """黄币预算：读数新鲜度。
 
 黄币靠截图 OCR，慢设备或界面动画没走完时会读到旧值或 0，调度据此判断
-"要不要打补给"就会误判。这里锁定三件事：
+"要不要打补给"就会误判。这里锁定四件事：
 1. 连续两次一致才算新鲜；
 2. OCR 失败沿用上次读数（带时间戳，过期作废），不要把 0 当成余额；
-3. 调度决策前读数不新鲜就重读一次。
+3. 调度决策前读数不新鲜就重读一次；
+4. 结算/获得物品弹窗遮住顶部栏时，先点掉再读。
 """
 
 from time import monotonic
@@ -71,6 +72,9 @@ class StatusStub:
     def loop(self, *args, **kwargs):
         return self
 
+    def appear_then_click(self, *args, **kwargs):
+        return False
+
     def __iter__(self):
         return self
 
@@ -79,6 +83,27 @@ class StatusStub:
         if self.iterations > 12:
             raise StopIteration
         return self.iterations
+
+
+class PopupStatusStub(StatusStub):
+    def __init__(self):
+        super().__init__()
+        self.popup_clicks = 0
+
+    def appear_then_click(self, *args, **kwargs):
+        if not self.popup_clicks:
+            self.popup_clicks += 1
+            return True
+        return False
+
+
+def test_popup_is_clicked_before_coin_ocr():
+    stub = PopupStatusStub()
+    with PatchedOcr([63063, 63063]):
+        value = stub.get_yellow_coins()
+    assert value == 63063
+    assert stub.popup_clicks == 1
+    assert stub.yellow_coins_fresh() is True
 
 
 def test_two_equal_readings_are_fresh():

@@ -5,6 +5,7 @@ from time import monotonic
 from module.base.decorator import cached_property
 import module.config.server as server
 from module.base.timer import Timer
+from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_SHIP
 from module.config.config import Function
 from module.config.utils import get_server_next_update
 from module.logger import logger
@@ -180,6 +181,20 @@ class OSStatus(UI):
         value = None
         confirmed = False
         for _ in self.loop():
+            # 结算/获得物品弹窗会遮住顶部货币栏，先点掉再识别
+            if self.appear_then_click(GET_ITEMS_1, offset=True, interval=1):
+                previous = None
+                timer.reset()
+                continue
+            if self.appear_then_click(GET_ITEMS_2, offset=True, interval=1):
+                previous = None
+                timer.reset()
+                continue
+            if self.appear_then_click(GET_SHIP, offset=(20, 20), interval=1):
+                previous = None
+                timer.reset()
+                continue
+
             value = OCR_SHOP_YELLOW_COINS.ocr(self.device.image)
             if value >= 100:
                 if previous is not None and value == previous:
