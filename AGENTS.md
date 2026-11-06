@@ -1,52 +1,44 @@
 # AGENTS.md — ALAS fork 维护入口
 
-新会话先读。这里只放稳定规则和入口；当前状态、版本、测试数一律现场查。
-最后更新：2026-11-05。
-主要场景：B 站客户端（com.bilibili.azurlane）、GemsFarming 长期挂机、大世界调度；实例常在另一台机器。
+新会话先读。这里只放稳定规则和入口；版本、测试数、当前状态现场查。
+本项目是 ALAS（AzurLaneAutoScript）的本地 fork；实例常在另一台机器。
 
 ## 开工
 
-```bash
-git status -sb
-git log --oneline -8
-git fetch upstream
-git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
-```
-
+- 改文件前先 `git status -sb`，确认没有未提交改动；涉及上游合并/差异时再
+  `git fetch upstream` 并比较 `HEAD..upstream/master`，日常任务不必每次查。
 - upstream = LmeSzinc/AzurLaneAutoScript，唯一官方上游。
-- AP 是另一套本地镜像，只做行为参照；路径优先用 `AZURPILOT_PATH`，没有就问用户，不要猜。
-  用户要求 AP 对齐、差异审计或搬功能时，才 fetch 并记录版本；日常任务不用每次查。
-  ```bash
-  git -C "$AZURPILOT_PATH" fetch --all
-  git -C "$AZURPILOT_PATH" log -1 --format="%h %ad %s" master
-  git -C "$AZURPILOT_PATH" log -1 --format="%h %ad %s" origin/dev
-  ```
-- 先查项目记忆和 `.workbuddy/memory/` 旧结论，别重复调研。
+- [AzurPilot](https://github.com/wess09/AzurPilot) 是另一套本地镜像，只做行为参照；
+  路径用 `$AZURPILOT_PATH`，没有就问用户，不要猜。
+  只有 AzurPilot 对齐、差异审计或搬功能时才 fetch，命令见 `doc/workflows.txt`。
+- 先查项目记忆和 `.workbuddy/memory/` 的旧结论，但只当线索；引用前用当前代码/AzurPilot 复核，旧日期和行号会过期。
 - 测试：`PYTHONIOENCODING=utf-8 python tests/run_os_tests.py [单文件/目录]`。
   `tests/island` 等截图/UI 测试需要 pytest 和素材，不在此 runner 范围。
   失败先报告具体项，不要继续提交；测试数按当次输出写，不要沿用旧数字。
-  找不到 Python 解释器或依赖时问用户，不要猜或往系统环境乱装。
+  找不到 Python 解释器或依赖时问用户，不要往系统环境乱装。
 - 具体开发问题：先查 `doc/dev-reference.txt` 的主题索引，只读对应章节/代码，不要整篇加载。
 
 ## 铁律
 
-1. 官方上游只有 upstream。不要把 AP 的分支合并进 master。
-2. 测试通过、用户明确说“提交推送”后才提交/推送。一次授权只对那批改动生效；
-   “做吧/改吧/修吧”不是授权；多主题分开提交。
+1. 官方上游只有 upstream。不要把 AzurPilot 的分支合并进 master。
+2. 测试通过（或说明无适用测试）、用户明确说“提交”或“推送”后才执行对应动作。
+   一次授权只对那批改动生效；“做吧/改吧/修吧”不是授权；多主题分开提交。
 3. origin URL 带凭据：不要打印 `git remote -v`，不要外发报错堆栈或截图。
-4. 不做破坏性 git 操作（force push、reset --hard、删除未提交文件）除非用户明确要求。
+4. 不做破坏性 git 操作（force push、reset --hard、删除未提交文件）；覆盖用户未提交改动前先确认。
+5. 一个主题/可验证的小功能（或用户一次指定的一批）做完、测试通过（或说明无适用测试）
+   后先停下报告；确认继续不等于授权提交。未确认前不开始下一个主题、不夹带无关大改；
+   跨文件大改先说明范围。
 
 ## 已定决策与踩坑
 
-动手前先读 `doc/decisions-and-pitfalls.txt`：已定决策、刻意偏差和踩过的坑都在那里。
-本文件只保留稳定规则和入口；新决策或新坑追加到该文件，不要扩这里。
+动手前先读 `doc/decisions-and-pitfalls.txt`；新决策/新坑写那里并写日期，不扩本文件。
 
 ## 流程入口
 
-- 合并官方上游、回退与恢复、搬 AP、AP 差异审计：见 `doc/workflows.txt`，按任务只读对应段。
+- 合并官方上游、回退与恢复、搬 AzurPilot、AzurPilot 差异审计：见 `doc/workflows.txt`，按任务只读对应段。
 - 用户贴日志/报错时：按 `doc/workflows.txt` 第五节；结论先行，先还原时间线和调用栈，
-  再查 AP 当前版；未批准不改代码。
-- 通用底线：合并前做整仓三方演练；搬 AP 前查回档；回退后用 diff 验证；共享判断实机验证。
+  再查 AzurPilot 当前版；未批准不改代码。
+- 通用底线：合并前做整仓三方演练；搬 AzurPilot 前查回档；回退后用 diff 验证；共享判断实机验证。
 
 ## 游戏交互代码约定
 
@@ -66,19 +58,24 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 ## 配置、运行与硬约束
 
 - 运行：`python alas.py`（调度器）、`python gui.py -p <端口>`（WebUI）。
+- 代码兼容 Python 3.7：不要用海象运算符、`X | Y` 类型标注等 3.8+ 语法。
 - 依赖：`pip install -r requirements.txt`；优先用项目约定环境，不要装系统 Python。
-  Windows bash 用 `PYTHONIOENCODING=utf-8 python ...`；cmd 用 `set PYTHONIOENCODING=utf-8`，
-  PowerShell 用 `$env:PYTHONIOENCODING="utf-8"`。
+  Windows 下先设 `PYTHONIOENCODING=utf-8`（bash 前缀，cmd 用 `set`，PowerShell 用 `$env:`）。
 - 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录运行
   `python module/config/config_updater.py`，不要只手改 `config_generated.py`。
   源文件职责、新增配置流程和服务器/包名见 `doc/dev-reference.txt` 的“配置系统”。
-- `config/*.json`、`log/` 是运行期数据，不提交；资产按 `assets/<server>/`，按钮图用 `dev_tools/button_extract.py`。
+- `config/*.json`、`log/` 是运行期数据，不提交；资产按 `assets/<server>/`，
+  按钮图用 `dev_tools/button_extract.py`。
 - 不做任务外扩展；没有数据源就不显示，禁止伪造数据。
-- 改动最小、默认关闭或可回退，补离线测试，按主题分开提交。
+- 改动最小、可回退；行为修复按 AzurPilot/现有默认，新开关默认关闭；补离线测试，
+  按主题分开提交。
 - UI/图标实际渲染验证；新增日志优先 debug，不影响判定。
-- 提交不带临时文件/日志/截图/令牌/本机路径/用户名。
-- 提交标题单行中文，只描述代码改动；不要写“测试/日志”字样。
-- 实机顺序：本机 AlasApp pull→重启→实测→云手机 pull；改完必须重启进程。
+- 临时截图、日志、录屏、音频、视频不进 Git；`assets/<server>/` 等游戏识别素材和已登记图标
+  按现有资产流程提交。
+- 提交不带临时文件、令牌、本机路径/用户名；标题单行中文，只描述代码改动，
+  不写“测试/日志”字样。
+- 涉及实机验证时：本机 AlasApp pull→重启→实测→云手机 pull；
+  改完需重启进程再验证。
 
 ## 模块地图
 
@@ -91,10 +88,7 @@ git log --oneline --date=short --format="%h %ad %s" HEAD..upstream/master
 
 ## 维护
 
-- 不要每次提交都改本文件。
-- 只有规则变化才更新本文件；决策和新坑写 `doc/decisions-and-pitfalls.txt`，并写日期。
-- 流程细节写 `doc/workflows.txt`，开发参考资料写 `doc/dev-reference.txt`。
-- 当前状态用命令查：git log、HEAD..upstream/master、AP master/dev、测试输出。
+- 只有规则变化才更新本文件，不要每次提交都改。
 - 汇报用中文、结论先行；审计逐项讲作用/适用性，再问做不做。
 - 交付时列出：改动文件清单、测试结果、需要用户实机验证的点（静态测试覆盖不到的）。
 - 本文件不替代用户当场任务说明。
