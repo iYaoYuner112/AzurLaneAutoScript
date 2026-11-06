@@ -58,7 +58,6 @@
 ## 配置、运行与硬约束
 
 - 运行：`python alas.py`（调度器）、`python gui.py -p <端口>`（WebUI）。
-- 代码兼容 Python 3.7：不要用海象运算符、`X | Y` 类型标注等 3.8+ 语法。
 - 依赖：`pip install -r requirements.txt`；优先用项目约定环境，不要装系统 Python。
   Windows 下先设 `PYTHONIOENCODING=utf-8`（bash 前缀，cmd 用 `set`，PowerShell 用 `$env:`）。
 - 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录运行
