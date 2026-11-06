@@ -70,9 +70,13 @@
 
 - 用上述 Python 环境运行 `tests/run_os_tests.py [单文件/目录]`，并设置
   `PYTHONIOENCODING=utf-8`（bash 前缀，cmd 用 `set`，PowerShell 用 `$env:`；Windows 应用商店的 `python` 别名可能不可用）。
-  `tests/island` 等截图/UI 测试需要 pytest 和素材，不在此 runner 范围。
+  `tests/island`、`tests/shop_event`、`tests/dev_tools` 等 pytest fixture/截图测试不在 runner 范围。
+  测试选择自行判断：`tests/os` 必跑，pytest 有环境就跑目标用例，没有就记录“未运行 + 原因”，
+  不为此询问用户，也不往其他项目/系统环境装包；找不到可用解释器时先做静态检查并写明测试未运行。
   失败先报告具体项，不要继续提交；测试数按当次输出写，不要沿用旧数字。
-  找不到 Python 解释器或依赖时问用户，不要往系统环境乱装；改动补离线测试，修 bug 配最小回归测试，断言约定见 `doc/decisions-and-pitfalls.txt` 的“测试约定”。
+  改动补离线测试，修 bug 配最小回归测试，断言约定见 `doc/decisions-and-pitfalls.txt` 的“测试约定”。
+- 确有必要的 pytest/截图测试：优先用已有环境；缺 pytest 时可在临时隔离环境安装最小依赖，
+  跑完即弃，不改现有项目/系统环境；安装或网络失败则记录“未运行 + 原因”，不阻塞。
 - 改配置相关测试用临时配置目录，避免写用户 `config/alas.json`。
 
 ## 提交
