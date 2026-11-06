@@ -11,8 +11,10 @@
 - [AzurPilot](https://github.com/wess09/AzurPilot) 是另一套本地镜像，只做行为参照；
   路径用 `$AZURPILOT_PATH`，没有就问用户，不要猜。
   只有 AzurPilot 对齐、差异审计或搬功能时才 fetch，命令见 `doc/workflows.txt`。
-- 先查项目记忆和 `.workbuddy/memory/` 的旧结论，但只当线索；引用前用当前代码/AzurPilot 复核，旧日期和行号会过期。
-- 测试：`PYTHONIOENCODING=utf-8 python tests/run_os_tests.py [单文件/目录]`。
+- 先查项目记忆和 `.workbuddy/memory/`（如果有）的旧结论，但只当线索；
+  引用前用当前代码/AzurPilot 复核，旧日期和行号会过期。
+- 测试：用项目约定的 Python 环境运行 `tests/run_os_tests.py [单文件/目录]`，
+  并设置 `PYTHONIOENCODING=utf-8`（Windows 应用商店的 `python` 别名可能不可用）。
   `tests/island` 等截图/UI 测试需要 pytest 和素材，不在此 runner 范围。
   失败先报告具体项，不要继续提交；测试数按当次输出写，不要沿用旧数字。
   找不到 Python 解释器或依赖时问用户，不要往系统环境乱装。
@@ -57,11 +59,11 @@
 
 ## 配置、运行与硬约束
 
-- 运行：`python alas.py`（调度器）、`python gui.py -p <端口>`（WebUI）。
-- 依赖：`pip install -r requirements.txt`；优先用项目约定环境，不要装系统 Python。
+- 运行：用项目约定环境运行 `alas.py`（调度器）、`gui.py -p <端口>`（WebUI）。
+- 依赖优先用项目约定环境，不要装系统 Python；需要重装时再参考 `requirements.txt`。
   Windows 下先设 `PYTHONIOENCODING=utf-8`（bash 前缀，cmd 用 `set`，PowerShell 用 `$env:`）。
-- 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录运行
-  `python module/config/config_updater.py`，不要只手改 `config_generated.py`。
+- 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录用
+  项目约定环境运行 `module/config/config_updater.py`，不要只手改 `config_generated.py`。
   源文件职责、新增配置流程和服务器/包名见 `doc/dev-reference.txt` 的“配置系统”。
 - `config/*.json`、`log/` 是运行期数据，不提交；资产按 `assets/<server>/`，
   按钮图用 `dev_tools/button_extract.py`。
@@ -71,10 +73,8 @@
 - UI/图标实际渲染验证；新增日志优先 debug，不影响判定。
 - 临时截图、日志、录屏、音频、视频不进 Git；`assets/<server>/` 等游戏识别素材和已登记图标
   按现有资产流程提交。
-- 提交不带临时文件、令牌、本机路径/用户名；标题单行中文，只描述代码改动，
-  不写“测试/日志”字样。
-- 涉及实机验证时：本机 AlasApp pull→重启→实测→云手机 pull；
-  改完需重启进程再验证。
+- 提交不带临时文件、令牌、本机路径/用户名；标题单行中文，只描述改动，
+  不用“测试/日志”等过程词凑数；确实是测试/日志本身的改动可以写。
 
 ## 模块地图
 
