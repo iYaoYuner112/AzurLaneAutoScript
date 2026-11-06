@@ -11,13 +11,9 @@
 - [AzurPilot](https://github.com/wess09/AzurPilot) 是另一套本地镜像，只做行为参照；
   路径用 `$AZURPILOT_PATH`，没有就问用户，不要猜。
   只有 AzurPilot 对齐、差异审计或搬功能时才 fetch，命令见 `doc/workflows.txt`。
-- 先查项目记忆和 `.workbuddy/memory/`（如果有）的旧结论，但只当线索；
+- 存在 `.workbuddy/memory/` 时先读其中旧结论，只当线索；
   引用前用当前代码/AzurPilot 复核，旧日期和行号会过期。
-- 测试：用项目约定的 Python 环境运行 `tests/run_os_tests.py [单文件/目录]`，
-  并设置 `PYTHONIOENCODING=utf-8`（Windows 应用商店的 `python` 别名可能不可用）。
-  `tests/island` 等截图/UI 测试需要 pytest 和素材，不在此 runner 范围。
-  失败先报告具体项，不要继续提交；测试数按当次输出写，不要沿用旧数字。
-  找不到 Python 解释器或依赖时问用户，不要往系统环境乱装。
+- 测试：见下文“测试”小节。
 - 具体开发问题：先查 `doc/dev-reference.txt` 的主题索引，只读对应章节/代码，不要整篇加载。
 
 ## 铁律
@@ -38,7 +34,7 @@
 ## 流程入口
 
 - 合并官方上游、回退与恢复、搬 AzurPilot、AzurPilot 差异审计：见 `doc/workflows.txt`，按任务只读对应段。
-- 用户贴日志/报错时：按 `doc/workflows.txt` 第五节；结论先行，先还原时间线和调用栈，
+- 用户贴日志/报错时：按 `doc/workflows.txt` 第五节；先还原时间线和调用栈，
   再查 AzurPilot 当前版；未批准不改代码。
 - 通用底线：合并前做整仓三方演练；搬 AzurPilot 前查回档；回退后用 diff 验证；共享判断实机验证。
 
@@ -55,26 +51,35 @@
   True 表示已操作、需要新截图。
 - 复用 `GameStuckError`、`GameTooManyClickError` 和上层恢复，不吞异常。
 - 页面跳转用现有 UI/Page；docstring 用 `Pages:` 标注进入/退出页面。
-- 改配置相关测试用临时配置目录，避免写用户 `config/alas.json`。
 
 ## 配置、运行与硬约束
 
-- 运行：用项目约定环境运行 `alas.py`（调度器）、`gui.py -p <端口>`（WebUI）。
-- 依赖优先用项目约定环境，不要装系统 Python；需要重装时再参考 `requirements.txt`。
-  Windows 下先设 `PYTHONIOENCODING=utf-8`（bash 前缀，cmd 用 `set`，PowerShell 用 `$env:`）。
+- 项目约定的 Python 环境：优先用 `deploy.yaml` 的 `PythonExecutable`（默认 `./toolkit/python.exe`）；该路径不可用或未配置时，以用户当次说明为准，未说明就问用户。
+- 运行：用上述 Python 环境运行 `alas.py`（调度器）、`gui.py -p <端口>`（WebUI）。
+- 依赖优先用上述 Python 环境，不要装系统 Python；需要重装时再参考 `requirements.txt`。
 - 配置源：`module/config/argument/*.yaml`、`module/config/i18n/*.json`；改完在仓库根目录用
-  项目约定环境运行 `module/config/config_updater.py`，不要只手改 `config_generated.py`。
+  上述 Python 环境运行 `module/config/config_updater.py`，不要只手改 `config_generated.py`。
   源文件职责、新增配置流程和服务器/包名见 `doc/dev-reference.txt` 的“配置系统”。
 - `config/*.json`、`log/` 是运行期数据，不提交；资产按 `assets/<server>/`，
   按钮图用 `dev_tools/button_extract.py`。
 - 不做任务外扩展；没有数据源就不显示，禁止伪造数据。
-- 改动最小、可回退；行为修复按 AzurPilot/现有默认，新开关默认关闭；补离线测试，
-  按主题分开提交。
+- 改动最小、可回退；行为修复按 AzurPilot/现有默认，新开关默认关闭。
 - UI/图标实际渲染验证；新增日志优先 debug，不影响判定。
-- 临时截图、日志、录屏、音频、视频不进 Git；`assets/<server>/` 等游戏识别素材和已登记图标
-  按现有资产流程提交。
-- 提交不带临时文件、令牌、本机路径/用户名；标题单行中文，只描述改动，
-  不用“测试/日志”等过程词凑数；确实是测试/日志本身的改动可以写。
+
+## 测试
+
+- 用上述 Python 环境运行 `tests/run_os_tests.py [单文件/目录]`，并设置
+  `PYTHONIOENCODING=utf-8`（bash 前缀，cmd 用 `set`，PowerShell 用 `$env:`；Windows 应用商店的 `python` 别名可能不可用）。
+  `tests/island` 等截图/UI 测试需要 pytest 和素材，不在此 runner 范围。
+  失败先报告具体项，不要继续提交；测试数按当次输出写，不要沿用旧数字。
+  找不到 Python 解释器或依赖时问用户，不要往系统环境乱装；改动补离线测试，修 bug 配最小回归测试，断言约定见 `doc/decisions-and-pitfalls.txt` 的“测试约定”。
+- 改配置相关测试用临时配置目录，避免写用户 `config/alas.json`。
+
+## 提交
+
+- 提交不带临时文件、令牌、本机路径/用户名；临时截图、日志、录屏、音频、视频不进 Git；`assets/<server>/` 等游戏识别素材和已登记图标按现有资产流程提交。
+- 测试用回归截图统一放 `tests/os/fixtures/<主题>/`，注明 1280×720 来源和当时期望行为，不属于“临时截图”。
+- 标题单行中文，只描述改动，不用“测试/日志”等过程词凑数；确实是测试/日志本身的改动可以写。
 
 ## 模块地图
 
