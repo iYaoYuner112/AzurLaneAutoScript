@@ -724,7 +724,7 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 continue
             if self.combat_appear():
                 self.on_auto_search_battle_count_add()
-                if strategic and self.config.task_switched():
+                if self._os_auto_search_should_interrupt(strategic):
                     self.interrupt_auto_search()
                 if interrupt_confirm:
                     self.interrupt_auto_search(goto_main=False)
@@ -742,6 +742,34 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 continue
 
         return finished_combat
+
+    def _os_auto_search_should_interrupt(self, strategic):
+        """Whether the auto-search battle loop should yield to a pending task.
+
+        Aligned with AzurPilot (4e8a2f103, 2026-07-05): a stop event always
+        interrupts; a short meow strategic search is allowed to finish before
+        yielding; one-round proxies that disabled task switching keep searching.
+
+        Args:
+            strategic (bool): Whether the running search is a strategic search.
+
+        Returns:
+            bool: True if the caller should call `interrupt_auto_search()`.
+        """
+        if not strategic:
+            return False
+
+        stop_event = self.config.stop_event
+        if stop_event is not None and stop_event.is_set():
+            return True
+        if getattr(self.config, '_disable_task_switch', False):
+            return False
+        if not self.config.task_switched():
+            return False
+        if self.config.task.command == 'OpsiMeowfficerFarming':
+            logger.info('[大世界-搜索] 耄耋相接搜索运行中，延迟任务切换直到搜索完成')
+            return False
+        return True
 
     def interrupt_auto_search(self, goto_main=True):
         """
