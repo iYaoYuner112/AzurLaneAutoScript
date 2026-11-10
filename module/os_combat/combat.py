@@ -1,7 +1,7 @@
+from module.base.timer import Timer
 from module.combat.assets import *
 from module.combat.combat import Combat as Combat_
 from module.logger import logger
-from module.os.assets import MAP_EXIT, MAP_GOTO_GLOBE
 from module.os_combat.assets import *
 from module.os_handler.assets import *
 from module.os_handler.map_event import MapEventHandler
@@ -208,16 +208,19 @@ class Combat(Combat_, MapEventHandler):
 
         return False
 
+    _exp_info_click_timer = Timer(2)
+
     def handle_auto_search_exp_info(self):
         for button in (EXP_INFO_S, EXP_INFO_A, EXP_INFO_B, EXP_INFO_C, EXP_INFO_D):
             if self.appear(button, interval=self.battle_status_click_interval):
-                # 结算页的“确定”和大地图右下角的“作战总览 / 退出”是同一块屏幕位置；
-                # 画面已经回到地图时再点会点到地图按钮，把正在跑的自律点停。
-                if self.is_in_map() or self.appear(MAP_GOTO_GLOBE, offset=(20, 20)) \
-                        or self.appear(MAP_EXIT, offset=(20, 20)):
-                    logger.info(f'{button} is visible but the map is on screen, skip the click')
+                # 结算页的“确定”和大地图右下角的“作战总览 / 退出”是同一块屏幕位置。
+                # 结算页翻页约 1 秒，连点会让下一帧还匹配着旧页面，第二下就落到
+                # 已经切回的地图上；点过一次先等页面自己走，超过 2 秒还停着才补点。
+                if not self._exp_info_click_timer.reached():
+                    logger.debug('Exp info clicked recently, wait for the settlement to move on')
                     return False
                 self.device.click(button)
+                self._exp_info_click_timer.reset()
                 return True
         return False
 
