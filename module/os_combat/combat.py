@@ -208,14 +208,14 @@ class Combat(Combat_, MapEventHandler):
 
         return False
 
-    _exp_info_click_timer = Timer(2.5)
+    _exp_info_click_timer = Timer(3)
 
     def handle_auto_search_exp_info(self):
         for button in (EXP_INFO_S, EXP_INFO_A, EXP_INFO_B, EXP_INFO_C, EXP_INFO_D):
             if self.appear(button, interval=self.battle_status_click_interval):
                 # 结算页的“确定”和大地图右下角的“作战总览 / 退出”是同一块屏幕位置。
                 # 结算页翻页约 1 秒，连点会让下一帧还匹配着旧页面，第二下就落到
-                # 已经切回的地图上；点过一次先等页面自己走，超过 2.5 秒还停着才补点。
+                # 已经切回的地图上；点过一次先等页面自己走，超过 3 秒还停着才补点。
                 if not self._exp_info_click_timer.reached():
                     logger.debug('Exp info clicked recently, wait for the settlement to move on')
                     return False
