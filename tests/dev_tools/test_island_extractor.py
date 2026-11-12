@@ -71,11 +71,13 @@ def test_consecutive_extractors_load_cn_first(tmp_path, monkeypatch):
     ):
         requests.clear()
         extractor()
-        assert requests[0][1] == 'CN', (extractor.__name__, requests[0][2])
+        # Windows filesystems are case-insensitive, so LuaLoader may resolve
+        # CN to the lowercase alias; server names are case-insensitive.
+        assert requests[0][1].lower() == 'cn', (extractor.__name__, requests[0][2])
         assert all(
-            server == 'CN' for request_loader, server, _ in requests if request_loader is loader
+            server.lower() == 'cn' for request_loader, server, _ in requests if request_loader is loader
         ), extractor.__name__
-        assert loader.server == 'CN', extractor.__name__
+        assert loader.server.lower() == 'cn', extractor.__name__
 
 
 def test_sources_include_primary_secondary_and_activity_outputs():

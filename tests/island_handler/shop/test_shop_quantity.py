@@ -30,7 +30,8 @@ class QuantityDevice:
         self.now = 100.0
         self.screenshots = 0
         self.clicks = []
-        self.click_record = deque(maxlen=15)
+        # Match Device.click_record; the guard fires on the last 50 clicks.
+        self.click_record = deque(maxlen=50)
         self.quantities = [current]
         self.readings = []
 
@@ -152,7 +153,7 @@ def test_stalled_quantity_uses_device_guard_without_confirming_purchase(monkeypa
         shop.island_shop_buy_execute(object(), 19)
 
     assert device.quantity == 1
-    assert device.clicks == [10] * 22
+    assert device.clicks == [10] * 98
     assert confirmations == []
 
 
