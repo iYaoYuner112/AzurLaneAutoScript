@@ -2870,9 +2870,9 @@
       "help": "サーバーの最新の開発シーズンが自動的に選択されます。離島の全タスクと生産プランナーで共通の設定です。",
       "season_20260806_cn": "開発シーズンⅣ",
       "season_20261105_cn": "離島開発シーズンⅤ――冬日漫々",
-      "season_20260507_cn": "開発シーズンⅢ",
+      "season_20251106_cn": "開発シーズンⅠ",
       "season_20260205_cn": "開発シーズンⅡ",
-      "season_20251106_cn": "開発シーズンⅠ"
+      "season_20260507_cn": "開発シーズンⅢ"
     }
   },
   "IslandProduction": {
@@ -3271,10 +3271,10 @@
       "ResourceActionPoint": "行動力",
       "ResourceGems": "ジェム",
       "ResourceCube": "心智キューブ",
-      "ResourceGuildCoin": "艦隊コイン",
       "ResourceCore": "コアデータ",
       "ResourceMedal": "名誉メダル",
       "ResourceMerit": "戦功",
+      "ResourceGuildCoin": "艦隊コイン",
       "ResourceActionPointTotal": "箱を含む",
       "ResourceWaiting": "リソース同期待ち",
       "ResourceUpdated": "更新",

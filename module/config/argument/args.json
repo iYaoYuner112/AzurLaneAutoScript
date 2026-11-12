@@ -203,7 +203,11 @@
       },
       "TaskRestartLimit": {
         "type": "input",
-        "value": 3
+        "value": 3,
+        "validate": [
+          0,
+          999
+        ]
       },
       "ScreenshotLength": {
         "type": "input",
@@ -2954,6 +2958,11 @@
         "value": false,
         "display": "hide"
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -3349,6 +3358,11 @@
         "display": "hide"
       },
       "UseAutoSearch": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
+      "ContinueAfterRestart": {
         "type": "checkbox",
         "value": false,
         "display": "hide"
@@ -6394,6 +6408,11 @@
         "value": false,
         "display": "hide"
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -6617,6 +6636,11 @@
         "display": "hide"
       },
       "UseAutoSearch": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
+      "ContinueAfterRestart": {
         "type": "checkbox",
         "value": false,
         "display": "hide"

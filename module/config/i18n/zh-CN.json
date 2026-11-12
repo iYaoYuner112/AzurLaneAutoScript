@@ -2870,9 +2870,9 @@
       "help": "自动使用当前服务器最新的开发季，所有岛屿任务和生产规划共用此设置。",
       "season_20260806_cn": "岛屿开发季IV——秋日絮语",
       "season_20261105_cn": "岛屿开发季V——冬日漫行",
-      "season_20260507_cn": "岛屿开发季III——夏日悠游",
+      "season_20251106_cn": "岛屿开发季I——启动时刻！",
       "season_20260205_cn": "岛屿开发季II——春日闲趣",
-      "season_20251106_cn": "岛屿开发季I——启动时刻！"
+      "season_20260507_cn": "岛屿开发季III——夏日悠游"
     }
   },
   "IslandProduction": {
@@ -3271,10 +3271,10 @@
       "ResourceActionPoint": "行动力",
       "ResourceGems": "钻石",
       "ResourceCube": "心智魔方",
-      "ResourceGuildCoin": "舰队币",
       "ResourceCore": "核心数据",
       "ResourceMedal": "荣誉勋章",
       "ResourceMerit": "功勋",
+      "ResourceGuildCoin": "舰队币",
       "ResourceActionPointTotal": "含体力箱",
       "ResourceWaiting": "等待资源同步",
       "ResourceUpdated": "更新于",

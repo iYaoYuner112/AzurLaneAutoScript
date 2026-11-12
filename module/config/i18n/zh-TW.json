@@ -2870,9 +2870,9 @@
       "help": "自動使用目前伺服器最新的開發季，所有島嶼任務和生產規劃共用此設定。",
       "season_20260806_cn": "島嶼開發季IV——秋日絮語",
       "season_20261105_cn": "Island Planner Season V – Winter Wanderlust",
-      "season_20260507_cn": "島嶼開發季III——夏日悠遊",
+      "season_20251106_cn": "島嶼開發季I——啟動時刻！",
       "season_20260205_cn": "島嶼開發季II——春日閒趣",
-      "season_20251106_cn": "島嶼開發季I——啟動時刻！"
+      "season_20260507_cn": "島嶼開發季III——夏日悠遊"
     }
   },
   "IslandProduction": {
@@ -3271,10 +3271,10 @@
       "ResourceActionPoint": "行動力",
       "ResourceGems": "鑽石",
       "ResourceCube": "心智魔方",
-      "ResourceGuildCoin": "艦隊幣",
       "ResourceCore": "核心數據",
       "ResourceMedal": "榮譽勳章",
       "ResourceMerit": "勳功",
+      "ResourceGuildCoin": "艦隊幣",
       "ResourceActionPointTotal": "含行動力箱",
       "ResourceWaiting": "等待資源同步",
       "ResourceUpdated": "更新於",

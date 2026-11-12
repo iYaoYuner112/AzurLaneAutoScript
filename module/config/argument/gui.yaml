@@ -56,9 +56,11 @@ Overview:
   ResourcePurpleCoin:
   ResourceActionPoint:
   ResourceGems:
+  ResourceCube:
   ResourceCore:
   ResourceMedal:
   ResourceMerit:
+  ResourceGuildCoin:
   ResourceActionPointTotal:
   ResourceWaiting:
   ResourceUpdated:
