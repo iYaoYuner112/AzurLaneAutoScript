@@ -246,14 +246,6 @@
       "name": "Monthly Boss",
       "help": "To clear (easy/difficult) monthly bosses, the following conditions must be met to use this function:\n- Clear the main task of the big world\n- Enable the Great World Land Reclamation Mission or use the Battle Information Recorder (5000 oil props)\nIf the easy difficulty fails, the attack will be repeated according to the submarine settings; if the difficult difficulty fails, the mission will be terminated directly"
     },
-    "OpsiPreventActionPointOverflow": {
-      "name": "行動力溢れ防止",
-      "help": "現在行動力が上限に達した時、セイレーン作戦任務を実行して行動力を消費します"
-    },
-    "OpsiScheduling": {
-      "name": "スマートスケジューリング",
-      "help": ""
-    },
     "OpsiMeowfficerFarming": {
       "name": "Meowfficer Farming",
       "help": ""
@@ -324,6 +316,14 @@
     },
     "GameManager": {
       "name": "Game Manager(WIP)",
+      "help": ""
+    },
+    "OpsiPreventActionPointOverflow": {
+      "name": "行動力溢れ防止",
+      "help": "現在行動力が上限に達した時、セイレーン作戦任務を実行して行動力を消費します"
+    },
+    "OpsiScheduling": {
+      "name": "スマートスケジューリング",
       "help": ""
     }
   },
@@ -552,6 +552,10 @@
       "name": "Error.OnePushConfig.name",
       "help": "Error.OnePushConfig.help"
     },
+    "ScreenshotLength": {
+      "name": "Error.ScreenshotLength.name",
+      "help": "Error.ScreenshotLength.help"
+    },
     "LowPushMode": {
       "name": "低通知モード",
       "help": "手動対応が必要なエラーのみ通知します。ゲーム未起動、ゲームのフリーズなど自動復旧できるエラーはログに記録するだけで通知しません",
@@ -561,10 +565,6 @@
     "TaskRestartLimit": {
       "name": "同一タスクの連続再起動上限",
       "help": "同じタスクの連続エラーによる復旧がこの回数に達すると、サーバーの翌日0時まで延期し、エラー通知設定で通知します。そのタスクの成功で回数をリセットします。他のタスクやゲーム再起動の成功ではリセットしません。0 = 無制限。"
-    },
-    "ScreenshotLength": {
-      "name": "Error.ScreenshotLength.name",
-      "help": "Error.ScreenshotLength.help"
     }
   },
   "Optimization": {
@@ -918,10 +918,6 @@
       "name": "Campaign.UseAutoSearch.name",
       "help": "Campaign.UseAutoSearch.help"
     },
-    "ContinueAfterRestart": {
-      "name": "再起動後に戦闘を継続",
-      "help": "メイン・イベント海域の任務で利用可能。イベント日課、SP、緊急委託、燃料3周回を含み、既定はオフです。周回モードと自動攻略が必要です。異常再起動後に元の海域マップへ戻ったら自動攻略を有効にし、以後の各戦闘で通常どおりコンディションを計算します。再起動前の戦闘やリザルトは引き継ぎません。マップ情報は同じスケジューラープロセス内のみ保持し、設定変更や復旧上限到達時は従来の処理に戻ります。"
-    },
     "Use2xBook": {
       "name": "Campaign.Use2xBook.name",
       "help": "Campaign.Use2xBook.help"
@@ -929,6 +925,10 @@
     "AmbushEvade": {
       "name": "Campaign.AmbushEvade.name",
       "help": "Campaign.AmbushEvade.help"
+    },
+    "ContinueAfterRestart": {
+      "name": "再起動後に戦闘を継続",
+      "help": "メイン・イベント海域の任務で利用可能。イベント日課、SP、緊急委託、燃料3周回を含み、既定はオフです。周回モードと自動攻略が必要です。異常再起動後に元の海域マップへ戻ったら自動攻略を有効にし、以後の各戦闘で通常どおりコンディションを計算します。再起動前の戦闘やリザルトは引き継ぎません。マップ情報は同じスケジューラープロセス内のみ保持し、設定変更や復旧上限到達時は従来の処理に戻ります。"
     }
   },
   "StopCondition": {
@@ -1792,10 +1792,6 @@
       "name": "GeneralShop._info.name",
       "help": "GeneralShop._info.help"
     },
-    "Enable": {
-      "name": "ショップ切替",
-      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
-    },
     "UseGems": {
       "name": "GeneralShop.UseGems.name",
       "help": "GeneralShop.UseGems.help"
@@ -1815,16 +1811,16 @@
     "Filter": {
       "name": "GeneralShop.Filter.name",
       "help": "GeneralShop.Filter.help"
+    },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     }
   },
   "GuildShop": {
     "_info": {
       "name": "GuildShop._info.name",
       "help": "GuildShop._info.help"
-    },
-    "Enable": {
-      "name": "ショップ切替",
-      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     },
     "Refresh": {
       "name": "GuildShop.Refresh.name",
@@ -1932,16 +1928,16 @@
       "mainz": "マインツ",
       "odin": "オーディン",
       "champagne": "シャンパーニュ"
+    },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     }
   },
   "MedalShop2": {
     "_info": {
       "name": "MedalShop._info.name",
       "help": "MedalShop._info.help"
-    },
-    "Enable": {
-      "name": "ショップ切替",
-      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     },
     "Filter": {
       "name": "MedalShop.Filter.name",
@@ -1997,16 +1993,16 @@
       "torpedo": "torpedo",
       "antiair": "antiair",
       "plane": "plane"
+    },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     }
   },
   "MeritShop": {
     "_info": {
       "name": "MeritShop._info.name",
       "help": "MeritShop._info.help"
-    },
-    "Enable": {
-      "name": "ショップ切替",
-      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     },
     "Refresh": {
       "name": "MeritShop.Refresh.name",
@@ -2019,6 +2015,10 @@
     "Filter": {
       "name": "MeritShop.Filter.name",
       "help": "MeritShop.Filter.help"
+    },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     }
   },
   "CoreShop": {
@@ -2026,13 +2026,13 @@
       "name": "CoreShop._info.name",
       "help": "CoreShop._info.help"
     },
-    "Enable": {
-      "name": "ショップ切替",
-      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
-    },
     "Filter": {
       "name": "CoreShop.Filter.name",
       "help": "CoreShop.Filter.help"
+    },
+    "Enable": {
+      "name": "ショップ切替",
+      "help": "有効にするとこのショップを実行し、無効にするとタスク中にこのショップをスキップします。"
     }
   },
   "ShipyardDr": {
@@ -2651,13 +2651,13 @@
       "name": "OpsiObscure._info.name",
       "help": "OpsiObscure._info.help"
     },
-    "SkipHazard2Obscure": {
-      "name": "レベル2座標をクリアしない",
-      "help": "オンにすると、侵蝕レベル2の隠秘海域を攻撃しません。"
-    },
     "ForceRun": {
       "name": "OpsiObscure.ForceRun.name",
       "help": "OpsiObscure.ForceRun.help"
+    },
+    "SkipHazard2Obscure": {
+      "name": "レベル2座標をクリアしない",
+      "help": "オンにすると、侵蝕レベル2の隠秘海域を攻撃しません。"
     }
   },
   "OpsiAbyssal": {
@@ -2698,27 +2698,6 @@
     "ForceRun": {
       "name": "OpsiMonthBoss.ForceRun.name",
       "help": "OpsiMonthBoss.ForceRun.help"
-    }
-  },
-  "OpsiPreventActionPointOverflow": {
-    "_info": {
-      "name": "行動力溢れ防止",
-      "help": "現在行動力が上限に達した時、セイレーン作戦任務を実行して行動力を消費します\nスマートスケジューリングを選択した場合、行動力と作戦補給コインがどちらも不足して実行可能な任務がない時は、オフニャ周回を実行して現在行動力を消費します"
-    },
-    "Task": {
-      "name": "実行する任務",
-      "help": "専用処理があるスマートスケジューリングを推奨します",
-      "OpsiScheduling": "スマートスケジューリング（推奨）",
-      "OpsiHazard1Leveling": "侵蝕1レベリング",
-      "OpsiMeowfficerFarming": "短猫相接"
-    },
-    "ActionPointUpperbound": {
-      "name": "現在行動力上限",
-      "help": "現在行動力がこの値に達した時、セイレーン作戦任務を開始します"
-    },
-    "ActionPointLowerbound": {
-      "name": "現在行動力下限",
-      "help": "現在行動力がこの値を下回るまで実行を続けます"
     }
   },
   "OpsiMeowfficerFarming": {
@@ -2773,93 +2752,6 @@
       "help": "プログラムが自動管理します。すでに見つけたが処理し終えていない大世界マップイベント（明石/セイレーン装置）を記録し、クラッシュ後の再起動時に先に処理します。通常は変更不要です"
     }
   },
-  "OpsiSirenBug": {
-    "_info": {
-      "name": "セイレーン研究装置",
-      "help": "セイレーン研究装置を処理するための基本設定"
-    },
-    "SirenResearch_Enable": {
-      "name": "セイレーン研究装置を有効化",
-      "help": "有効化すると、セイレーン研究装置で紫コインを黄コインに変換します\n紫コイン消費を維持するには十分な海里数が必要です"
-    },
-    "Siren_Mode": {
-      "name": "セイレーン探知装置との対話方法",
-      "help": "セイレーン装置との対話方法を選択。資源探知はパープルコイン（特別交換券）を消費し、敵探知はセイレーンエネルギー貯蔵器を消費します",
-      "resource": "隠された資源の探知を繰り返し試みる",
-      "enemy": "隠された敵の探知を繰り返し試みる"
-    },
-    "Siren_Fleet": {
-      "name": "敵探知に使用する艦隊",
-      "help": "隠された敵を探知する際に使用する艦隊を選択。0は現在の艦隊を使用、1-4は指定した艦隊を使用",
-      "0": "現在の艦隊を使用",
-      "1": "艦隊1",
-      "2": "艦隊2",
-      "3": "艦隊3",
-      "4": "艦隊4"
-    }
-  },
-  "OpsiScheduling": {
-    "_info": {
-      "name": "スマートスケジューリング",
-      "help": "スマートスケジューリング関連の設定"
-    },
-    "UseSmartSchedulingOperationCoinsPreserve": {
-      "name": "コイン目標による調整",
-      "help": "有効時は、コインを確保量と補充量の合計まで補充してから侵蝕1のレベリングに戻ります。無効時は行動力で調整し、行動力が確保量に達するまでコインを補充します。どちらもスマートスケジューリング自身のコイン確保量を使います。",
-      "True": "有効",
-      "False": "無効"
-    },
-    "OperationCoinsPreserve": {
-      "name": "スマートスケジューリング：作戦補給コインをX個確保",
-      "help": "戦闘補給バウチャーが X より低い場合は、黄色のコイン補充タスクを実行します。これを変更することはお勧めできません。"
-    },
-    "ActionPointPreserve": {
-      "name": "コイン補充：行動力をXポイント確保",
-      "help": "総行動力がXに達したらコイン補充を停止します。総行動力には行動力回復アイテム分も含みます。0にするとオフニャ周回の行動力確保量を使います。本項目は大世界全体の開始ラインも兼ねており、総行動力がこれ以下の場合は侵蝕1レベリングも開始しません。"
-    },
-    "MeowfficerActionPointPreserve": {
-      "name": "オフニャ周回：行動力をXポイント確保",
-      "help": "「コイン補充：行動力をXポイント確保」が 0 のときに使われる代替確保値。既定値は 1000、入力どおりに適用されます（上限なし、月末の引き下げなし）。"
-    },
-    "OperationCoinsReturnThreshold": {
-      "name": "コイン補充量",
-      "help": "コイン目標による調整では、コインを確保量とXの合計まで補充してから侵蝕1のレベリングに戻ります。行動力による調整ではこの値を使いません。"
-    },
-    "EnableMeowfficerFarming": {
-      "name": "短猫相接を有効にする",
-      "help": "インテリジェント スケジューリングでショート キャット接続タスクが黄色のコインを補充できるようにするかどうか",
-      "True": "有効",
-      "False": "無効"
-    },
-    "EnableHazard1Leveling": {
-      "name": "侵蝕1レベリングを有効にする",
-      "help": "スマートスケジューリングで侵蝕1レベリングタスクを有効にするかどうか",
-      "True": "有効",
-      "False": "無効"
-    },
-    "EnableObscure": {
-      "name": "隠秘海域を有効にする",
-      "help": "黄色のコインを補充するため、スマートスケジューリングで隠秘海域ミッションを有効にするかどうか",
-      "True": "有効",
-      "False": "無効"
-    },
-    "EnableAbyssal": {
-      "name": "深淵座標を有効にする",
-      "help": "イエローコインを補充するため、スマートスケジューリングで深淵座標ミッションを有効にするかどうか",
-      "True": "有効",
-      "False": "無効"
-    },
-    "EnableStronghold": {
-      "name": "セイレーン要塞を有効にする",
-      "help": "黄色のコインを補充するため、スマートスケジューリングでセイレーン要塞タスクを有効にするかどうか",
-      "True": "有効",
-      "False": "無効"
-    },
-    "TaskPriority": {
-      "name": "作戦コイン補充優先度",
-      "help": "作戦コイン（黄）が不足している場合、作戦コイン補充任務の実行優先順位。> で区切ります。"
-    }
-  },
   "IslandGeneral": {
     "_info": {
       "name": "離島共通設定",
@@ -2868,11 +2760,11 @@
     "Season": {
       "name": "開発シーズン",
       "help": "サーバーの最新の開発シーズンが自動的に選択されます。離島の全タスクと生産プランナーで共通の設定です。",
-      "season_20260806_cn": "開発シーズンⅣ",
       "season_20261105_cn": "離島開発シーズンⅤ――冬日漫々",
       "season_20251106_cn": "開発シーズンⅠ",
       "season_20260205_cn": "開発シーズンⅡ",
-      "season_20260507_cn": "開発シーズンⅢ"
+      "season_20260507_cn": "開発シーズンⅢ",
+      "season_20260806_cn": "開発シーズンⅣ"
     }
   },
   "IslandProduction": {
@@ -3261,6 +3153,10 @@
     "Overview": {
       "Scheduler": "スケジューラー",
       "Log": "ログ",
+      "Running": "実行中",
+      "Pending": "隊列中",
+      "Waiting": "Waiting",
+      "NoTask": "No Task",
       "Resources": "リソースモニター",
       "ResourceHint": "タスクが最後に読み取った値を表示します。24時間以上前の値は古いものとして表示されます",
       "ResourceOil": "燃料",
@@ -3278,11 +3174,7 @@
       "ResourceActionPointTotal": "箱を含む",
       "ResourceWaiting": "リソース同期待ち",
       "ResourceUpdated": "更新",
-      "ResourceStale": "古いデータ",
-      "Running": "実行中",
-      "Pending": "隊列中",
-      "Waiting": "Waiting",
-      "NoTask": "No Task"
+      "ResourceStale": "古いデータ"
     },
     "AddAlas": {
       "PopupTitle": "新しいコンフィグを追加",
@@ -3346,6 +3238,114 @@
       "Clear": "消除",
       "EnterPassword": "パスワードを入力してください",
       "ChooseFile": "ファイルを選択してください"
+    }
+  },
+  "OpsiPreventActionPointOverflow": {
+    "_info": {
+      "name": "行動力溢れ防止",
+      "help": "現在行動力が上限に達した時、セイレーン作戦任務を実行して行動力を消費します\nスマートスケジューリングを選択した場合、行動力と作戦補給コインがどちらも不足して実行可能な任務がない時は、オフニャ周回を実行して現在行動力を消費します"
+    },
+    "Task": {
+      "name": "実行する任務",
+      "help": "専用処理があるスマートスケジューリングを推奨します",
+      "OpsiScheduling": "スマートスケジューリング（推奨）",
+      "OpsiHazard1Leveling": "侵蝕1レベリング",
+      "OpsiMeowfficerFarming": "短猫相接"
+    },
+    "ActionPointUpperbound": {
+      "name": "現在行動力上限",
+      "help": "現在行動力がこの値に達した時、セイレーン作戦任務を開始します"
+    },
+    "ActionPointLowerbound": {
+      "name": "現在行動力下限",
+      "help": "現在行動力がこの値を下回るまで実行を続けます"
+    }
+  },
+  "OpsiSirenBug": {
+    "_info": {
+      "name": "セイレーン研究装置",
+      "help": "セイレーン研究装置を処理するための基本設定"
+    },
+    "SirenResearch_Enable": {
+      "name": "セイレーン研究装置を有効化",
+      "help": "有効化すると、セイレーン研究装置で紫コインを黄コインに変換します\n紫コイン消費を維持するには十分な海里数が必要です"
+    },
+    "Siren_Mode": {
+      "name": "セイレーン探知装置との対話方法",
+      "help": "セイレーン装置との対話方法を選択。資源探知はパープルコイン（特別交換券）を消費し、敵探知はセイレーンエネルギー貯蔵器を消費します",
+      "resource": "隠された資源の探知を繰り返し試みる",
+      "enemy": "隠された敵の探知を繰り返し試みる"
+    },
+    "Siren_Fleet": {
+      "name": "敵探知に使用する艦隊",
+      "help": "隠された敵を探知する際に使用する艦隊を選択。0は現在の艦隊を使用、1-4は指定した艦隊を使用",
+      "0": "現在の艦隊を使用",
+      "1": "艦隊1",
+      "2": "艦隊2",
+      "3": "艦隊3",
+      "4": "艦隊4"
+    }
+  },
+  "OpsiScheduling": {
+    "_info": {
+      "name": "スマートスケジューリング",
+      "help": "スマートスケジューリング関連の設定"
+    },
+    "UseSmartSchedulingOperationCoinsPreserve": {
+      "name": "コイン目標による調整",
+      "help": "有効時は、コインを確保量と補充量の合計まで補充してから侵蝕1のレベリングに戻ります。無効時は行動力で調整し、行動力が確保量に達するまでコインを補充します。どちらもスマートスケジューリング自身のコイン確保量を使います。",
+      "True": "有効",
+      "False": "無効"
+    },
+    "OperationCoinsPreserve": {
+      "name": "スマートスケジューリング：作戦補給コインをX個確保",
+      "help": "戦闘補給バウチャーが X より低い場合は、黄色のコイン補充タスクを実行します。これを変更することはお勧めできません。"
+    },
+    "ActionPointPreserve": {
+      "name": "コイン補充：行動力をXポイント確保",
+      "help": "総行動力がXに達したらコイン補充を停止します。総行動力には行動力回復アイテム分も含みます。0にするとオフニャ周回の行動力確保量を使います。本項目は大世界全体の開始ラインも兼ねており、総行動力がこれ以下の場合は侵蝕1レベリングも開始しません。"
+    },
+    "MeowfficerActionPointPreserve": {
+      "name": "オフニャ周回：行動力をXポイント確保",
+      "help": "「コイン補充：行動力をXポイント確保」が 0 のときに使われる代替確保値。既定値は 1000、入力どおりに適用されます（上限なし、月末の引き下げなし）。"
+    },
+    "OperationCoinsReturnThreshold": {
+      "name": "コイン補充量",
+      "help": "コイン目標による調整では、コインを確保量とXの合計まで補充してから侵蝕1のレベリングに戻ります。行動力による調整ではこの値を使いません。"
+    },
+    "EnableMeowfficerFarming": {
+      "name": "短猫相接を有効にする",
+      "help": "インテリジェント スケジューリングでショート キャット接続タスクが黄色のコインを補充できるようにするかどうか",
+      "True": "有効",
+      "False": "無効"
+    },
+    "EnableHazard1Leveling": {
+      "name": "侵蝕1レベリングを有効にする",
+      "help": "スマートスケジューリングで侵蝕1レベリングタスクを有効にするかどうか",
+      "True": "有効",
+      "False": "無効"
+    },
+    "EnableObscure": {
+      "name": "隠秘海域を有効にする",
+      "help": "黄色のコインを補充するため、スマートスケジューリングで隠秘海域ミッションを有効にするかどうか",
+      "True": "有効",
+      "False": "無効"
+    },
+    "EnableAbyssal": {
+      "name": "深淵座標を有効にする",
+      "help": "イエローコインを補充するため、スマートスケジューリングで深淵座標ミッションを有効にするかどうか",
+      "True": "有効",
+      "False": "無効"
+    },
+    "EnableStronghold": {
+      "name": "セイレーン要塞を有効にする",
+      "help": "黄色のコインを補充するため、スマートスケジューリングでセイレーン要塞タスクを有効にするかどうか",
+      "True": "有効",
+      "False": "無効"
+    },
+    "TaskPriority": {
+      "name": "作戦コイン補充優先度",
+      "help": "作戦コイン（黄）が不足している場合、作戦コイン補充任務の実行優先順位。> で区切ります。"
     }
   }
 }

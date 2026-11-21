@@ -246,14 +246,6 @@
       "name": "Monthly Boss",
       "help": "To clear (easy/difficult) monthly bosses, the following conditions must be met to use this function:\n- Clear the main task of the big world\n- Enable the Great World Land Reclamation Mission or use the Battle Information Recorder (5000 oil props)\nIf the easy difficulty fails, the attack will be repeated according to the submarine settings; if the difficult difficulty fails, the mission will be terminated directly"
     },
-    "OpsiPreventActionPointOverflow": {
-      "name": "Prevent AP Overflow",
-      "help": "Runs Operation Siren tasks when current AP reaches the upper limit."
-    },
-    "OpsiScheduling": {
-      "name": "Smart Scheduling",
-      "help": ""
-    },
     "OpsiMeowfficerFarming": {
       "name": "Meowfficer Farming",
       "help": ""
@@ -324,6 +316,14 @@
     },
     "GameManager": {
       "name": "Game Manager(WIP)",
+      "help": ""
+    },
+    "OpsiPreventActionPointOverflow": {
+      "name": "Prevent AP Overflow",
+      "help": "Runs Operation Siren tasks when current AP reaches the upper limit."
+    },
+    "OpsiScheduling": {
+      "name": "Smart Scheduling",
       "help": ""
     }
   },
@@ -552,6 +552,10 @@
       "name": "Error notify config",
       "help": "When Alas cannot handle exception, send a message through Onepush. Configuration document:\nhttps://github.com/LmeSzinc/AzurLaneAutoScript/wiki/Onepush-configuration-%5BEN%5D"
     },
+    "ScreenshotLength": {
+      "name": "Record Screenshot(s)",
+      "help": "Number of screenshots saved when exception occurs"
+    },
     "LowPushMode": {
       "name": "Low Push Mode",
       "help": "Only push errors that require manual intervention. Recoverable errors such as the game not running or the game being stuck are only logged, not pushed",
@@ -561,10 +565,6 @@
     "TaskRestartLimit": {
       "name": "Consecutive restart limit per task",
       "help": "After this many consecutive failed recovery attempts, defer the task until the next server midnight and send an alert using error notification settings. Only success of that task resets its count; other tasks and successful game restarts do not. 0 = unlimited."
-    },
-    "ScreenshotLength": {
-      "name": "Record Screenshot(s)",
-      "help": "Number of screenshots saved when exception occurs"
     }
   },
   "Optimization": {
@@ -918,10 +918,6 @@
       "name": "Use Auto Search",
       "help": ""
     },
-    "ContinueAfterRestart": {
-      "name": "Continue battle after restart",
-      "help": "Available for main and event map tasks, including daily event stages, SP, urgent commissions and three-oil farming; off by default. Requires clearing mode and auto search. After an abnormal restart returns to the original map, enable auto search and account for morale normally in each subsequent battle. Does not resume a pre-restart battle or settlement. Map context exists only in this scheduler process; changed settings or exhausted retries fall back to the existing flow."
-    },
     "Use2xBook": {
       "name": "Use High-Efficiency Combat Logistics Plan",
       "help": "Twice the oil consumption but also twice the exp and drops"
@@ -929,6 +925,10 @@
     "AmbushEvade": {
       "name": "Evade Ambush(es)",
       "help": ""
+    },
+    "ContinueAfterRestart": {
+      "name": "Continue battle after restart",
+      "help": "Available for main and event map tasks, including daily event stages, SP, urgent commissions and three-oil farming; off by default. Requires clearing mode and auto search. After an abnormal restart returns to the original map, enable auto search and account for morale normally in each subsequent battle. Does not resume a pre-restart battle or settlement. Map context exists only in this scheduler process; changed settings or exhausted retries fall back to the existing flow."
     }
   },
   "StopCondition": {
@@ -1792,10 +1792,6 @@
       "name": "General Shop Settings",
       "help": ""
     },
-    "Enable": {
-      "name": "Shop toggle",
-      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
-    },
     "UseGems": {
       "name": "Use Gems",
       "help": ""
@@ -1815,16 +1811,16 @@
     "Filter": {
       "name": "Item Filter",
       "help": "All options have been defined at <https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/reward_shop_filter_string>"
+    },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     }
   },
   "GuildShop": {
     "_info": {
       "name": "Guild Shop Settings",
       "help": ""
-    },
-    "Enable": {
-      "name": "Shop toggle",
-      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     },
     "Refresh": {
       "name": "Allow Shop Refresh",
@@ -1932,16 +1928,16 @@
       "mainz": "Mainz",
       "odin": "Odin",
       "champagne": "Champagne"
+    },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     }
   },
   "MedalShop2": {
     "_info": {
       "name": "Medal Shop Settings",
       "help": ""
-    },
-    "Enable": {
-      "name": "Shop toggle",
-      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     },
     "Filter": {
       "name": "Item Filter",
@@ -1997,16 +1993,16 @@
       "torpedo": "torpedo",
       "antiair": "antiair",
       "plane": "plane"
+    },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     }
   },
   "MeritShop": {
     "_info": {
       "name": "Merit Shop Settings",
       "help": ""
-    },
-    "Enable": {
-      "name": "Shop toggle",
-      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     },
     "Refresh": {
       "name": "Allow Shop Refresh",
@@ -2019,6 +2015,10 @@
     "Filter": {
       "name": "Item Filter",
       "help": "All options have been defined at <https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/reward_shop_filter_string>"
+    },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     }
   },
   "CoreShop": {
@@ -2026,13 +2026,13 @@
       "name": "Core Shop Settings",
       "help": ""
     },
-    "Enable": {
-      "name": "Shop toggle",
-      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
-    },
     "Filter": {
       "name": "Item Filter",
       "help": "All options have been defined at <https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/reward_shop_filter_string>\nHowever unlike other shops, only Chip and Array are supported\nALAS does not browse, scroll, or recognize any other items displayed besides those two"
+    },
+    "Enable": {
+      "name": "Shop toggle",
+      "help": "Enable this to run the shop. Disable it to skip this shop during the task."
     }
   },
   "ShipyardDr": {
@@ -2651,13 +2651,13 @@
       "name": "OpSi Obscure Settings",
       "help": "Clear obscure zones every 27 minutes\nThe following must be satisfied:\n- OpSi story and practice battles must be complete\n- Task OpSi Explore enabled or consuming 5000 oil for special radar in OpSi voucher shop"
     },
-    "SkipHazard2Obscure": {
-      "name": "Skip Corrosion Level 2 coordinates",
-      "help": "When enabled, Obscured Zones with Corrosion Level 2 will not be cleared."
-    },
     "ForceRun": {
       "name": "Force Run",
       "help": "Ignore interval, clear all obscure zones, and use AP to submit scan orders (and submarine if enabled)\nGenerally not needed to force run, just run in intervals unless in a rush"
+    },
+    "SkipHazard2Obscure": {
+      "name": "Skip Corrosion Level 2 coordinates",
+      "help": "When enabled, Obscured Zones with Corrosion Level 2 will not be cleared."
     }
   },
   "OpsiAbyssal": {
@@ -2700,27 +2700,6 @@
       "help": "Ignore interval, clear all abyssal zones, and use AP to submit scan orders (and submarine if enabled)\nGenerally not needed to force run, just run in intervals unless in a rush"
     }
   },
-  "OpsiPreventActionPointOverflow": {
-    "_info": {
-      "name": "Prevent AP overflow",
-      "help": "Runs Operation Siren tasks when current AP reaches the upper limit.\nWhen Smart Scheduling is selected, it runs Meowfficer Farming if both AP and Operation Supply Coins are insufficient and no other task can run."
-    },
-    "Task": {
-      "name": "Task to run",
-      "help": "Recommended: Smart Scheduling, which has dedicated overflow handling.",
-      "OpsiScheduling": "Smart scheduling (recommended)",
-      "OpsiHazard1Leveling": "Corrosion 1 leveling",
-      "OpsiMeowfficerFarming": "Meowfficer farming"
-    },
-    "ActionPointUpperbound": {
-      "name": "Current AP upper limit",
-      "help": "Start running Operation Siren tasks when current AP reaches this value."
-    },
-    "ActionPointLowerbound": {
-      "name": "Current AP lower limit",
-      "help": "Keep running until current AP drops below this value."
-    }
-  },
   "OpsiMeowfficerFarming": {
     "_info": {
       "name": "OpSi Meowfficer Farm Settings",
@@ -2755,7 +2734,7 @@
   "OpsiHazard1Leveling": {
     "_info": {
       "name": "CL1 leveling",
-      "help": "Consume operation coins to gain a lot of experience and a little action points.\nRecommended to carry 1-2 pre-loaded CV to obtain the highest average hourly benefit.\n\nWhen run independently, Alas retains 100,000 operation coins for port shops. When OpSi resource scheduling is enabled, its coin reserve and return target are controlled by that scheduler.\nSince buying action points at the mystery shop requires a large number of operation coins, CL1 leveling still uses overflow action points for meowfficer farming."
+      "help": "Consume operation coins to gain a lot of experience and a little action points.\nRecommended to carry 1-2 pre-loaded CV to obtain the highest average hourly benefit.\n\nTo avoid being unable to buying goods from port shops, Alas will retain 100,000 operation coins\nSince buying action points at the mystery shop requires a large number of operation coins, this function will be supplemented by running meowfficer farming with overflow action points."
     },
     "TargetZone": {
       "name": "Target Zone ID",
@@ -2773,93 +2752,6 @@
       "help": "Maintained by the program: the Opsi map event (Akashi / siren device) that was already seen but not finished. It is resumed first after a crash and restart. Normally you do not need to change it"
     }
   },
-  "OpsiSirenBug": {
-    "_info": {
-      "name": "Siren research device",
-      "help": "Basic options for handling Siren Research Devices"
-    },
-    "SirenResearch_Enable": {
-      "name": "Enable Siren research device",
-      "help": "After enabling, use purple coins to convert to yellow coins through the Siren Research Device\nSufficient nautical miles are needed to sustain the purple coin consumption"
-    },
-    "Siren_Mode": {
-      "name": "Interaction mode with Siren detection device",
-      "help": "Choose how to interact with Siren devices. Detecting resources costs purple coins (Special Exchange Vouchers), detecting enemies costs Siren Energy Storage",
-      "resource": "Repeatedly attempt to detect hidden resources",
-      "enemy": "Repeatedly attempt to detect hidden enemies"
-    },
-    "Siren_Fleet": {
-      "name": "Fleet for enemy detection",
-      "help": "Select the fleet to use when detecting hidden enemies. 0 means use current fleet, 1-4 means use specified fleet",
-      "0": "Use current fleet",
-      "1": "Fleet 1",
-      "2": "Fleet 2",
-      "3": "Fleet 3",
-      "4": "Fleet 4"
-    }
-  },
-  "OpsiScheduling": {
-    "_info": {
-      "name": "Smart scheduling",
-      "help": "Smart scheduling related settings"
-    },
-    "UseSmartSchedulingOperationCoinsPreserve": {
-      "name": "Coin target scheduling",
-      "help": "When enabled, replenish coins to the coin reserve plus the refill amount before returning to corrosion 1 leveling. When disabled, use AP scheduling and replenish coins until AP reaches its reserve. Both modes use Smart Scheduling's own coin reserve.",
-      "True": "Enabled",
-      "False": "Disabled"
-    },
-    "OperationCoinsPreserve": {
-      "name": "Smart Scheduling: preserve X combat supply vouchers",
-      "help": "When Combat Supply Vouchers are lower than X, run yellow coin replenishment task. Not recommended to modify."
-    },
-    "ActionPointPreserve": {
-      "name": "Coin replenishment: preserve X action points",
-      "help": "Stop coin replenishment when total AP reaches X. Total AP includes AP in boxes. Set to 0 to use the Meowfficer Farming AP reserve. This is also the overall Operation Siren start line: at or below it, corrosion 1 leveling does not start this round either."
-    },
-    "MeowfficerActionPointPreserve": {
-      "name": "Meowfficer Farming: preserve X action points",
-      "help": "Fallback reserve used when \"Coin replenishment: preserve X action points\" is set to 0. Default 1000, used as configured (no cap, no month-end reduction)."
-    },
-    "OperationCoinsReturnThreshold": {
-      "name": "Coin refill amount",
-      "help": "In coin target scheduling, replenish coins to the coin reserve plus X before returning to corrosion 1 leveling. AP scheduling does not use this amount."
-    },
-    "EnableMeowfficerFarming": {
-      "name": "Enable meowfficer farming",
-      "help": "Whether to enable Meowfficer Farming task for yellow coin replenishment in Smart Scheduling",
-      "True": "Enabled",
-      "False": "Disabled"
-    },
-    "EnableHazard1Leveling": {
-      "name": "Enable corrosion 1 leveling",
-      "help": "Whether to enable Corrosion 1 Leveling task in Smart Scheduling",
-      "True": "Enabled",
-      "False": "Disabled"
-    },
-    "EnableObscure": {
-      "name": "Enable obscured zone",
-      "help": "Whether to enable Obscured Zone task for yellow coin replenishment in Smart Scheduling",
-      "True": "Enabled",
-      "False": "Disabled"
-    },
-    "EnableAbyssal": {
-      "name": "Enable abyssal zone",
-      "help": "Whether to enable Abyssal Zone task for yellow coin replenishment in Smart Scheduling",
-      "True": "Enabled",
-      "False": "Disabled"
-    },
-    "EnableStronghold": {
-      "name": "Enable Siren stronghold",
-      "help": "Whether to enable Siren Stronghold task for yellow coin replenishment in Smart Scheduling",
-      "True": "Enabled",
-      "False": "Disabled"
-    },
-    "TaskPriority": {
-      "name": "Replenishment task priority",
-      "help": "The priority order of tasks for yellow coin replenishment when they are insufficient. Separated by >."
-    }
-  },
   "IslandGeneral": {
     "_info": {
       "name": "Island Settings",
@@ -2868,11 +2760,11 @@
     "Season": {
       "name": "Development Season",
       "help": "The latest development season for your server is selected automatically. All island tasks and the production planner share this setting.",
-      "season_20260806_cn": "Island Planner Season IV - Tales from Autumn",
       "season_20261105_cn": "Island Planner Season V – Winter Wanderlust",
       "season_20251106_cn": "Development Season I - Lets Get Started!",
       "season_20260205_cn": "Development Season II - Spring Merrymaking",
-      "season_20260507_cn": "Development Season Ⅲ – Summer Sojourn"
+      "season_20260507_cn": "Development Season Ⅲ – Summer Sojourn",
+      "season_20260806_cn": "Island Planner Season IV - Tales from Autumn"
     }
   },
   "IslandProduction": {
@@ -3261,6 +3153,10 @@
     "Overview": {
       "Scheduler": "Scheduler",
       "Log": "Log",
+      "Running": "Running",
+      "Pending": "Pending",
+      "Waiting": "Waiting",
+      "NoTask": "No Task",
       "Resources": "Resource Monitor",
       "ResourceHint": "Latest values read by a task; values older than 24 hours are marked stale",
       "ResourceOil": "Oil",
@@ -3278,11 +3174,7 @@
       "ResourceActionPointTotal": "including boxes",
       "ResourceWaiting": "Waiting for resource sync",
       "ResourceUpdated": "Updated",
-      "ResourceStale": "Stale",
-      "Running": "Running",
-      "Pending": "Pending",
-      "Waiting": "Waiting",
-      "NoTask": "No Task"
+      "ResourceStale": "Stale"
     },
     "AddAlas": {
       "PopupTitle": "Add new config",
@@ -3346,6 +3238,114 @@
       "Clear": "Clear",
       "EnterPassword": "Enter password",
       "ChooseFile": "Choose file"
+    }
+  },
+  "OpsiPreventActionPointOverflow": {
+    "_info": {
+      "name": "Prevent AP overflow",
+      "help": "Runs Operation Siren tasks when current AP reaches the upper limit.\nWhen Smart Scheduling is selected, it runs Meowfficer Farming if both AP and Operation Supply Coins are insufficient and no other task can run."
+    },
+    "Task": {
+      "name": "Task to run",
+      "help": "Recommended: Smart Scheduling, which has dedicated overflow handling.",
+      "OpsiScheduling": "Smart scheduling (recommended)",
+      "OpsiHazard1Leveling": "Corrosion 1 leveling",
+      "OpsiMeowfficerFarming": "Meowfficer farming"
+    },
+    "ActionPointUpperbound": {
+      "name": "Current AP upper limit",
+      "help": "Start running Operation Siren tasks when current AP reaches this value."
+    },
+    "ActionPointLowerbound": {
+      "name": "Current AP lower limit",
+      "help": "Keep running until current AP drops below this value."
+    }
+  },
+  "OpsiSirenBug": {
+    "_info": {
+      "name": "Siren research device",
+      "help": "Basic options for handling Siren Research Devices"
+    },
+    "SirenResearch_Enable": {
+      "name": "Enable Siren research device",
+      "help": "After enabling, use purple coins to convert to yellow coins through the Siren Research Device\nSufficient nautical miles are needed to sustain the purple coin consumption"
+    },
+    "Siren_Mode": {
+      "name": "Interaction mode with Siren detection device",
+      "help": "Choose how to interact with Siren devices. Detecting resources costs purple coins (Special Exchange Vouchers), detecting enemies costs Siren Energy Storage",
+      "resource": "Repeatedly attempt to detect hidden resources",
+      "enemy": "Repeatedly attempt to detect hidden enemies"
+    },
+    "Siren_Fleet": {
+      "name": "Fleet for enemy detection",
+      "help": "Select the fleet to use when detecting hidden enemies. 0 means use current fleet, 1-4 means use specified fleet",
+      "0": "Use current fleet",
+      "1": "Fleet 1",
+      "2": "Fleet 2",
+      "3": "Fleet 3",
+      "4": "Fleet 4"
+    }
+  },
+  "OpsiScheduling": {
+    "_info": {
+      "name": "Smart scheduling",
+      "help": "Smart scheduling related settings"
+    },
+    "UseSmartSchedulingOperationCoinsPreserve": {
+      "name": "Coin target scheduling",
+      "help": "When enabled, replenish coins to the coin reserve plus the refill amount before returning to corrosion 1 leveling. When disabled, use AP scheduling and replenish coins until AP reaches its reserve. Both modes use Smart Scheduling's own coin reserve.",
+      "True": "Enabled",
+      "False": "Disabled"
+    },
+    "OperationCoinsPreserve": {
+      "name": "Smart Scheduling: preserve X combat supply vouchers",
+      "help": "When Combat Supply Vouchers are lower than X, run yellow coin replenishment task. Not recommended to modify."
+    },
+    "ActionPointPreserve": {
+      "name": "Coin replenishment: preserve X action points",
+      "help": "Stop coin replenishment when total AP reaches X. Total AP includes AP in boxes. Set to 0 to use the Meowfficer Farming AP reserve. This is also the overall Operation Siren start line: at or below it, corrosion 1 leveling does not start this round either."
+    },
+    "MeowfficerActionPointPreserve": {
+      "name": "Meowfficer Farming: preserve X action points",
+      "help": "Fallback reserve used when \"Coin replenishment: preserve X action points\" is set to 0. Default 1000, used as configured (no cap, no month-end reduction)."
+    },
+    "OperationCoinsReturnThreshold": {
+      "name": "Coin refill amount",
+      "help": "In coin target scheduling, replenish coins to the coin reserve plus X before returning to corrosion 1 leveling. AP scheduling does not use this amount."
+    },
+    "EnableMeowfficerFarming": {
+      "name": "Enable meowfficer farming",
+      "help": "Whether to enable Meowfficer Farming task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
+    },
+    "EnableHazard1Leveling": {
+      "name": "Enable corrosion 1 leveling",
+      "help": "Whether to enable Corrosion 1 Leveling task in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
+    },
+    "EnableObscure": {
+      "name": "Enable obscured zone",
+      "help": "Whether to enable Obscured Zone task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
+    },
+    "EnableAbyssal": {
+      "name": "Enable abyssal zone",
+      "help": "Whether to enable Abyssal Zone task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
+    },
+    "EnableStronghold": {
+      "name": "Enable Siren stronghold",
+      "help": "Whether to enable Siren Stronghold task for yellow coin replenishment in Smart Scheduling",
+      "True": "Enabled",
+      "False": "Disabled"
+    },
+    "TaskPriority": {
+      "name": "Replenishment task priority",
+      "help": "The priority order of tasks for yellow coin replenishment when they are insufficient. Separated by >."
     }
   }
 }
