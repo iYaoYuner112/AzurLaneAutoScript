@@ -41,14 +41,20 @@ def make_auto_search(monkeypatch, frames):
 
     main = SimpleNamespace(
         device=device,
+        config=SimpleNamespace(task=SimpleNamespace(command='OpsiDaily')),
         loop=loop,
         is_in_map=lambda: device.image.get('page', 'map') == 'map',
         match_template_color=match, appear=match,
         walk_counter_changed=Mock(
             side_effect=lambda reset=False: None if reset else device.image.get('progress', False)),
         hp_reset=Mock(),
+        hp_get=Mock(),
+        need_repair=[],
         on_auto_search_battle_count_reset=Mock(),
         on_auto_search_battle_count_add=Mock(),
+        _os_auto_search_enable_budget_clear=Mock(),
+        _os_auto_search_should_interrupt=lambda strategic: False,
+        interrupt_auto_search=Mock(),
         handle_os_auto_search_map_option=lambda **kwargs: device.image.get('option', False),
         handle_retirement=lambda: device.image.get('retirement', False),
         combat_appear=lambda: device.image.get('combat', False),

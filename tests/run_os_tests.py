@@ -30,16 +30,31 @@ os.chdir(ROOT)
 
 passed = 0
 failed = 0
+skipped = 0
 failures = []
 
 for name in files:
     path = TEST_DIR / name
     mod_name = 'os_' + name[:-3]
+    source = path.read_text(encoding='utf-8')
+    if 'pytest' in source and importlib.util.find_spec('pytest') is None:
+        skipped += 1
+        print('SKIP pytest-only file (pytest unavailable):', name)
+        continue
     spec = importlib.util.spec_from_file_location(mod_name, str(path))
     module = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = module
     try:
         spec.loader.exec_module(module)
+    except ModuleNotFoundError as error:
+        if 'pytest' in source and error.name in ('pytest', 'PIL'):
+            skipped += 1
+            print(f'SKIP pytest-only file ({error.name} unavailable):', name)
+            continue
+        failed += 1
+        failures.append((name, '<import>', traceback.format_exc()))
+        print('IMPORT FAIL', name)
+        continue
     except Exception:
         failed += 1
         failures.append((name, '<import>', traceback.format_exc()))
@@ -49,6 +64,12 @@ for name in files:
     cases = []
     for attr, obj in sorted(vars(module).items()):
         if inspect.isfunction(obj) and attr.startswith('test_'):
+            parameters = inspect.signature(obj).parameters.values()
+            if any(parameter.default is inspect.Parameter.empty
+                   for parameter in parameters):
+                skipped += 1
+                print('SKIP pytest fixture case:', name, attr)
+                continue
             cases.append(attr)
         elif inspect.isclass(obj) and issubclass(obj, unittest.TestCase):
             suite = unittest.defaultTestLoader.loadTestsFromTestCase(obj)
@@ -71,7 +92,7 @@ for name in files:
 
 print('')
 print('=' * 60)
-print(f'passed={passed} failed={failed}')
+print(f'passed={passed} failed={failed} skipped={skipped}')
 for file_name, case, tb in failures:
     print('')
     print('-' * 60)
