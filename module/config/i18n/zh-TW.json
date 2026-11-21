@@ -246,6 +246,14 @@
       "name": "月度Boss",
       "help": ""
     },
+    "OpsiPreventActionPointOverflow": {
+      "name": "防止行動力溢出",
+      "help": "當前行動力達到上限時執行大世界任務消耗行動力"
+    },
+    "OpsiScheduling": {
+      "name": "智能調度",
+      "help": ""
+    },
     "OpsiMeowfficerFarming": {
       "name": "短貓相接",
       "help": ""
@@ -316,14 +324,6 @@
     },
     "GameManager": {
       "name": "遊戲管理器(未完成)",
-      "help": ""
-    },
-    "OpsiPreventActionPointOverflow": {
-      "name": "防止行動力溢出",
-      "help": "當前行動力達到上限時執行大世界任務消耗行動力"
-    },
-    "OpsiScheduling": {
-      "name": "智能調度",
       "help": ""
     }
   },
@@ -552,10 +552,6 @@
       "name": "錯誤推送設定",
       "help": "發生無法處理的異常後，使用 Onepush 推送错误消息。設定參考文檔：https://github.com/LmeSzinc/AzurLaneAutoScript/wiki/Onepush-configuration-%5BCN%5D"
     },
-    "ScreenshotLength": {
-      "name": "出錯時，保留最後 X 張截圖",
-      "help": ""
-    },
     "LowPushMode": {
       "name": "低推送量模式",
       "help": "只推送需要人工介入的錯誤。遊戲未執行、遊戲卡住等能自動復原的錯誤只記錄日誌，不再推送",
@@ -565,6 +561,10 @@
     "TaskRestartLimit": {
       "name": "同一任務連續重啟上限",
       "help": "同一任務連續出錯復原達到此次數後，延後至伺服器次日零點，並透過錯誤推播設定提醒。任務成功後歸零；其他任務或遊戲重啟成功不歸零。0 = 不限制。"
+    },
+    "ScreenshotLength": {
+      "name": "出錯時，保留最後 X 張截圖",
+      "help": ""
     }
   },
   "Optimization": {
@@ -918,6 +918,10 @@
       "name": "使用自律尋敵",
       "help": ""
     },
+    "ContinueAfterRestart": {
+      "name": "重新啟動後繼續戰鬥",
+      "help": "主線圖與活動圖任務可用，包含活動每日、SP、緊急委託及三油低耗，預設關閉。需同時啟用周回與自律尋敵。異常重新啟動回到原關卡地圖後開啟自律，後續戰鬥依正常流程計算心情，不接管重新啟動前的戰鬥或結算。地圖資訊僅保留於本次排程程序；設定變更或復原達到上限時回到原有流程。"
+    },
     "Use2xBook": {
       "name": "使用高效作戰指令書",
       "help": "兩倍石油消耗，兩次掉落結算"
@@ -925,10 +929,6 @@
     "AmbushEvade": {
       "name": "規避伏擊",
       "help": ""
-    },
-    "ContinueAfterRestart": {
-      "name": "重新啟動後繼續戰鬥",
-      "help": "主線圖與活動圖任務可用，包含活動每日、SP、緊急委託及三油低耗，預設關閉。需同時啟用周回與自律尋敵。異常重新啟動回到原關卡地圖後開啟自律，後續戰鬥依正常流程計算心情，不接管重新啟動前的戰鬥或結算。地圖資訊僅保留於本次排程程序；設定變更或復原達到上限時回到原有流程。"
     }
   },
   "StopCondition": {
@@ -1792,6 +1792,10 @@
       "name": "軍火商 (通用商店)",
       "help": ""
     },
+    "Enable": {
+      "name": "商店開關",
+      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
+    },
     "UseGems": {
       "name": "使用鑽石",
       "help": ""
@@ -1811,16 +1815,16 @@
     "Filter": {
       "name": "商店過濾器",
       "help": ""
-    },
-    "Enable": {
-      "name": "商店開關",
-      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
     }
   },
   "GuildShop": {
     "_info": {
       "name": "艦隊商店",
       "help": ""
+    },
+    "Enable": {
+      "name": "商店開關",
+      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
     },
     "Refresh": {
       "name": "刷新艦隊商店",
@@ -1928,16 +1932,16 @@
       "mainz": "美因茲",
       "odin": "奧丁",
       "champagne": "香檳"
-    },
-    "Enable": {
-      "name": "商店開關",
-      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
     }
   },
   "MedalShop2": {
     "_info": {
       "name": "功勳商店（退役兌換）",
       "help": ""
+    },
+    "Enable": {
+      "name": "商店開關",
+      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
     },
     "Filter": {
       "name": "商店過濾器",
@@ -1993,16 +1997,16 @@
       "torpedo": "魚雷",
       "antiair": "防空",
       "plane": "艦載機"
-    },
-    "Enable": {
-      "name": "商店開關",
-      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
     }
   },
   "MeritShop": {
     "_info": {
       "name": "軍需商店 (演習商店)",
       "help": ""
+    },
+    "Enable": {
+      "name": "商店開關",
+      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
     },
     "Refresh": {
       "name": "刷新軍需商店",
@@ -2015,10 +2019,6 @@
     "Filter": {
       "name": "軍需商店過濾器",
       "help": ""
-    },
-    "Enable": {
-      "name": "商店開關",
-      "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
     }
   },
   "CoreShop": {
@@ -2026,13 +2026,13 @@
       "name": "核心兌換",
       "help": ""
     },
-    "Filter": {
-      "name": "商店過濾器",
-      "help": ""
-    },
     "Enable": {
       "name": "商店開關",
       "help": "開啟後才會執行該商店，關閉後會在任務中跳過該商店"
+    },
+    "Filter": {
+      "name": "商店過濾器",
+      "help": ""
     }
   },
   "ShipyardDr": {
@@ -2651,13 +2651,13 @@
       "name": "隱秘海域",
       "help": "每隔27分鍾清理一個隱秘海域，以保證空域搜索冷卻\n使用此功能前必須滿足以下條件：\n- 通關大世界主線任務並完成模擬戰+塞壬試驗場\n- 開啟大世界開荒任務或使用戰役信息記錄儀（5000油道具）"
     },
-    "ForceRun": {
-      "name": "無視執行間隔強制執行",
-      "help": "啟用後將帶來額外的行動力消耗，一般不用打開，慢慢打就好"
-    },
     "SkipHazard2Obscure": {
       "name": "不清理2級坐標",
       "help": "開啟後，將不會打侵蝕等級為2的隱秘海域"
+    },
+    "ForceRun": {
+      "name": "無視執行間隔強制執行",
+      "help": "啟用後將帶來額外的行動力消耗，一般不用打開，慢慢打就好"
     }
   },
   "OpsiAbyssal": {
@@ -2698,6 +2698,27 @@
     "ForceRun": {
       "name": "無視運行間隔強制運行",
       "help": "開啟後將帶來額外的行動力消耗，一般不用打開，慢慢打就好"
+    }
+  },
+  "OpsiPreventActionPointOverflow": {
+    "_info": {
+      "name": "防止行動力溢位",
+      "help": "當前行動力達到上限時執行大世界任務消耗行動力\n選擇智慧排程時，如果行動力和黃幣都不足導致沒有可執行任務，將執行短貓相接清理當前行動力"
+    },
+    "Task": {
+      "name": "執行任務",
+      "help": "推薦選擇智慧排程，防溢位任務對此有專門處理",
+      "OpsiScheduling": "智慧排程（推薦）",
+      "OpsiHazard1Leveling": "侵蝕1練級",
+      "OpsiMeowfficerFarming": "短貓相接"
+    },
+    "ActionPointUpperbound": {
+      "name": "當前行動力上限",
+      "help": "當前行動力達到此值時開始執行大世界任務"
+    },
+    "ActionPointLowerbound": {
+      "name": "當前行動力下限",
+      "help": "防溢位任務會持續執行，直到當前行動力低於此值"
     }
   },
   "OpsiMeowfficerFarming": {
@@ -2750,6 +2771,93 @@
     "PendingMapEvent": {
       "name": "事件續查記錄",
       "help": "程式自維護：記錄「已經看見、但沒處理完」的大世界地圖事件（明石/塞壬裝置），卡死重啟後先把它補完。一般不需要修改"
+    }
+  },
+  "OpsiSirenBug": {
+    "_info": {
+      "name": "塞壬研究裝置",
+      "help": "設定塞壬研究裝置的基礎處理選項"
+    },
+    "SirenResearch_Enable": {
+      "name": "啟用塞壬研究裝置",
+      "help": "啟用後使用紫幣透過塞壬研究裝置轉換為黃幣\n需要足夠的海里數支撐紫幣消耗"
+    },
+    "Siren_Mode": {
+      "name": "與塞壬探測裝置的互動方式",
+      "help": "選擇與塞壬裝置的互動方式。探測資源消耗紫幣（特別兌換憑證），探測敵人消耗塞壬能源存儲器",
+      "resource": "反覆嘗試探測隱藏的資源",
+      "enemy": "反覆嘗試探測隱藏的敵人"
+    },
+    "Siren_Fleet": {
+      "name": "探測敵人使用的艦隊",
+      "help": "選擇探測隱藏敵人時使用的艦隊。0表示使用當前艦隊，1-4表示使用指定艦隊",
+      "0": "使用當前艦隊",
+      "1": "艦隊1",
+      "2": "艦隊2",
+      "3": "艦隊3",
+      "4": "艦隊4"
+    }
+  },
+  "OpsiScheduling": {
+    "_info": {
+      "name": "智慧排程",
+      "help": "智慧排程相關配置"
+    },
+    "UseSmartSchedulingOperationCoinsPreserve": {
+      "name": "黃幣目標排程",
+      "help": "開啟時補到黃幣保留值加回補增量後返回侵蝕1練級；關閉時使用體力排程，補幣直到行動力達到保留值。兩種模式都讀取智慧排程自己的黃幣保留值。",
+      "True": "開啟",
+      "False": "關閉"
+    },
+    "OperationCoinsPreserve": {
+      "name": "智慧排程 保留 X 個作戰補給憑證",
+      "help": "作戰補給憑證低於 X 時執行黃幣補充任務，不建議修改"
+    },
+    "ActionPointPreserve": {
+      "name": "補黃幣 保留 X 點行動力",
+      "help": "補黃幣任務在總行動力達到 X 後停止。總行動力包含箱中的行動力；設為 0 時使用短貓相接的行動力保留值。本項同時是大世界整體的開工線：總行動力低於或等於此值時，侵蝕1練級本輪也不開工。"
+    },
+    "MeowfficerActionPointPreserve": {
+      "name": "耄耋相接 保留 X 點行動力",
+      "help": "「補黃幣 保留 X 點行動力」設為 0 時使用的備用保留值。預設1000，依填寫值原樣生效（不設上限、不隨月末下調）。"
+    },
+    "OperationCoinsReturnThreshold": {
+      "name": "黃幣回補增量",
+      "help": "黃幣目標排程中，補到黃幣保留值加 X 後返回侵蝕1練級；體力排程不使用此增量。"
+    },
+    "EnableMeowfficerFarming": {
+      "name": "啟用短貓相接",
+      "help": "智慧排程中是否啟用短貓相接任務來補充黃幣",
+      "True": "已啟用",
+      "False": "未啟用"
+    },
+    "EnableHazard1Leveling": {
+      "name": "啟用侵蝕1練級",
+      "help": "智慧排程中是否啟用侵蝕1練級任務",
+      "True": "已啟用",
+      "False": "未啟用"
+    },
+    "EnableObscure": {
+      "name": "啟用隱秘海域",
+      "help": "智慧排程中是否啟用隱秘海域任務來補充黃幣",
+      "True": "已啟用",
+      "False": "未啟用"
+    },
+    "EnableAbyssal": {
+      "name": "啟用深淵海域",
+      "help": "智慧排程中是否啟用深淵海域任務來補充黃幣",
+      "True": "已啟用",
+      "False": "未啟用"
+    },
+    "EnableStronghold": {
+      "name": "啟用塞壬要塞",
+      "help": "智慧排程中是否啟用塞壬要塞任務來補充黃幣",
+      "True": "已啟用",
+      "False": "未啟用"
+    },
+    "TaskPriority": {
+      "name": "補充黃幣任務優先級",
+      "help": "黃幣不足時，執行補充黃幣任務的優先級順序。使用 > 分隔。"
     }
   },
   "IslandGeneral": {
@@ -3153,10 +3261,6 @@
     "Overview": {
       "Scheduler": "調度器",
       "Log": "日誌",
-      "Running": "執行中",
-      "Pending": "佇列中",
-      "Waiting": "等待中",
-      "NoTask": "無任務",
       "Resources": "資源監視器",
       "ResourceHint": "顯示任務最近讀取的資源；超過24小時會標示為過期",
       "ResourceOil": "石油",
@@ -3174,7 +3278,11 @@
       "ResourceActionPointTotal": "含行動力箱",
       "ResourceWaiting": "等待資源同步",
       "ResourceUpdated": "更新於",
-      "ResourceStale": "資料過期"
+      "ResourceStale": "資料過期",
+      "Running": "執行中",
+      "Pending": "佇列中",
+      "Waiting": "等待中",
+      "NoTask": "無任務"
     },
     "AddAlas": {
       "PopupTitle": "添加新的設定",
@@ -3238,114 +3346,6 @@
       "Clear": "清除",
       "EnterPassword": "輸入密碼",
       "ChooseFile": "選擇檔案"
-    }
-  },
-  "OpsiPreventActionPointOverflow": {
-    "_info": {
-      "name": "防止行動力溢位",
-      "help": "當前行動力達到上限時執行大世界任務消耗行動力\n選擇智慧排程時，如果行動力和黃幣都不足導致沒有可執行任務，將執行短貓相接清理當前行動力"
-    },
-    "Task": {
-      "name": "執行任務",
-      "help": "推薦選擇智慧排程，防溢位任務對此有專門處理",
-      "OpsiScheduling": "智慧排程（推薦）",
-      "OpsiHazard1Leveling": "侵蝕1練級",
-      "OpsiMeowfficerFarming": "短貓相接"
-    },
-    "ActionPointUpperbound": {
-      "name": "當前行動力上限",
-      "help": "當前行動力達到此值時開始執行大世界任務"
-    },
-    "ActionPointLowerbound": {
-      "name": "當前行動力下限",
-      "help": "防溢位任務會持續執行，直到當前行動力低於此值"
-    }
-  },
-  "OpsiSirenBug": {
-    "_info": {
-      "name": "塞壬研究裝置",
-      "help": "設定塞壬研究裝置的基礎處理選項"
-    },
-    "SirenResearch_Enable": {
-      "name": "啟用塞壬研究裝置",
-      "help": "啟用後使用紫幣透過塞壬研究裝置轉換為黃幣\n需要足夠的海里數支撐紫幣消耗"
-    },
-    "Siren_Mode": {
-      "name": "與塞壬探測裝置的互動方式",
-      "help": "選擇與塞壬裝置的互動方式。探測資源消耗紫幣（特別兌換憑證），探測敵人消耗塞壬能源存儲器",
-      "resource": "反覆嘗試探測隱藏的資源",
-      "enemy": "反覆嘗試探測隱藏的敵人"
-    },
-    "Siren_Fleet": {
-      "name": "探測敵人使用的艦隊",
-      "help": "選擇探測隱藏敵人時使用的艦隊。0表示使用當前艦隊，1-4表示使用指定艦隊",
-      "0": "使用當前艦隊",
-      "1": "艦隊1",
-      "2": "艦隊2",
-      "3": "艦隊3",
-      "4": "艦隊4"
-    }
-  },
-  "OpsiScheduling": {
-    "_info": {
-      "name": "智慧排程",
-      "help": "智慧排程相關配置"
-    },
-    "UseSmartSchedulingOperationCoinsPreserve": {
-      "name": "黃幣目標排程",
-      "help": "開啟時補到黃幣保留值加回補增量後返回侵蝕1練級；關閉時使用體力排程，補幣直到行動力達到保留值。兩種模式都讀取智慧排程自己的黃幣保留值。",
-      "True": "開啟",
-      "False": "關閉"
-    },
-    "OperationCoinsPreserve": {
-      "name": "智慧排程 保留 X 個作戰補給憑證",
-      "help": "作戰補給憑證低於 X 時執行黃幣補充任務，不建議修改"
-    },
-    "ActionPointPreserve": {
-      "name": "補黃幣 保留 X 點行動力",
-      "help": "補黃幣任務在總行動力達到 X 後停止。總行動力包含箱中的行動力；設為 0 時使用短貓相接的行動力保留值。本項同時是大世界整體的開工線：總行動力低於或等於此值時，侵蝕1練級本輪也不開工。"
-    },
-    "MeowfficerActionPointPreserve": {
-      "name": "耄耋相接 保留 X 點行動力",
-      "help": "「補黃幣 保留 X 點行動力」設為 0 時使用的備用保留值。預設1000，依填寫值原樣生效（不設上限、不隨月末下調）。"
-    },
-    "OperationCoinsReturnThreshold": {
-      "name": "黃幣回補增量",
-      "help": "黃幣目標排程中，補到黃幣保留值加 X 後返回侵蝕1練級；體力排程不使用此增量。"
-    },
-    "EnableMeowfficerFarming": {
-      "name": "啟用短貓相接",
-      "help": "智慧排程中是否啟用短貓相接任務來補充黃幣",
-      "True": "已啟用",
-      "False": "未啟用"
-    },
-    "EnableHazard1Leveling": {
-      "name": "啟用侵蝕1練級",
-      "help": "智慧排程中是否啟用侵蝕1練級任務",
-      "True": "已啟用",
-      "False": "未啟用"
-    },
-    "EnableObscure": {
-      "name": "啟用隱秘海域",
-      "help": "智慧排程中是否啟用隱秘海域任務來補充黃幣",
-      "True": "已啟用",
-      "False": "未啟用"
-    },
-    "EnableAbyssal": {
-      "name": "啟用深淵海域",
-      "help": "智慧排程中是否啟用深淵海域任務來補充黃幣",
-      "True": "已啟用",
-      "False": "未啟用"
-    },
-    "EnableStronghold": {
-      "name": "啟用塞壬要塞",
-      "help": "智慧排程中是否啟用塞壬要塞任務來補充黃幣",
-      "True": "已啟用",
-      "False": "未啟用"
-    },
-    "TaskPriority": {
-      "name": "補充黃幣任務優先級",
-      "help": "黃幣不足時，執行補充黃幣任務的優先級順序。使用 > 分隔。"
     }
   }
 }
