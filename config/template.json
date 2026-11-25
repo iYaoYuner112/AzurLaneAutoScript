@@ -18,6 +18,8 @@
       "HandleError": true,
       "SaveError": true,
       "OnePushConfig": "provider: null",
+      "LowPushMode": false,
+      "TaskRestartLimit": 3,
       "ScreenshotLength": 1
     },
     "Optimization": {
@@ -93,6 +95,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -167,6 +170,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -241,6 +245,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -326,6 +331,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -401,6 +407,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": false,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -449,6 +456,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -523,6 +531,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -601,6 +610,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": false,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -701,6 +711,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -775,6 +786,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": false,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -827,6 +839,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -905,6 +918,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -983,6 +997,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -1061,6 +1076,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -1135,6 +1151,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": true,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -1212,6 +1229,7 @@
       "UseClearMode": true,
       "UseFleetLock": true,
       "UseAutoSearch": false,
+      "ContinueAfterRestart": false,
       "Use2xBook": false,
       "AmbushEvade": true
     },
@@ -1498,6 +1516,7 @@
       "ServerUpdate": "00:00, 12:00, 18:00"
     },
     "GeneralShop": {
+      "Enable": true,
       "UseGems": false,
       "Refresh": false,
       "BuySkinBox": false,
@@ -1518,6 +1537,7 @@
       "ServerUpdate": "00:00"
     },
     "GuildShop": {
+      "Enable": true,
       "Refresh": true,
       "Filter": "PlateT4 > BookT3 > PR > CatT3 > Chip > BookT2 > Retrofit > FoodT6 > FoodT5 > CatT2 > BoxT4",
       "BOX_T3": "ironblood",
@@ -1534,6 +1554,7 @@
       "PR3": "cheshire"
     },
     "MedalShop2": {
+      "Enable": true,
       "Filter": "DR > PR\n> BookRedT3 > BookYellowT3 > BookBlueT3\n> BookRedT2 > BookYellowT2 > BookBlueT2\n> RetrofitT3\n> FoodT6 > FoodT5\n> PlateGeneralT3 > PlateWildT3",
       "RETROFIT_T1": "cl",
       "RETROFIT_T2": "cl",
@@ -1543,11 +1564,13 @@
       "PLATE_T3": "general"
     },
     "MeritShop": {
+      "Enable": true,
       "Refresh": false,
       "BuyUnobtainedShip": false,
       "Filter": "Cube"
     },
     "CoreShop": {
+      "Enable": true,
       "Filter": "Array"
     },
     "Storage": {
@@ -1667,7 +1690,9 @@
       "OilLimit": 1000,
       "RepairThreshold": 0.4,
       "DoRandomMapEvent": true,
-      "AkashiShopFilter": "ActionPoint > PurpleCoins"
+      "AkashiShopFilter": "ActionPoint > PurpleCoins",
+      "NotifyOpsiMail": true,
+      "SkipStrategicSearchCheck": false
     },
     "Storage": {
       "Storage": {}
@@ -1721,7 +1746,9 @@
     "OpsiExplore": {
       "SpecialRadar": false,
       "ForceRun": false,
-      "LastZone": 0
+      "LastZone": 0,
+      "MeowfficerCleanupState": null,
+      "ExploreProgress": null
     },
     "OpsiFleet": {
       "Fleet": 1,
@@ -1742,7 +1769,8 @@
     },
     "OpsiShop": {
       "PresetFilter": "max_benefit_meta",
-      "CustomFilter": "LoggerAbyssalT6 > LoggerAbyssalT5 > LoggerAbyssalT4 > LoggerObscureT6 > LoggerObscureT5 > LoggerObscureT4 > LoggerObscureT3 > ActionPoint > PurpleCoins\n> GearDesignPlanT3 > PlateRandomT4 > DevelopmentMaterialT3 > GearDesignPlanT2 > GearPart\n> OrdnanceTestingReportT3 > OrdnanceTestingReportT2 > DevelopmentMaterialT2 > OrdnanceTestingReportT1\n> METARedBook > CrystallizedHeatResistantSteel > NanoceramicAlloy > NeuroplasticProstheticArm > SupercavitationGenerator"
+      "CustomFilter": "LoggerAbyssalT6 > LoggerAbyssalT5 > LoggerAbyssalT4 > LoggerObscureT6 > LoggerObscureT5 > LoggerObscureT4 > LoggerObscureT3 > ActionPoint > PurpleCoins\n> GearDesignPlanT3 > PlateRandomT4 > DevelopmentMaterialT3 > GearDesignPlanT2 > GearPart\n> OrdnanceTestingReportT3 > OrdnanceTestingReportT2 > DevelopmentMaterialT2 > OrdnanceTestingReportT1\n> METARedBook > CrystallizedHeatResistantSteel > NanoceramicAlloy > NeuroplasticProstheticArm > SupercavitationGenerator",
+      "DisableBeforeDate": 0
     },
     "Storage": {
       "Storage": {}
@@ -1775,7 +1803,10 @@
     },
     "OpsiDaily": {
       "DoMission": true,
-      "UseTuningSample": true
+      "UseTuningSample": true,
+      "SkipSirenResearchMission": false,
+      "KeepMissionZone": false,
+      "MissionZones": null
     },
     "OpsiFleet": {
       "Fleet": 1,
@@ -1795,6 +1826,7 @@
       "ServerUpdate": "00:00"
     },
     "OpsiObscure": {
+      "SkipHazard2Obscure": false,
       "ForceRun": false
     },
     "OpsiFleet": {
@@ -1881,6 +1913,50 @@
       "Storage": {}
     }
   },
+  "OpsiPreventActionPointOverflow": {
+    "Scheduler": {
+      "Enable": false,
+      "NextRun": "2020-01-01 00:00:00",
+      "Command": "OpsiPreventActionPointOverflow",
+      "SuccessInterval": 1,
+      "FailureInterval": 30,
+      "ServerUpdate": "00:00"
+    },
+    "OpsiPreventActionPointOverflow": {
+      "Task": "OpsiScheduling",
+      "ActionPointUpperbound": 200,
+      "ActionPointLowerbound": 10
+    },
+    "Storage": {
+      "Storage": {}
+    }
+  },
+  "OpsiScheduling": {
+    "Scheduler": {
+      "Enable": false,
+      "NextRun": "2020-01-01 00:00:00",
+      "Command": "OpsiScheduling",
+      "SuccessInterval": 30,
+      "FailureInterval": 30,
+      "ServerUpdate": "00:00"
+    },
+    "OpsiScheduling": {
+      "UseSmartSchedulingOperationCoinsPreserve": true,
+      "OperationCoinsPreserve": 20000,
+      "ActionPointPreserve": 200,
+      "MeowfficerActionPointPreserve": 1000,
+      "OperationCoinsReturnThreshold": 60000,
+      "EnableMeowfficerFarming": true,
+      "EnableHazard1Leveling": true,
+      "EnableObscure": false,
+      "EnableAbyssal": false,
+      "EnableStronghold": false,
+      "TaskPriority": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming"
+    },
+    "Storage": {
+      "Storage": {}
+    }
+  },
   "OpsiMeowfficerFarming": {
     "Scheduler": {
       "Enable": false,
@@ -1893,7 +1969,14 @@
     "OpsiMeowfficerFarming": {
       "ActionPointPreserve": 1000,
       "HazardLevel": 5,
-      "TargetZone": 0
+      "TargetZone": 0,
+      "StayInZone": false,
+      "ExecuteFixedPatrolScan": false
+    },
+    "OpsiSirenBug": {
+      "SirenResearch_Enable": true,
+      "Siren_Mode": "resource",
+      "Siren_Fleet": 0
     },
     "OpsiFleet": {
       "Fleet": 1,
@@ -1913,7 +1996,14 @@
       "ServerUpdate": "00:00, 12:00"
     },
     "OpsiHazard1Leveling": {
-      "TargetZone": 0
+      "TargetZone": 0,
+      "ExecuteFixedPatrolScan": false,
+      "PendingMapEvent": null
+    },
+    "OpsiSirenBug": {
+      "SirenResearch_Enable": true,
+      "Siren_Mode": "resource",
+      "Siren_Fleet": 0
     },
     "OpsiFleet": {
       "Fleet": 1,

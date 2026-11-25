@@ -193,6 +193,22 @@
         "value": "provider: null",
         "mode": "yaml"
       },
+      "LowPushMode": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "TaskRestartLimit": {
+        "type": "input",
+        "value": 3,
+        "validate": [
+          0,
+          999
+        ]
+      },
       "ScreenshotLength": {
         "type": "input",
         "value": 1
@@ -494,6 +510,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -874,6 +894,10 @@
         "type": "checkbox",
         "value": true
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false
@@ -1252,6 +1276,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -1705,6 +1733,10 @@
         "type": "checkbox",
         "value": true
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -2114,6 +2146,11 @@
         "value": false,
         "display": "hide"
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -2355,6 +2392,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -2750,6 +2791,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -3162,6 +3207,11 @@
         "display": "hide"
       },
       "UseAutoSearch": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
+      "ContinueAfterRestart": {
         "type": "checkbox",
         "value": false,
         "display": "hide"
@@ -3880,6 +3930,10 @@
         "type": "checkbox",
         "value": true
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false
@@ -4281,6 +4335,11 @@
         "value": false,
         "display": "hide"
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -4534,6 +4593,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -4947,6 +5010,10 @@
         "type": "checkbox",
         "value": true
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -5358,6 +5425,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -5771,6 +5842,10 @@
         "type": "checkbox",
         "value": true
       },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
+      },
       "Use2xBook": {
         "type": "checkbox",
         "value": false,
@@ -6172,6 +6247,10 @@
       "UseAutoSearch": {
         "type": "checkbox",
         "value": true
+      },
+      "ContinueAfterRestart": {
+        "type": "checkbox",
+        "value": false
       },
       "Use2xBook": {
         "type": "checkbox",
@@ -6581,6 +6660,11 @@
         "display": "hide"
       },
       "UseAutoSearch": {
+        "type": "checkbox",
+        "value": false,
+        "display": "hide"
+      },
+      "ContinueAfterRestart": {
         "type": "checkbox",
         "value": false,
         "display": "hide"
@@ -7769,6 +7853,10 @@
       }
     },
     "GeneralShop": {
+      "Enable": {
+        "type": "checkbox",
+        "value": true
+      },
       "UseGems": {
         "type": "checkbox",
         "value": false
@@ -7836,6 +7924,10 @@
       }
     },
     "GuildShop": {
+      "Enable": {
+        "type": "checkbox",
+        "value": true
+      },
       "Refresh": {
         "type": "checkbox",
         "value": true
@@ -7969,6 +8061,10 @@
       }
     },
     "MedalShop2": {
+      "Enable": {
+        "type": "checkbox",
+        "value": true
+      },
       "Filter": {
         "type": "textarea",
         "value": "DR > PR\n> BookRedT3 > BookYellowT3 > BookBlueT3\n> BookRedT2 > BookYellowT2 > BookBlueT2\n> RetrofitT3\n> FoodT6 > FoodT5\n> PlateGeneralT3 > PlateWildT3"
@@ -8038,6 +8134,10 @@
       }
     },
     "MeritShop": {
+      "Enable": {
+        "type": "checkbox",
+        "value": true
+      },
       "Refresh": {
         "type": "checkbox",
         "value": false
@@ -8052,6 +8152,10 @@
       }
     },
     "CoreShop": {
+      "Enable": {
+        "type": "checkbox",
+        "value": true
+      },
       "Filter": {
         "type": "textarea",
         "value": "Array"
@@ -8512,6 +8616,14 @@
       "AkashiShopFilter": {
         "type": "textarea",
         "value": "ActionPoint > PurpleCoins"
+      },
+      "NotifyOpsiMail": {
+        "type": "checkbox",
+        "value": true
+      },
+      "SkipStrategicSearchCheck": {
+        "type": "checkbox",
+        "value": false
       }
     },
     "Storage": {
@@ -8693,6 +8805,16 @@
       "LastZone": {
         "type": "input",
         "value": 0
+      },
+      "MeowfficerCleanupState": {
+        "type": "stored",
+        "value": null,
+        "display": "hide"
+      },
+      "ExploreProgress": {
+        "type": "textarea",
+        "value": "",
+        "display": "disabled"
       }
     },
     "OpsiFleet": {
@@ -8771,6 +8893,10 @@
       "CustomFilter": {
         "type": "textarea",
         "value": "LoggerAbyssalT6 > LoggerAbyssalT5 > LoggerAbyssalT4 > LoggerObscureT6 > LoggerObscureT5 > LoggerObscureT4 > LoggerObscureT3 > ActionPoint > PurpleCoins\n> GearDesignPlanT3 > PlateRandomT4 > DevelopmentMaterialT3 > GearDesignPlanT2 > GearPart\n> OrdnanceTestingReportT3 > OrdnanceTestingReportT2 > DevelopmentMaterialT2 > OrdnanceTestingReportT1\n> METARedBook > CrystallizedHeatResistantSteel > NanoceramicAlloy > NeuroplasticProstheticArm > SupercavitationGenerator"
+      },
+      "DisableBeforeDate": {
+        "type": "input",
+        "value": 0
       }
     },
     "Storage": {
@@ -8877,6 +9003,19 @@
       "UseTuningSample": {
         "type": "checkbox",
         "value": true
+      },
+      "SkipSirenResearchMission": {
+        "type": "checkbox",
+        "value": false
+      },
+      "KeepMissionZone": {
+        "type": "checkbox",
+        "value": false
+      },
+      "MissionZones": {
+        "type": "stored",
+        "value": null,
+        "display": "hide"
       }
     },
     "OpsiFleet": {
@@ -8941,6 +9080,10 @@
       }
     },
     "OpsiObscure": {
+      "SkipHazard2Obscure": {
+        "type": "checkbox",
+        "value": false
+      },
       "ForceRun": {
         "type": "checkbox",
         "value": false
@@ -9215,6 +9358,185 @@
       }
     }
   },
+  "OpsiPreventActionPointOverflow": {
+    "Scheduler": {
+      "Enable": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "NextRun": {
+        "type": "datetime",
+        "value": "2020-01-01 00:00:00",
+        "validate": "datetime"
+      },
+      "Command": {
+        "type": "input",
+        "value": "OpsiPreventActionPointOverflow",
+        "display": "hide"
+      },
+      "SuccessInterval": {
+        "type": "input",
+        "value": 1,
+        "display": "hide"
+      },
+      "FailureInterval": {
+        "type": "input",
+        "value": 30,
+        "display": "hide"
+      },
+      "ServerUpdate": {
+        "type": "input",
+        "value": "00:00",
+        "display": "hide"
+      }
+    },
+    "OpsiPreventActionPointOverflow": {
+      "Task": {
+        "type": "select",
+        "value": "OpsiScheduling",
+        "option": [
+          "OpsiScheduling",
+          "OpsiHazard1Leveling",
+          "OpsiMeowfficerFarming"
+        ]
+      },
+      "ActionPointUpperbound": {
+        "type": "input",
+        "value": 200
+      },
+      "ActionPointLowerbound": {
+        "type": "input",
+        "value": 10
+      }
+    },
+    "Storage": {
+      "Storage": {
+        "type": "storage",
+        "value": {},
+        "valuetype": "ignore",
+        "display": "disabled"
+      }
+    }
+  },
+  "OpsiScheduling": {
+    "Scheduler": {
+      "Enable": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "NextRun": {
+        "type": "datetime",
+        "value": "2020-01-01 00:00:00",
+        "validate": "datetime"
+      },
+      "Command": {
+        "type": "input",
+        "value": "OpsiScheduling",
+        "display": "hide"
+      },
+      "SuccessInterval": {
+        "type": "input",
+        "value": 30,
+        "display": "hide"
+      },
+      "FailureInterval": {
+        "type": "input",
+        "value": 30,
+        "display": "hide"
+      },
+      "ServerUpdate": {
+        "type": "input",
+        "value": "00:00",
+        "display": "hide"
+      }
+    },
+    "OpsiScheduling": {
+      "UseSmartSchedulingOperationCoinsPreserve": {
+        "type": "checkbox",
+        "value": true,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "OperationCoinsPreserve": {
+        "type": "input",
+        "value": 20000
+      },
+      "ActionPointPreserve": {
+        "type": "input",
+        "value": 200
+      },
+      "MeowfficerActionPointPreserve": {
+        "type": "input",
+        "value": 1000
+      },
+      "OperationCoinsReturnThreshold": {
+        "type": "input",
+        "value": 60000
+      },
+      "EnableMeowfficerFarming": {
+        "type": "checkbox",
+        "value": true,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "EnableHazard1Leveling": {
+        "type": "checkbox",
+        "value": true,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "EnableObscure": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "EnableAbyssal": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "EnableStronghold": {
+        "type": "checkbox",
+        "value": false,
+        "option": [
+          true,
+          false
+        ]
+      },
+      "TaskPriority": {
+        "type": "input",
+        "value": "OpsiStronghold > OpsiObscure > OpsiAbyssal > OpsiMeowfficerFarming"
+      }
+    },
+    "Storage": {
+      "Storage": {
+        "type": "storage",
+        "value": {},
+        "valuetype": "ignore",
+        "display": "disabled"
+      }
+    }
+  },
   "OpsiMeowfficerFarming": {
     "Scheduler": {
       "Enable": {
@@ -9270,6 +9592,39 @@
       "TargetZone": {
         "type": "input",
         "value": 0
+      },
+      "StayInZone": {
+        "type": "checkbox",
+        "value": false
+      },
+      "ExecuteFixedPatrolScan": {
+        "type": "checkbox",
+        "value": false
+      }
+    },
+    "OpsiSirenBug": {
+      "SirenResearch_Enable": {
+        "type": "checkbox",
+        "value": true
+      },
+      "Siren_Mode": {
+        "type": "select",
+        "value": "resource",
+        "option": [
+          "resource",
+          "enemy"
+        ]
+      },
+      "Siren_Fleet": {
+        "type": "select",
+        "value": 0,
+        "option": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
       }
     },
     "OpsiFleet": {
@@ -9341,6 +9696,40 @@
           0,
           44,
           22
+        ]
+      },
+      "ExecuteFixedPatrolScan": {
+        "type": "checkbox",
+        "value": false
+      },
+      "PendingMapEvent": {
+        "type": "stored",
+        "value": null,
+        "display": "hide"
+      }
+    },
+    "OpsiSirenBug": {
+      "SirenResearch_Enable": {
+        "type": "checkbox",
+        "value": true
+      },
+      "Siren_Mode": {
+        "type": "select",
+        "value": "resource",
+        "option": [
+          "resource",
+          "enemy"
+        ]
+      },
+      "Siren_Fleet": {
+        "type": "select",
+        "value": 0,
+        "option": [
+          0,
+          1,
+          2,
+          3,
+          4
         ]
       }
     },
