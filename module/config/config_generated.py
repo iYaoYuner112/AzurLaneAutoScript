@@ -484,7 +484,6 @@ class GeneratedConfig:
     OpsiScheduling_ActionPointPreserve = 200
     OpsiScheduling_OperationCoinsReturnThreshold = 60000
     OpsiScheduling_EnableMeowfficerFarming = True  # True, False
-    OpsiScheduling_EnableHazard1Leveling = True  # True, False
     OpsiScheduling_EnableObscure = False  # True, False
     OpsiScheduling_EnableAbyssal = False  # True, False
     OpsiScheduling_EnableStronghold = False  # True, False

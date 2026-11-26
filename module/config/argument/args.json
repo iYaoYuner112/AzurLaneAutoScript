@@ -9487,14 +9487,6 @@
           false
         ]
       },
-      "EnableHazard1Leveling": {
-        "type": "checkbox",
-        "value": true,
-        "option": [
-          true,
-          false
-        ]
-      },
       "EnableObscure": {
         "type": "checkbox",
         "value": false,

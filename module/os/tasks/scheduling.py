@@ -238,10 +238,6 @@ class OpsiScheduling(OSMap):
         return bool(self.config.cross_get(
             f'OpsiScheduling.OpsiScheduling.{key}', default=default))
 
-    def _is_hazard1_enabled(self) -> bool:
-        return bool(self.config.cross_get(
-            'OpsiScheduling.OpsiScheduling.EnableHazard1Leveling', default=True))
-
     def _get_enabled_coin_tasks(self) -> list:
         """Enabled coin replenish tasks, ordered by TaskPriority."""
         priority = self._get_task_priority()
@@ -719,10 +715,6 @@ class OpsiScheduling(OSMap):
                 self._delay_to_server_update('黄币补充任务均无可执行内容')
                 self.config.task_stop()
         else:
-            if not self._is_hazard1_enabled():
-                logger.warning(f'[大世界-调度] {TASK_NAME_HAZARD1_LEVELING} 未在智能调度中启用')
-                self._delay_to_server_update('侵蚀1练级未启用')
-                self.config.task_stop()
             result = self._execute_hazard1_leveling_once(
                 yellow_coins, total_ap, current_ap, ap_preserve=cl1_ap_preserve)
 

@@ -252,7 +252,7 @@
     },
     "OpsiScheduling": {
       "name": "Smart Scheduling",
-      "help": ""
+      "help": "Operation Siren Smart Scheduling. It can take over these tasks: Corrosion 1 leveling (on by default), Meowfficer farming, Obscure Zones, Abyssal Zones, Siren Strongholds.\nAfter taking over, settings other than the ones on this page follow the corresponding task's own page.\n*Unless it is necessary and you understand how Alas works, avoid running Smart Scheduling together with its sub-tasks."
     },
     "OpsiMeowfficerFarming": {
       "name": "Meowfficer Farming",
@@ -2829,12 +2829,6 @@
     "EnableMeowfficerFarming": {
       "name": "Enable meowfficer farming",
       "help": "Whether to enable Meowfficer Farming task for yellow coin replenishment in Smart Scheduling",
-      "True": "Enabled",
-      "False": "Disabled"
-    },
-    "EnableHazard1Leveling": {
-      "name": "Enable corrosion 1 leveling",
-      "help": "Whether to enable Corrosion 1 Leveling task in Smart Scheduling",
       "True": "Enabled",
       "False": "Disabled"
     },
