@@ -130,7 +130,7 @@ class OpsiHazard1Leveling(OSMap):
         coin_preserve = (
             self.config.OpsiScheduling_OperationCoinsPreserve
             if self.is_smart_scheduling_enabled
-            else self.yellow_coins_preserve
+            else self.config.OpsiHazard1Leveling_OperationCoinsPreserve
         )
         if self.get_yellow_coins() >= coin_preserve:
             return

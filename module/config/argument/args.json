@@ -9686,6 +9686,10 @@
           22
         ]
       },
+      "OperationCoinsPreserve": {
+        "type": "input",
+        "value": 20000
+      },
       "MinimumActionPointReserve": {
         "type": "input",
         "value": 200

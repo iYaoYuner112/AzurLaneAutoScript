@@ -604,9 +604,10 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
         if self.is_smart_scheduling_enabled:
             return
         if self.is_cl1_enabled and get_os_reset_remain() > 2 \
-                and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE:
-            logger.info('Keep 1000 AP when CL1 available')
-            if not self.action_point_check(1000):
+                and self.cl1_enough_yellow_coins:
+            preserve = int(self.config.OpsiHazard1Leveling_MinimumActionPointReserve)
+            logger.info(f'Keep {preserve} AP when CL1 available')
+            if not self.action_point_check(preserve):
                 self.config.opsi_task_delay(cl1_preserve=True)
                 self.config.task_stop()
 

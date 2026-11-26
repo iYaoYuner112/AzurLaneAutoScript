@@ -818,6 +818,7 @@ OpsiHazard1Leveling:
   TargetZone:
     value: 0
     option: [ 0, 44, 22 ]
+  OperationCoinsPreserve: 20000
   MinimumActionPointReserve: 200
   ExecuteFixedPatrolScan: false
   # 程序自维护的续查记录：卡死重启后补完“已经看见、但没处理完”的地图事件。

@@ -9,10 +9,14 @@
 from types import SimpleNamespace
 from datetime import datetime as dt, timedelta
 from contextlib import contextmanager
+from unittest.mock import patch
 
 import module.os.tasks.scheduling as sched_mod
+from module.campaign.os_run import OSCampaignRun
+from module.os.map import OSMap
 from module.os.tasks.scheduling import OpsiScheduling
 from module.os.tasks.meowfficer_farming import OpsiMeowfficerFarming
+from module.os_handler.os_status import OSStatus
 from module.config.utils import get_server_next_update
 from module.os_handler.action_point import ActionPointLimit
 
@@ -57,14 +61,14 @@ def test_action_point_limit_can_be_raised_bare():
 class MeowApCheckStub:
     is_smart_scheduling_enabled = False
     is_cl1_mode_enabled = True
-    yellow_coins_preserve = 20000
 
-    def __init__(self, yellow=30000, raise_limit=True, buy=False):
+    def __init__(self, yellow=30000, raise_limit=True, buy=False, cl1_preserve=20000):
         self.delayed = []
         self.stopped = []
         self.config = SimpleNamespace(
             temporary=lambda **kwargs: _TempContext(),
             OpsiGeneral_BuyActionPointLimit=buy,
+            OpsiHazard1Leveling_OperationCoinsPreserve=cl1_preserve,
             OS_ACTION_POINT_PRESERVE=0,
             task=SimpleNamespace(command='OpsiMeowfficerFarming'),
             task_delay=lambda **kwargs: self.delayed.append(kwargs),
@@ -76,6 +80,10 @@ class MeowApCheckStub:
 
     def get_yellow_coins(self):
         return self._yellow
+
+    @property
+    def cl1_enough_yellow_coins(self):
+        return self._yellow >= self.config.OpsiHazard1Leveling_OperationCoinsPreserve
 
     def action_point_set(self, **kwargs):
         self.ap_set_calls.append(kwargs)
@@ -118,6 +126,128 @@ def test_meow_ap_check_second_round_skips_check():
     assert OpsiMeowfficerFarming._meow_ap_check(stub, True) is True
     assert stub.ap_set_calls == []
     assert stub.delayed == []
+
+
+def test_meow_uses_hazard1_operation_coins_preserve():
+    """短猫独立跑的“黄币够不够”读侵蚀一页的保留凭证。"""
+    stub = MeowApCheckStub(yellow=30000, raise_limit=True, cl1_preserve=40000)
+    raised = False
+    try:
+        OpsiMeowfficerFarming._meow_ap_check(stub, False)
+    except ActionPointLimit:
+        raised = True
+    assert raised
+    assert stub.delayed == []
+
+    stub = MeowApCheckStub(yellow=40000, raise_limit=True, cl1_preserve=40000)
+    assert OpsiMeowfficerFarming._meow_ap_check(stub, False) is True
+    assert stub.delayed == [{'server_update': True}]
+
+
+class CoinEnoughStub:
+    cl1_enough_yellow_coins = OSStatus.cl1_enough_yellow_coins
+
+    def __init__(self, yellow, preserve):
+        self._yellow = yellow
+        self.config = SimpleNamespace(
+            OpsiHazard1Leveling_OperationCoinsPreserve=preserve,
+        )
+
+    def get_yellow_coins(self):
+        return self._yellow
+
+
+def test_cl1_enough_yellow_coins_uses_the_task_reserve():
+    assert CoinEnoughStub(yellow=40000, preserve=40000).cl1_enough_yellow_coins
+    assert not CoinEnoughStub(yellow=39999, preserve=40000).cl1_enough_yellow_coins
+
+
+class Cl1ApPreserveStub:
+    cl1_ap_preserve = OSMap.cl1_ap_preserve
+    is_smart_scheduling_enabled = False
+    is_cl1_enabled = True
+
+    def __init__(self, yellow_enough=True, ap_ok=True):
+        self.cl1_enough_yellow_coins = yellow_enough
+        self.ap_ok = ap_ok
+        self.checked = []
+        self.delayed = []
+        self.stopped = []
+        self.config = SimpleNamespace(
+            OpsiHazard1Leveling_MinimumActionPointReserve=200,
+            opsi_task_delay=lambda **kwargs: self.delayed.append(kwargs),
+            task_stop=lambda: self.stopped.append(1),
+        )
+
+    def action_point_check(self, preserve):
+        self.checked.append(preserve)
+        return self.ap_ok
+
+
+def test_cl1_ap_preserve_uses_the_task_action_point_reserve():
+    stub = Cl1ApPreserveStub(ap_ok=False)
+    with patch('module.os.map.get_os_reset_remain', return_value=5):
+        OSMap.cl1_ap_preserve(stub)
+    assert stub.checked == [200]
+    assert stub.delayed == [{'cl1_preserve': True}]
+    assert stub.stopped == [1]
+
+
+def test_cl1_ap_preserve_skips_when_coins_are_not_enough():
+    stub = Cl1ApPreserveStub(yellow_enough=False)
+    with patch('module.os.map.get_os_reset_remain', return_value=5):
+        OSMap.cl1_ap_preserve(stub)
+    assert stub.checked == []
+    assert stub.delayed == []
+
+
+def test_cl1_ap_preserve_skips_under_smart_scheduling():
+    stub = Cl1ApPreserveStub()
+    stub.is_smart_scheduling_enabled = True
+    with patch('module.os.map.get_os_reset_remain', return_value=5):
+        OSMap.cl1_ap_preserve(stub)
+    assert stub.checked == []
+
+
+# ---- 任务层 ActionPointLimit 兜底 ----
+
+class OsRunStub:
+    opsi_meowfficer_farming = OSCampaignRun.opsi_meowfficer_farming
+    opsi_obscure = OSCampaignRun.opsi_obscure
+    opsi_abyssal = OSCampaignRun.opsi_abyssal
+    opsi_stronghold = OSCampaignRun.opsi_stronghold
+
+    def __init__(self):
+        self.delays = []
+        self.calls = []
+        self.stopped = []
+        self.config = SimpleNamespace(
+            is_task_enabled=lambda name: False,
+            task_delay=lambda **kwargs: self.delays.append(kwargs),
+            task_call=lambda name, **kwargs: self.calls.append(name),
+            task_stop=lambda: self.stopped.append(1),
+            opsi_task_delay=lambda **kwargs: self.delays.append(kwargs),
+        )
+
+    def load_campaign(self):
+        raise ActionPointLimit(current=1000, total=1000, preserve=1000)
+
+
+def test_ap_limit_fallback_no_longer_switches_to_cl1():
+    """独立任务行动力不足时只延迟，不再按黄币阈值切侵蚀一。"""
+    for method_name in ('opsi_obscure', 'opsi_abyssal', 'opsi_stronghold'):
+        stub = OsRunStub()
+        getattr(stub, method_name)()
+        assert stub.calls == [], method_name
+        assert stub.delays == [{'ap_limit': True}], method_name
+
+
+def test_meow_ap_limit_fallback_only_calls_reward():
+    stub = OsRunStub()
+    with patch('module.campaign.os_run.get_os_reset_remain', return_value=5):
+        stub.opsi_meowfficer_farming()
+    assert stub.calls == ['Reward']
+    assert {'server_update': True} in stub.delays
 
 
 # ---- 调度代理层捕获 ActionPointLimit ----

@@ -1995,6 +1995,7 @@
     },
     "OpsiHazard1Leveling": {
       "TargetZone": 0,
+      "OperationCoinsPreserve": 20000,
       "MinimumActionPointReserve": 200,
       "ExecuteFixedPatrolScan": false,
       "PendingMapEvent": null

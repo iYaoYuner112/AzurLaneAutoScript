@@ -2765,6 +2765,10 @@
       "44": "44 | West Continental Shelf D",
       "22": "22 | NA Ocean SW Sector B"
     },
+    "OperationCoinsPreserve": {
+      "name": "Preserve X Operation Supply Coins",
+      "help": "When Operation Supply Coins are lower than X, run Meowfficer Farming. Not recommended to modify."
+    },
     "MinimumActionPointReserve": {
       "name": "Preserve X action points",
       "help": "Minimum AP reserve for Corrosion 1 leveling, used both standalone and when proxied by Smart Scheduling: 200 early in the month for Akashi, 500 near month end for the monthly rollover."

@@ -834,6 +834,11 @@ class ConfigUpdater:
             key = key.split(".")
             key[-1] = key[-1].replace("Value", "Record")
             yield ".".join(key), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 侵蚀一与智能调度的黄币保留值双向同步（对齐 AzurPilot）
+        if key == 'OpsiScheduling.OpsiScheduling.OperationCoinsPreserve':
+            yield 'OpsiHazard1Leveling.OpsiHazard1Leveling.OperationCoinsPreserve', value
+        elif key == 'OpsiHazard1Leveling.OpsiHazard1Leveling.OperationCoinsPreserve':
+            yield 'OpsiScheduling.OpsiScheduling.OperationCoinsPreserve', value
         # Oh no, dynamic dropdown update can only be used on pywebio > 1.8.0
         # elif key == 'Alas.Emulator.ScreenshotMethod' and value == 'nemu_ipc':
         #     yield 'Alas.Emulator.ControlMethod', 'nemu_ipc'

@@ -170,7 +170,7 @@ class OpsiMeowfficerFarming(OSMap):
             if self.is_smart_scheduling_enabled:
                 check_rest_ap = False
             if self.is_cl1_mode_enabled and not smart_scheduled:
-                cl1_yellow_enough = self.get_yellow_coins() >= self.yellow_coins_preserve
+                cl1_yellow_enough = self.cl1_enough_yellow_coins
                 if cl1_yellow_enough:
                     check_rest_ap = False
             if not self.is_cl1_mode_enabled and self.config.OpsiGeneral_BuyActionPointLimit > 0:

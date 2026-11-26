@@ -68,6 +68,10 @@ class OSStatus(UI):
     def is_cl1_mode_enabled(self) -> bool:
         return self.is_cl1_enabled or self.is_smart_scheduling_enabled
 
+    @property
+    def cl1_enough_yellow_coins(self) -> bool:
+        return self.get_yellow_coins() >= self.config.OpsiHazard1Leveling_OperationCoinsPreserve
+
     @staticmethod
     def task_cooling_soon(task, now, update) -> bool:
         """

@@ -1,6 +1,7 @@
 from datetime import datetime
 from types import SimpleNamespace
 
+from module.config.config_updater import ConfigUpdater
 from module.os.map import OSMap, should_move_fleet_for_fixed_patrol
 from module.os.tasks.scheduling import OpsiScheduling, decide_resource_action
 from module.statistics.resource_monitor import record_dashboard_resource
@@ -122,6 +123,18 @@ def test_cl1_start_line_comes_from_the_hazard1_task_setting():
     assert OpsiScheduling._get_cl1_ap_preserve(Cl1GateStub(200)) == 200
     assert OpsiScheduling._get_cl1_ap_preserve(Cl1GateStub(500)) == 500
     assert OpsiScheduling._get_cl1_ap_preserve(Cl1GateStub(-5)) == 0
+
+
+def test_coin_preserve_syncs_between_cl1_and_scheduling():
+    updater = ConfigUpdater()
+    assert dict(updater.save_callback(
+        'OpsiScheduling.OpsiScheduling.OperationCoinsPreserve', 30000)) == {
+        'OpsiHazard1Leveling.OpsiHazard1Leveling.OperationCoinsPreserve': 30000,
+    }
+    assert dict(updater.save_callback(
+        'OpsiHazard1Leveling.OpsiHazard1Leveling.OperationCoinsPreserve', 40000)) == {
+        'OpsiScheduling.OpsiScheduling.OperationCoinsPreserve': 40000,
+    }
 
 
 def test_cl1_line_is_independent_from_the_coin_task_line():

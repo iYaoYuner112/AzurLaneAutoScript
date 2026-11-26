@@ -55,6 +55,7 @@ class Cl1RoundStub(PendingEventStub):
             check_task_switch=lambda: None,
             OS_ACTION_POINT_PRESERVE=200,
             OpsiHazard1Leveling_MinimumActionPointReserve=200,
+            OpsiHazard1Leveling_OperationCoinsPreserve=20000,
             OpsiScheduling_OperationCoinsPreserve=20000,
             OpsiGeneral_BuyActionPointLimit=0,
             OpsiHazard1Leveling_TargetZone=44,
@@ -156,6 +157,22 @@ def test_non_scheduling_low_coins_delays_and_calls_other_tasks():
 
 def test_non_scheduling_enough_coins_returns_without_stopping():
     stub = Cl1RoundStub(proxy=False, smart=False, yellow_coins=999999)
+    assert OpsiHazard1Leveling._cl1_resource_check(stub) is None
+    assert stub.calls == ['yellow_coins']
+
+
+def test_standalone_cl1_uses_hazard1_operation_coins_preserve():
+    """独立侵蚀一的黄币开工线读任务页的保留凭证。"""
+    stub = Cl1RoundStub(proxy=False, smart=False, yellow_coins=49999)
+    stub.config.OpsiHazard1Leveling_OperationCoinsPreserve = 50000
+    try:
+        stub._cl1_resource_check()
+    except TaskEnd:
+        pass
+    assert 'stop' in stub.calls
+
+    stub = Cl1RoundStub(proxy=False, smart=False, yellow_coins=50000)
+    stub.config.OpsiHazard1Leveling_OperationCoinsPreserve = 50000
     assert OpsiHazard1Leveling._cl1_resource_check(stub) is None
     assert stub.calls == ['yellow_coins']
 
