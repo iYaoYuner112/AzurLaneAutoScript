@@ -31,13 +31,10 @@ from module.os.tasks.scheduling import (
 class PreserveStub:
     """只提供 _meow_preserve_value 需要的配置。"""
 
-    def __init__(self, smart_scheduling=True,
-                 scheduling_meow=1000, task_meow=1000):
+    def __init__(self, task_meow=1000):
         self.config = SimpleNamespace(
-            OpsiScheduling_MeowfficerActionPointPreserve=scheduling_meow,
             OpsiMeowfficerFarming_ActionPointPreserve=task_meow,
         )
-        self.is_smart_scheduling_enabled = smart_scheduling
 
 
 class TestMeowPreserveValue(unittest.TestCase):
@@ -53,13 +50,9 @@ class TestMeowPreserveValue(unittest.TestCase):
             OpsiMeowfficerFarming._meow_preserve_value(PreserveStub(), 0), 0)
 
     def test_standalone_round_keeps_its_own_setting(self):
-        """独立跑短猫（智能调度关着）：仍按短猫任务自己的保留值。"""
-        stub = PreserveStub(smart_scheduling=False, task_meow=1000)
-        self.assertEqual(OpsiMeowfficerFarming._meow_preserve_value(stub), 1000)
-
-    def test_standalone_under_scheduling_uses_the_scheduling_meow_reserve(self):
-        stub = PreserveStub(smart_scheduling=True, scheduling_meow=1000)
-        self.assertEqual(OpsiMeowfficerFarming._meow_preserve_value(stub), 1000)
+        """不代跑时按短猫任务自己的保留值，智能调度开着也一样（对齐 AzurPilot）。"""
+        stub = PreserveStub(task_meow=500)
+        self.assertEqual(OpsiMeowfficerFarming._meow_preserve_value(stub), 500)
 
 
 class _Backup(object):

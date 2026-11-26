@@ -53,40 +53,45 @@ def decide_resource_action(
         total_ap,
         coin_preserve,
         coin_return_threshold,
-        ap_preserve,
-        meow_ap_preserve,
+        cl1_ap_preserve,
+        coin_ap_preserve,
         coin_target_mode,
         coin_replenish_active,
         ap_replenish_active=False,
 ):
     """Choose the next Operation Siren action from current coin and AP totals.
 
+    `cl1_ap_preserve` is the corrosion-1 leveling line, `coin_ap_preserve` is
+    the line for coin replenishment tasks. They can differ (AzurPilot keeps
+    them in separate settings): coins are only worth farming above the coin
+    line, while corrosion 1 can keep burning AP down to its own line.
+
     Returns:
         tuple[str, bool, bool]: (action, coin_replenish_active, ap_replenish_active)
     """
     coin_preserve = max(int(coin_preserve), 0)
     coin_return_threshold = max(int(coin_return_threshold), 0)
-    ap_preserve = max(int(ap_preserve), 0)
-    meow_ap_preserve = max(int(meow_ap_preserve), 0)
+    cl1_ap_preserve = max(int(cl1_ap_preserve), 0)
+    coin_ap_preserve = max(int(coin_ap_preserve), 0)
 
-    if total_ap <= ap_preserve:
+    if total_ap <= cl1_ap_preserve:
         return 'wait', coin_replenish_active, ap_replenish_active
 
     if coin_target_mode:
         coin_replenish_active = coin_replenish_active or yellow_coins < coin_preserve
         coin_target = coin_preserve + coin_return_threshold
         if coin_replenish_active and yellow_coins < coin_target:
-            if total_ap <= meow_ap_preserve:
+            if total_ap <= coin_ap_preserve:
                 return 'wait', True, ap_replenish_active
             return 'meow', True, ap_replenish_active
         return 'cl1', False, ap_replenish_active
 
     # Action point scheduling (non coin-target): once coins drop below the
-    # preserve value, keep replenishing coins until AP drops to the meow preserve
+    # preserve value, keep replenishing coins until AP drops to the coin line
     # (hysteresis), matching AzurPilot's ap_replenish_active.
     if yellow_coins < coin_preserve or ap_replenish_active:
         ap_replenish_active = True
-        if total_ap <= meow_ap_preserve:
+        if total_ap <= coin_ap_preserve:
             ap_replenish_active = False
             if yellow_coins < coin_preserve:
                 return 'wait', coin_replenish_active, False
@@ -246,22 +251,18 @@ class OpsiScheduling(OSMap):
     def _get_coin_task_action_point_preserve(self) -> int:
         """Total AP a coin replenish task needs before it may start.
 
-        The scheduler's own line rules, and the meowfficer line is only a
-        fallback for when that line is switched off (0) -- this is AzurPilot's
-        precedence (`_get_coin_task_action_point_preserve`).
+        The scheduler's own line rules; the meowfficer task's own reserve is
+        only a fallback for when that line is switched off (0) -- this is
+        AzurPilot's precedence (`_get_coin_task_action_point_preserve`).
         """
         ap_preserve = max(int(self.config.OpsiScheduling_ActionPointPreserve), 0)
         if ap_preserve > 0:
             return ap_preserve
-        return max(int(self.config.OpsiScheduling_MeowfficerActionPointPreserve), 0)
+        return max(int(self.config.OpsiMeowfficerFarming_ActionPointPreserve), 0)
 
-    def _get_scheduled_meow_ap_preserve(self) -> int:
-        """This round's coin-task AP line, exactly as configured.
-
-        AzurPilot neither caps this line nor lowers it at month end (it has no
-        `get_action_point_limit()` at all), so the reserve is used as-is.
-        """
-        return self._get_coin_task_action_point_preserve()
+    def _get_cl1_ap_preserve(self) -> int:
+        """Corrosion 1 leveling's own AP line, used standalone and when proxied."""
+        return max(int(self.config.OpsiHazard1Leveling_MinimumActionPointReserve), 0)
 
     def _get_coin_replenish_target(self) -> int:
         """本轮补黄币的目标值：目标模式按 保留值 + 回补阈值，否则就是保留值。"""
@@ -391,7 +392,7 @@ class OpsiScheduling(OSMap):
             return OpsiTaskResult(OpsiStatus.NO_CONTENT, task=task_name, reason='no content')
         return OpsiTaskResult(OpsiStatus.SUCCESS, task=task_name, map_changed=True)
 
-    def _dispatch_coin_task(self, yellow_coins, total_ap, meow_ap_preserve, current_ap) -> OpsiTaskResult:
+    def _dispatch_coin_task(self, yellow_coins, total_ap, coin_ap_preserve, current_ap) -> OpsiTaskResult:
         """Try enabled coin tasks in TaskPriority order, run one round of the first
         candidate that has content, and report its result.
 
@@ -416,13 +417,13 @@ class OpsiScheduling(OSMap):
 
             logger.info(f'[大世界-调度] 选择任务: {task_name}（原因: COIN_REPLENISH）')
             result = self._run_scheduled_coin_task_once(
-                task_name, meow_ap_preserve,
+                task_name, coin_ap_preserve,
                 fresh_ap=(total_ap, current_ap) if current_ap is not None else None,
             )
             if result.executed:
                 notify_coin_task_proxy(
                     self, yellow_coins, total_ap,
-                    self._get_coin_replenish_target(), meow_ap_preserve, task_name)
+                    self._get_coin_replenish_target(), coin_ap_preserve, task_name)
                 return result
             skipped.append(task_name)
 
@@ -463,7 +464,7 @@ class OpsiScheduling(OSMap):
         try:
             with opsi_task_context(self.config, TASK_NAME_HAZARD1_LEVELING, disable_task_switch=False):
                 # 把决策刚读到的行动力交给子任务，它在同一个面板里完成开工检查；
-                # ap_preserve 透传给子任务（防溢出要花光，正常调度传 None）
+                # ap_preserve 透传侵蚀一保留线，子任务不再自行读取配置
                 self.os_hazard1_leveling(fresh_ap=(total_ap, current_ap),
                                          ap_preserve=ap_preserve)
         except OpsiNoContent as e:
@@ -629,7 +630,8 @@ class OpsiScheduling(OSMap):
 
     def _run_opsi_scheduler_decision(self, yellow_coins, total_ap, current_ap):
         """使用首读的行动力做决策；面板在实际地图操作之前关闭或合并开工补充。"""
-        meow_ap_preserve = self._get_scheduled_meow_ap_preserve()
+        cl1_ap_preserve = self._get_cl1_ap_preserve()
+        coin_ap_preserve = self._get_coin_task_action_point_preserve()
 
         state = self._get_smart_state()
         coin_replenish_active = bool(state.get(STATE_KEY_COIN_REPLENISH, False))
@@ -641,8 +643,8 @@ class OpsiScheduling(OSMap):
             total_ap=total_ap,
             coin_preserve=self.config.OpsiScheduling_OperationCoinsPreserve,
             coin_return_threshold=self.config.OpsiScheduling_OperationCoinsReturnThreshold,
-            ap_preserve=self.config.OpsiScheduling_ActionPointPreserve,
-            meow_ap_preserve=meow_ap_preserve,
+            cl1_ap_preserve=cl1_ap_preserve,
+            coin_ap_preserve=coin_ap_preserve,
             coin_target_mode=coin_target_mode,
             coin_replenish_active=coin_replenish_active,
             ap_replenish_active=ap_replenish_active,
@@ -664,8 +666,8 @@ class OpsiScheduling(OSMap):
         logger.info(
             f'[大世界-调度] 黄币={yellow_coins}, AP={total_ap}, '
             f'黄币保留={self.config.OpsiScheduling_OperationCoinsPreserve}, '
-            f'行动力保留={self.config.OpsiScheduling_ActionPointPreserve}, '
-            f'补黄币保留={meow_ap_preserve}, 补黄币模式={coin_target_mode}, '
+            f'侵蚀一保留={cl1_ap_preserve}, '
+            f'补黄币保留={coin_ap_preserve}, 补黄币模式={coin_target_mode}, '
             f'coin_replenish_active={coin_replenish_active}, '
             f'ap_replenish_active={ap_replenish_active}')
 
@@ -699,18 +701,17 @@ class OpsiScheduling(OSMap):
             # 否则本轮只是撞在行动力保留线上（对齐 AP 的两条分支条件）。
             coin_preserve = int(self.config.OpsiScheduling_OperationCoinsPreserve)
             coins_short = coin_replenish_active or yellow_coins < coin_preserve
-            if coins_short and total_ap <= meow_ap_preserve:
+            if coins_short and total_ap <= coin_ap_preserve:
                 notify_coins_ap_insufficient(
                     self, yellow_coins, total_ap,
-                    self._get_coin_replenish_target(), meow_ap_preserve)
+                    self._get_coin_replenish_target(), coin_ap_preserve)
             else:
-                notify_ap_insufficient(
-                    self, total_ap, int(self.config.OpsiScheduling_ActionPointPreserve))
+                notify_ap_insufficient(self, total_ap, cl1_ap_preserve)
             self._delay_to_server_update('行动力不足')
             self.config.task_stop()
 
         if action == 'meow':
-            result = self._dispatch_coin_task(yellow_coins, total_ap, meow_ap_preserve, current_ap)
+            result = self._dispatch_coin_task(yellow_coins, total_ap, coin_ap_preserve, current_ap)
             if result.status == OpsiStatus.NO_TASK:
                 self._delay_to_server_update('未启用黄币补充任务')
                 self.config.task_stop()
@@ -722,7 +723,8 @@ class OpsiScheduling(OSMap):
                 logger.warning(f'[大世界-调度] {TASK_NAME_HAZARD1_LEVELING} 未在智能调度中启用')
                 self._delay_to_server_update('侵蚀1练级未启用')
                 self.config.task_stop()
-            result = self._execute_hazard1_leveling_once(yellow_coins, total_ap, current_ap)
+            result = self._execute_hazard1_leveling_once(
+                yellow_coins, total_ap, current_ap, ap_preserve=cl1_ap_preserve)
 
         self._handle_opsi_task_result(result)
 

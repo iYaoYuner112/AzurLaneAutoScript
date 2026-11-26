@@ -469,6 +469,7 @@ class GeneratedConfig:
 
     # Group `OpsiHazard1Leveling`
     OpsiHazard1Leveling_TargetZone = 0  # 0, 44, 22
+    OpsiHazard1Leveling_MinimumActionPointReserve = 200
     OpsiHazard1Leveling_ExecuteFixedPatrolScan = False
     OpsiHazard1Leveling_PendingMapEvent = None
 
@@ -481,7 +482,6 @@ class GeneratedConfig:
     OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True  # True, False
     OpsiScheduling_OperationCoinsPreserve = 20000
     OpsiScheduling_ActionPointPreserve = 200
-    OpsiScheduling_MeowfficerActionPointPreserve = 1000
     OpsiScheduling_OperationCoinsReturnThreshold = 60000
     OpsiScheduling_EnableMeowfficerFarming = True  # True, False
     OpsiScheduling_EnableHazard1Leveling = True  # True, False

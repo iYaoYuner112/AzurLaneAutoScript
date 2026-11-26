@@ -12,8 +12,8 @@ def decide(yellow_coins, total_ap, active=False, coin_target_mode=True, ap_activ
         total_ap=total_ap,
         coin_preserve=20000,
         coin_return_threshold=60000,
-        ap_preserve=200,
-        meow_ap_preserve=1000,
+        cl1_ap_preserve=200,
+        coin_ap_preserve=1000,
         coin_target_mode=coin_target_mode,
         coin_replenish_active=active,
         ap_replenish_active=ap_active,
@@ -59,8 +59,8 @@ def decide_at_coin_line(gate, yellow_coins, total_ap, active=False):
         total_ap=total_ap,
         coin_preserve=20000,
         coin_return_threshold=60000,
-        ap_preserve=200,
-        meow_ap_preserve=gate,
+        cl1_ap_preserve=200,
+        coin_ap_preserve=gate,
         coin_target_mode=True,
         coin_replenish_active=active,
         ap_replenish_active=False,
@@ -78,17 +78,27 @@ def test_ap_band_between_the_two_lines_now_replenishes_coins():
 class CoinGateStub:
     """只提供补黄币开工线计算所需的 config。
 
-    两个计算函数直接借用生产实现：这条线由「调度保留线 → 回退短猫保留线」两步
-    组成，只测其中一步会漏掉它们之间的衔接。AzurPilot 不封顶也不做月末降线。
+    补币线由「调度保留线 → 回退短猫任务自己的保留线」两步组成，只测其中一步
+    会漏掉它们之间的衔接。AzurPilot 不封顶也不做月末降线。
     """
 
     _get_coin_task_action_point_preserve = OpsiScheduling._get_coin_task_action_point_preserve
-    _get_scheduled_meow_ap_preserve = OpsiScheduling._get_scheduled_meow_ap_preserve
 
     def __init__(self, ap_preserve, meow_preserve):
         self.config = SimpleNamespace(
             OpsiScheduling_ActionPointPreserve=ap_preserve,
-            OpsiScheduling_MeowfficerActionPointPreserve=meow_preserve,
+            OpsiMeowfficerFarming_ActionPointPreserve=meow_preserve,
+        )
+
+
+class Cl1GateStub:
+    """只提供侵蚀一保留线计算所需的 config。"""
+
+    _get_cl1_ap_preserve = OpsiScheduling._get_cl1_ap_preserve
+
+    def __init__(self, reserve):
+        self.config = SimpleNamespace(
+            OpsiHazard1Leveling_MinimumActionPointReserve=reserve,
         )
 
 
@@ -96,16 +106,42 @@ def test_coin_task_start_line_follows_the_scheduler_reserve():
     assert OpsiScheduling._get_coin_task_action_point_preserve(CoinGateStub(200, 1000)) == 200
 
 
-def test_coin_task_start_line_falls_back_to_the_meowfficer_reserve():
+def test_coin_task_start_line_falls_back_to_the_meowfficer_task_reserve():
     assert OpsiScheduling._get_coin_task_action_point_preserve(CoinGateStub(0, 1000)) == 1000
 
 
 def test_coin_task_start_line_is_used_as_configured():
     # 对齐 AzurPilot：线画多高就用多高，不截到 2000。
-    assert OpsiScheduling._get_scheduled_meow_ap_preserve(CoinGateStub(100000, 1000)) == 100000
+    assert OpsiScheduling._get_coin_task_action_point_preserve(CoinGateStub(100000, 1000)) == 100000
     # 也没有月末降线那一层，配置值原样传下去。
-    assert OpsiScheduling._get_scheduled_meow_ap_preserve(CoinGateStub(200, 1000)) == 200
-    assert OpsiScheduling._get_scheduled_meow_ap_preserve(CoinGateStub(0, 0)) == 0
+    assert OpsiScheduling._get_coin_task_action_point_preserve(CoinGateStub(200, 1000)) == 200
+    assert OpsiScheduling._get_coin_task_action_point_preserve(CoinGateStub(0, 0)) == 0
+
+
+def test_cl1_start_line_comes_from_the_hazard1_task_setting():
+    assert OpsiScheduling._get_cl1_ap_preserve(Cl1GateStub(200)) == 200
+    assert OpsiScheduling._get_cl1_ap_preserve(Cl1GateStub(500)) == 500
+    assert OpsiScheduling._get_cl1_ap_preserve(Cl1GateStub(-5)) == 0
+
+
+def test_cl1_line_is_independent_from_the_coin_task_line():
+    """黄币够时侵蚀一能烧到 200；黄币不够时补币任务仍按 500 的线停。"""
+    def decide(yellow_coins, coin_target_mode=True):
+        return decide_resource_action(
+            yellow_coins=yellow_coins,
+            total_ap=300,
+            coin_preserve=20000,
+            coin_return_threshold=60000,
+            cl1_ap_preserve=200,
+            coin_ap_preserve=500,
+            coin_target_mode=coin_target_mode,
+            coin_replenish_active=False,
+            ap_replenish_active=False,
+        )
+
+    assert decide(90000) == ('cl1', False, False)
+    assert decide(19000) == ('wait', True, False)
+    assert decide(19000, coin_target_mode=False) == ('wait', False, False)
 
 
 class FakeResourceConfig:

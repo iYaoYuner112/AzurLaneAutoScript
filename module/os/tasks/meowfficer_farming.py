@@ -60,9 +60,10 @@ class OpsiMeowfficerFarming(OSMap):
     def _meow_preserve_value(self, ap_preserve=None) -> int:
         """本轮短猫的行动力保留线（总行动力低于或等于它就停手）。
 
-        代跑时阈值由调度层给（对齐 AzurPilot 的 `ap_preserve` 传递），独立运行时
-        仍按配置读。不再叠加月末动态保留、也不封顶：AzurPilot 没有官源的
-        `get_action_point_limit()`，配置填多少就按多少停手。
+        代跑时阈值由调度层给（对齐 AzurPilot 的 `ap_preserve` 传递）；不传时
+        按短猫任务自己的配置读，和 AzurPilot 一致。不再叠加月末动态保留、
+        也不封顶：AzurPilot 没有官源的 `get_action_point_limit()`，配置填多少
+        就按多少停手。
 
         Args:
             ap_preserve (int | None): 智能调度本轮的补黄币开工线。
@@ -72,8 +73,6 @@ class OpsiMeowfficerFarming(OSMap):
         """
         if ap_preserve is not None:
             return int(ap_preserve)
-        if self.is_smart_scheduling_enabled:
-            return int(self.config.OpsiScheduling_MeowfficerActionPointPreserve)
         return int(self.config.OpsiMeowfficerFarming_ActionPointPreserve)
 
     def _run_meowfficer_farming(self, fresh_ap=None, ap_checked=False, ap_preserve=None):
@@ -365,6 +364,6 @@ class OpsiMeowfficerFarming(OSMap):
             OpsiTaskResult: 本轮结果。
         """
         if ap_preserve is None:
-            ap_preserve = self._get_scheduled_meow_ap_preserve()
+            ap_preserve = self._get_coin_task_action_point_preserve()
         return self._run_scheduled_coin_task_once(
             'OpsiMeowfficerFarming', int(ap_preserve), fresh_ap=fresh_ap)

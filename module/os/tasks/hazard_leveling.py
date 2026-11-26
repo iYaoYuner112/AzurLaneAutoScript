@@ -13,7 +13,8 @@ class OpsiHazard1Leveling(OSMap):
                 (总行动力, 当前行动力) 首读；用于在同一个行动力面板里确认开工、
                 跳过重复的弹窗往返。独立运行时为 None。
             ap_preserve (int | None): 调用方指定的行动力保留值，优先级最高。
-                防止行动力溢出传下限（要花光）；智能调度代跑传 None 走配置。
+                防止行动力溢出传下限（要花光）；智能调度代跑传侵蚀一保留线。
+                不传时读侵蚀一任务自己的配置。
         """
         logger.hr('OS hazard 1 leveling', level=1)
         # Without these enabled, CL1 gains 0 profits
@@ -26,14 +27,12 @@ class OpsiHazard1Leveling(OSMap):
         if ap_preserve is not None:
             logger.attr('侵蚀1行动力保留', int(ap_preserve))
         while True:
-            # 保留值优先级：调用方指定 > 智能调度配置 > 独立运行固定 200
+            # 保留值优先级：调用方指定（智能调度/防溢出） > 侵蚀一任务自己的配置
             if ap_preserve is not None:
                 self.config.OS_ACTION_POINT_PRESERVE = int(ap_preserve)
             else:
-                self.config.OS_ACTION_POINT_PRESERVE = (
-                    self.config.OpsiScheduling_ActionPointPreserve
-                    if self.is_smart_scheduling_enabled else 200
-                )
+                self.config.OS_ACTION_POINT_PRESERVE = int(
+                    self.config.OpsiHazard1Leveling_MinimumActionPointReserve)
             # 塞壬信标没收完时忽略保留值，是为了「先收信标」；但防止行动力溢出
             # 代跑时清零会把用户设的下限一并作废（实测会把行动力花光），
             # 所以这种放行只在正常代跑/独立运行时生效。

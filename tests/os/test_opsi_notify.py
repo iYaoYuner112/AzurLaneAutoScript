@@ -38,7 +38,8 @@ class StubConfig:
         self.OpsiGeneral_NotifyOpsiMail = notify_mail
         self.OS_ACTION_POINT_BOX_USE = False
         self.OpsiScheduling_ActionPointPreserve = 200
-        self.OpsiScheduling_MeowfficerActionPointPreserve = 0
+        self.OpsiHazard1Leveling_MinimumActionPointReserve = 200
+        self.OpsiMeowfficerFarming_ActionPointPreserve = 1000
         self.OpsiScheduling_OperationCoinsPreserve = 20000
         self.OpsiScheduling_OperationCoinsReturnThreshold = 60000
         self.OpsiScheduling_UseSmartSchedulingOperationCoinsPreserve = True
@@ -350,7 +351,7 @@ def make_decision_stub():
     stub.get_action_point_limit = lambda: 2000
     bind(
         stub,
-        '_run_opsi_scheduler_decision', '_get_scheduled_meow_ap_preserve',
+        '_run_opsi_scheduler_decision', '_get_cl1_ap_preserve',
         '_get_coin_task_action_point_preserve', '_get_coin_replenish_target',
         '_get_smart_state', '_save_smart_state', '_sync_scheduling_mode',
         '_decide_scheduling_mode', '_delay_to_server_update',

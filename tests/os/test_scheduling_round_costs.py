@@ -54,7 +54,7 @@ class Cl1RoundStub(PendingEventStub):
             task_stop=lambda: self._raise_stop(),
             check_task_switch=lambda: None,
             OS_ACTION_POINT_PRESERVE=200,
-            OpsiScheduling_ActionPointPreserve=200,
+            OpsiHazard1Leveling_MinimumActionPointReserve=200,
             OpsiScheduling_OperationCoinsPreserve=20000,
             OpsiGeneral_BuyActionPointLimit=0,
             OpsiHazard1Leveling_TargetZone=44,

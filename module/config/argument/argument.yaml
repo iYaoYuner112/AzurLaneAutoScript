@@ -818,6 +818,7 @@ OpsiHazard1Leveling:
   TargetZone:
     value: 0
     option: [ 0, 44, 22 ]
+  MinimumActionPointReserve: 200
   ExecuteFixedPatrolScan: false
   # 程序自维护的续查记录：卡死重启后补完“已经看见、但没处理完”的地图事件。
   # stored + hide 成对使用（同 OpsiDaily.MissionZones）。
@@ -840,7 +841,6 @@ OpsiScheduling:
     option: [true, false]
   OperationCoinsPreserve: 20000
   ActionPointPreserve: 200
-  MeowfficerActionPointPreserve: 1000
   OperationCoinsReturnThreshold: 60000
   EnableMeowfficerFarming:
     type: checkbox

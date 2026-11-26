@@ -9475,10 +9475,6 @@
         "type": "input",
         "value": 200
       },
-      "MeowfficerActionPointPreserve": {
-        "type": "input",
-        "value": 1000
-      },
       "OperationCoinsReturnThreshold": {
         "type": "input",
         "value": 60000
@@ -9697,6 +9693,10 @@
           44,
           22
         ]
+      },
+      "MinimumActionPointReserve": {
+        "type": "input",
+        "value": 200
       },
       "ExecuteFixedPatrolScan": {
         "type": "checkbox",
