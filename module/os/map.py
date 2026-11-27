@@ -676,8 +676,8 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
         else:
             is_interrupt, not_interrupt = false_func, false_func
         finished_combat = 0
+        walk_counter = 0
         died_timer = Timer(1.5, count=3)
-        self.walk_counter_changed(reset=True)
         self.device.stuck_record_clear()
         self.hp_reset()
         for _ in self.loop():
@@ -689,8 +689,6 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                 raise RequestHumanTakeover
             if self.is_in_map():
                 if not success:
-                    self.walk_counter_changed(reset=True)
-                    self.device.stuck_record_clear()
                     if died_timer.reached():
                         logger.warning('Fleet died confirm')
                         break
@@ -701,15 +699,11 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                         interrupt_confirm = False
                     died_timer.reset()
                     if self.match_template_color(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120)):
-                        # An enabled auto button alone does not prove the fleet is moving.
-                        if self.walk_counter_changed():
+                        counter = self.get_walk_counter()
+                        if counter != walk_counter:
+                            walk_counter = counter
                             self.device.stuck_record_clear()
-                    elif self.match_template_color(AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120)) \
-                            or self.match_template_color(AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120)):
-                        self.walk_counter_changed(reset=True)
-                        self.device.stuck_record_clear()
             else:
-                self.walk_counter_changed(reset=True)
                 died_timer.reset()
 
             if not unlock_checked:
@@ -729,16 +723,13 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                     drop=drop,
                     enable=success
             ):
-                self.walk_counter_changed(reset=True)
                 unlock_checked = True
                 continue
             if self.handle_retirement():
                 # Retire will interrupt auto search, need a retry
-                self.walk_counter_changed(reset=True)
                 self.ash_popup_canceled = True
                 continue
             if self.combat_appear():
-                self.walk_counter_changed(reset=True)
                 self.on_auto_search_battle_count_add()
                 if self._os_auto_search_should_interrupt(strategic):
                     self.interrupt_auto_search()
@@ -755,7 +746,6 @@ class OSMap(MapEventResumeMixin, OSFleet, Map, GlobeCamera, StrategicSearchHandl
                         continue
             if self.handle_map_event():
                 # Auto search can not handle siren searching device.
-                self.walk_counter_changed(reset=True)
                 continue
 
         return finished_combat
